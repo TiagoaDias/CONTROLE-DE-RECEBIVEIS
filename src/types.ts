@@ -22,6 +22,7 @@ export interface UserAccount {
   authProvider: 'local' | 'gmail' | 'facebook' | 'whatsapp';
   isFirstLogin?: boolean;
   hasSeenWelcome?: boolean;
+  welcomeCompletedAt?: string;
   createdAt: string;
   companyName?: string;
   city?: string;

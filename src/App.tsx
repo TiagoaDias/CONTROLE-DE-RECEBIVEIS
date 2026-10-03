@@ -21,14 +21,19 @@ import {
   saveUserToFirestore,
   getUserFromFirestore,
   saveDebtorsToFirestore,
+  saveSingleDebtorToFirestore,
   getDebtorsFromFirestore,
   deleteDebtorFromFirestore,
   savePurchasesToFirestore,
+  saveSinglePurchaseToFirestore,
   getPurchasesFromFirestore,
   saveInstallmentsToFirestore,
+  saveSingleInstallmentToFirestore,
+  deleteInstallmentFromFirestore,
   getInstallmentsFromFirestore,
   saveAuthRecordToFirestore,
   clearAllUserDataFromFirestore,
+  markWelcomeCompletedInFirestore,
   logoutSession,
   TIAGO_DIAS_USER,
   auth,
@@ -122,18 +127,8 @@ export default function App() {
     return null;
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
-  const [isWelcomeOpen, setIsWelcomeOpen] = useState<boolean>(() => {
-    try {
-      const saved = localStorage.getItem('haspaho_auth_user');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        return Boolean(parsed.isFirstLogin && !parsed.hasSeenWelcome);
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return false;
-  });
+  // A apresentação inicia sempre como fechada no carregamento para nunca reaparecer em reload
+  const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
 
   // Domain data in state - with robust LocalStorage persistence and fallback per user ID
   const [debtors, setDebtors] = useState<Debtor[]>(() => {
@@ -206,11 +201,12 @@ export default function App() {
 
   const isInitialLoadRef = useRef(true);
 
-  // Enforce Firebase Auth as the single source of truth for identity
+  // Enforce Firebase Auth session listener without wiping valid local user sessions
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       if (fbUser) {
         const authUid = fbUser.uid;
+        console.log('[Auth:SESSION_ACTIVE] Firebase Auth session detected for UID:', authUid);
         setCurrentUser((prev) => {
           if (!prev || prev.id !== authUid) {
             try {
@@ -233,11 +229,20 @@ export default function App() {
           return prev;
         });
       } else {
-        // No active Firebase Auth session - clear user and private data
+        // No active Firebase Auth session - check if user is logged in locally
+        try {
+          const saved = localStorage.getItem('haspaho_auth_user');
+          if (saved) {
+            const parsed = JSON.parse(saved);
+            if (parsed && parsed.id) {
+              console.log('[Auth:LOCAL_SESSION] Restoring local user session:', parsed.name || parsed.email);
+              setCurrentUser(parsed);
+              return;
+            }
+          }
+        } catch {}
+        console.log('[Auth:NO_SESSION] No active user session.');
         setCurrentUser(null);
-        setDebtors([]);
-        setPurchases([]);
-        setInstallments([]);
       }
     });
     return () => unsubscribe();
@@ -246,27 +251,49 @@ export default function App() {
   // Sync initial user data from Firebase Firestore
   useEffect(() => {
     const activeUser = currentUser;
-    const authUid = auth.currentUser?.uid;
-    if (!activeUser || !authUid || activeUser.id !== authUid) return;
+    if (!activeUser || !activeUser.id) {
+      isInitialLoadRef.current = false;
+      return;
+    }
     let isMounted = true;
 
     async function loadUserData(user: UserAccount) {
+      console.log(`[Firestore:LOAD_DATA] Loading data from database for user "${user.name}" (ID: ${user.id})...`);
       try {
-        if (!auth.currentUser || auth.currentUser.uid !== user.id) return;
-
         const remoteUser = await getUserFromFirestore(user.id);
         if (remoteUser && isMounted) {
+          console.log(`[Firestore:LOAD_DATA] User profile loaded from Firestore:`, remoteUser.email || remoteUser.name);
           setCurrentUser(remoteUser);
           localStorage.setItem('haspaho_auth_user', JSON.stringify(remoteUser));
+          if (remoteUser.hasSeenWelcome === true) {
+            localStorage.setItem(`haspaho_welcome_completed_${remoteUser.id}`, 'true');
+            setIsWelcomeOpen(false);
+          }
         } else {
+          console.log(`[Firestore:LOAD_DATA] Creating initial user profile in Firestore for ${user.id}...`);
           await saveUserToFirestore(user);
         }
 
         const [remoteDebtors, remotePurchases, remoteInstallments] = await Promise.all([
-          getDebtorsFromFirestore(user.id),
-          getPurchasesFromFirestore(user.id),
-          getInstallmentsFromFirestore(user.id),
+          getDebtorsFromFirestore(user.id).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Debtors read warning:', err);
+            return [];
+          }),
+          getPurchasesFromFirestore(user.id).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Purchases read warning:', err);
+            return [];
+          }),
+          getInstallmentsFromFirestore(user.id).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Installments read warning:', err);
+            return [];
+          }),
         ]);
+
+        console.log(`[Firestore:LOAD_DATA] Retrieved from Firestore:`, {
+          debtors: remoteDebtors?.length || 0,
+          purchases: remotePurchases?.length || 0,
+          installments: remoteInstallments?.length || 0,
+        });
 
         if (isMounted) {
           const isMaster = user.id === 'usr_thiago_dias' || user.email === 'tiagodias8888@gmail.com';
@@ -279,13 +306,38 @@ export default function App() {
               }))
             );
           } else {
-            setDebtors(isMaster ? INITIAL_DEBTORS : []);
+            // Se não houver devedores no Firestore, verificar se há dados locais para sincronizar
+            const localSaved = localStorage.getItem(`haspaho_debtors_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_debtors') : null);
+            if (localSaved) {
+              try {
+                const parsed = JSON.parse(localSaved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setDebtors(parsed);
+                  saveDebtorsToFirestore(user.id, parsed).catch((e) => console.warn('Sync debtors warning:', e));
+                }
+              } catch {}
+            } else if (isMaster) {
+              setDebtors(INITIAL_DEBTORS);
+              saveDebtorsToFirestore(user.id, INITIAL_DEBTORS).catch((e) => console.warn('Init master debtors warning:', e));
+            }
           }
 
           if (remotePurchases && remotePurchases.length > 0) {
             setPurchases(remotePurchases);
           } else {
-            setPurchases(isMaster ? INITIAL_PURCHASES : []);
+            const localSaved = localStorage.getItem(`haspaho_purchases_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_purchases') : null);
+            if (localSaved) {
+              try {
+                const parsed = JSON.parse(localSaved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setPurchases(parsed);
+                  savePurchasesToFirestore(user.id, parsed).catch((e) => console.warn('Sync purchases warning:', e));
+                }
+              } catch {}
+            } else if (isMaster) {
+              setPurchases(INITIAL_PURCHASES);
+              savePurchasesToFirestore(user.id, INITIAL_PURCHASES).catch((e) => console.warn('Init master purchases warning:', e));
+            }
           }
 
           if (remoteInstallments && remoteInstallments.length > 0) {
@@ -313,23 +365,27 @@ export default function App() {
               })
             );
           } else {
-            setInstallments(isMaster ? INITIAL_INSTALLMENTS : []);
-          }
-
-          // Se o banco ainda não foi inicializado para o usuário Mestre, salvar os dados iniciais uma única vez
-          const hasInitKey = `haspaho_db_init_${user.id}`;
-          if (isMaster && !localStorage.getItem(hasInitKey) && (!remoteDebtors || remoteDebtors.length === 0)) {
-            localStorage.setItem(hasInitKey, 'true');
-            saveDebtorsToFirestore(user.id, INITIAL_DEBTORS).catch(() => {});
-            savePurchasesToFirestore(user.id, INITIAL_PURCHASES).catch(() => {});
-            saveInstallmentsToFirestore(user.id, INITIAL_INSTALLMENTS).catch(() => {});
+            const localSaved = localStorage.getItem(`haspaho_installments_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_installments') : null);
+            if (localSaved) {
+              try {
+                const parsed = JSON.parse(localSaved);
+                if (Array.isArray(parsed) && parsed.length > 0) {
+                  setInstallments(parsed);
+                  saveInstallmentsToFirestore(user.id, parsed).catch((e) => console.warn('Sync installments warning:', e));
+                }
+              } catch {}
+            } else if (isMaster) {
+              setInstallments(INITIAL_INSTALLMENTS);
+              saveInstallmentsToFirestore(user.id, INITIAL_INSTALLMENTS).catch((e) => console.warn('Init master installments warning:', e));
+            }
           }
         }
       } catch (err) {
-        console.error('[Firebase Sync Error]:', err);
+        console.error('[Firestore:LOAD_DATA_ERROR]:', err);
       } finally {
         if (isMounted) {
           isInitialLoadRef.current = false;
+          console.log('[Firestore:LOAD_DATA] Initial data load complete. Live auto-sync is ready.');
         }
       }
     }
@@ -343,7 +399,7 @@ export default function App() {
 
   // Auto-sync subsequent changes to LocalStorage and Firestore
   useEffect(() => {
-    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    const activeUserId = currentUser?.id;
     if (!activeUserId) return;
 
     // Salvar sempre imediatamente no LocalStorage
@@ -359,12 +415,16 @@ export default function App() {
       console.error('LocalStorage error:', e);
     }
 
-    if (isInitialLoadRef.current) return;
+    if (isInitialLoadRef.current) {
+      console.log('[Firestore:AUTO_SYNC] Waiting for initial load to finish...');
+      return;
+    }
 
     const timer = setTimeout(() => {
-      saveDebtorsToFirestore(activeUserId, debtors).catch((err) => console.warn(err));
-      savePurchasesToFirestore(activeUserId, purchases).catch((err) => console.warn(err));
-      saveInstallmentsToFirestore(activeUserId, installments).catch((err) => console.warn(err));
+      console.log(`[Firestore:AUTO_SYNC] Syncing current state to Firestore for user: ${activeUserId}...`);
+      saveDebtorsToFirestore(activeUserId, debtors).catch((err) => console.error('[Firestore:AUTO_SYNC_DEBTORS_FAIL]', err));
+      savePurchasesToFirestore(activeUserId, purchases).catch((err) => console.error('[Firestore:AUTO_SYNC_PURCHASES_FAIL]', err));
+      saveInstallmentsToFirestore(activeUserId, installments).catch((err) => console.error('[Firestore:AUTO_SYNC_INSTALLMENTS_FAIL]', err));
     }, 500);
 
     return () => clearTimeout(timer);
@@ -675,26 +735,33 @@ export default function App() {
       setInstallments(updatedAllInstallments);
 
       // Update debtor owed total & active purchases
-      setDebtors((prev) =>
-        prev.map((d) => {
-          if (d.id === existingDebtor.id) {
-            const updatedOwed = d.totalOwed + totalAmount;
-            const updatedActivePurchases = (d.activePurchases || 0) + 1;
-            const tempDebtor = { ...d, totalOwed: updatedOwed, activePurchases: updatedActivePurchases };
-            const alert = evaluateSpendingAlert(tempDebtor, [newPurchase, ...purchases], updatedAllInstallments);
-            const scoreResult = calculateDebtorScore(tempDebtor, updatedAllInstallments.filter((i) => i.debtorId === d.id));
+      const updatedDebtors = debtors.map((d) => {
+        if (d.id === existingDebtor.id) {
+          const updatedOwed = d.totalOwed + totalAmount;
+          const updatedActivePurchases = (d.activePurchases || 0) + 1;
+          const tempDebtor = { ...d, totalOwed: updatedOwed, activePurchases: updatedActivePurchases };
+          const alert = evaluateSpendingAlert(tempDebtor, [newPurchase, ...purchases], updatedAllInstallments);
+          const scoreResult = calculateDebtorScore(tempDebtor, updatedAllInstallments.filter((i) => i.debtorId === d.id));
 
-            return {
-              ...tempDebtor,
-              spendingAlert: alert.isAlert,
-              spendingAlertMessage: alert.message,
-              score: scoreResult.score,
-              scoreTier: scoreResult.tier,
-            };
-          }
-          return d;
-        })
-      );
+          return {
+            ...tempDebtor,
+            spendingAlert: alert.isAlert,
+            spendingAlertMessage: alert.message,
+            score: scoreResult.score,
+            scoreTier: scoreResult.tier,
+          };
+        }
+        return d;
+      });
+      setDebtors(updatedDebtors);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveDebtorsToFirestore(activeUserId, updatedDebtors).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, [newPurchase, ...purchases]).catch(console.warn);
+        saveInstallmentsToFirestore(activeUserId, updatedAllInstallments).catch(console.warn);
+      }
 
       setTargetDebtorId(existingDebtor.id);
       setCurrentTab('devedores');
@@ -743,8 +810,10 @@ export default function App() {
         attachmentsCount: 1,
       };
 
-      setDebtors((prev) => [newDebtor, ...prev]);
-      setPurchases((prev) => [newPurchase, ...prev]);
+      const updatedDebtors = [newDebtor, ...debtors];
+      const updatedPurchases = [newPurchase, ...purchases];
+      setDebtors(updatedDebtors);
+      setPurchases(updatedPurchases);
 
       const newInsts: Installment[] = [];
       const baseTimestamp = Date.now();
@@ -767,7 +836,17 @@ export default function App() {
         });
       }
 
-      setInstallments((prev) => [...newInsts, ...prev]);
+      const updatedAllInstallments = [...newInsts, ...installments];
+      setInstallments(updatedAllInstallments);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveDebtorsToFirestore(activeUserId, updatedDebtors).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, updatedPurchases).catch(console.warn);
+        saveInstallmentsToFirestore(activeUserId, updatedAllInstallments).catch(console.warn);
+      }
+
       setTargetDebtorId(targetDebtorIdStr);
       setCurrentTab('devedores');
       showToast(`✨ Novo devedor "${data.name}" e compra "${data.purchaseProduct}" cadastrados automaticamente via Portal do Devedor!`);
@@ -1010,10 +1089,25 @@ export default function App() {
     }
   };
 
-  const handleConfirmDeleteInstallment = (inst: Installment) => {
-    setInstallments((prev) => prev.filter((i) => i.id !== inst.id));
+  const handleConfirmDeleteInstallment = async (inst: Installment) => {
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    const nextInstallments = installments.filter((i) => i.id !== inst.id);
+    setInstallments(nextInstallments);
     setDeletingInstallmentTarget(null);
-    showToast('Parcela excluída com sucesso!');
+
+    try {
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      if (activeUserId) {
+        localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
+        deleteInstallmentFromFirestore(activeUserId, inst.id).catch((err) => console.warn('Delete inst firestore note:', err));
+        saveInstallmentsToFirestore(activeUserId, nextInstallments).catch((err) => console.warn('Sync insts note:', err));
+      }
+    } catch (e) {
+      console.warn('LocalStorage error on delete installment:', e);
+    }
+
+    addAuditLog('EXCLUSAO_PARCELA_DATABASE', `Parcela #${inst.installmentNumber} do produto "${inst.product}" excluída do banco.`, inst.debtorName, 'FIRESTORE_SAVED');
+    showToast('Parcela excluída com sucesso do sistema e do banco de dados!');
   };
 
   // Confirm payment submission with automatic score, late fee calculations
@@ -1145,7 +1239,21 @@ export default function App() {
   };
 
   const handleUpdateInstallment = (updatedInst: Installment) => {
-    setInstallments((prev) => prev.map((item) => (item.id === updatedInst.id ? updatedInst : item)));
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    const nextInstallments = installments.map((item) => (item.id === updatedInst.id ? updatedInst : item));
+    setInstallments(nextInstallments);
+
+    try {
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      if (activeUserId) {
+        localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
+        saveSingleInstallmentToFirestore(activeUserId, updatedInst).catch((err) => console.warn('Update inst note:', err));
+        saveInstallmentsToFirestore(activeUserId, nextInstallments).catch((err) => console.warn('Sync insts note:', err));
+      }
+    } catch (e) {
+      console.warn('LocalStorage error on update installment:', e);
+    }
+
     showToast(`Encargos da parcela #${updatedInst.installmentNumber} recalculados com sucesso!`);
   };
 
@@ -1414,13 +1522,35 @@ export default function App() {
       newDebtor.activePurchases = 1;
       newDebtor.nextDueDate = p.firstDueDate || new Date().toISOString().split('T')[0];
 
-      setPurchases((prev) => [newPurchase, ...prev]);
-      setInstallments((prev) => [...newInsts, ...prev]);
-      setDebtors([newDebtor, ...debtors]);
+      const nextPurchases = [newPurchase, ...purchases];
+      const nextInsts = [...newInsts, ...installments];
+      const nextDebtors = [newDebtor, ...debtors];
+
+      setPurchases(nextPurchases);
+      setInstallments(nextInsts);
+      setDebtors(nextDebtors);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, nextPurchases).catch(console.warn);
+        saveInstallmentsToFirestore(activeUserId, nextInsts).catch(console.warn);
+      }
+
       addAuditLog('CADASTRO_DEVEDOR_E_COMPRA', `Comprador "${newD.name}" e compra "${p.product}" safeToFixed(${instCount}x de R$ ${safeToFixed(instValue).replace('.', ',')}) cadastrados simultaneamente.`, newD.name, 'FIRESTORE_SAVED');
       showToast(`✨ Comprador "${newD.name}" e compra "${p.product}" cadastrados juntos com sucesso!`);
     } else {
-      setDebtors([newDebtor, ...debtors]);
+      const nextDebtors = [newDebtor, ...debtors];
+      setDebtors(nextDebtors);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveSingleDebtorToFirestore(activeUserId, newDebtor).catch(console.warn);
+        saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
+      }
+
       addAuditLog('CADASTRO_DEVEDOR_SISTEMA', `Novo devedor "${newD.name}" (CPF/CNPJ: ${newDebtor.cpfCnpj || 'N/A'}) cadastrado e salvo no banco Firestore.`, newD.name, 'FIRESTORE_SAVED');
       showToast(`✨ Comprador ${newD.name} cadastrado com sucesso!`);
     }
@@ -1434,20 +1564,39 @@ export default function App() {
 
   // Salvar alterações do devedor editado
   const handleSaveEditedDebtor = (updated: Debtor) => {
-    setDebtors((prev) => prev.map((d) => (d.id === updated.id ? updated : d)));
-    setInstallments((prev) =>
-      prev.map((i) =>
-        i.debtorId === updated.id
-          ? { ...i, debtorName: updated.name, debtorAvatar: updated.avatar }
-          : i
-      )
+    const nextDebtors = debtors.map((d) => (d.id === updated.id ? updated : d));
+    const nextInsts = installments.map((i) =>
+      i.debtorId === updated.id
+        ? { ...i, debtorName: updated.name, debtorAvatar: updated.avatar }
+        : i
     );
-    setPurchases((prev) =>
-      prev.map((p) =>
-        p.debtorId === updated.id ? { ...p, debtorName: updated.name } : p
-      )
+    const nextPurchases = purchases.map((p) =>
+      p.debtorId === updated.id ? { ...p, debtorName: updated.name } : p
     );
-    addAuditLog('EDICAO_DEVEDOR_SISTEMA', `Dados cadastrais do devedor "${updated.name}" atualizados no Firestore.`, updated.name, 'FIRESTORE_SAVED');
+
+    setDebtors(nextDebtors);
+    setInstallments(nextInsts);
+    setPurchases(nextPurchases);
+
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    try {
+      localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
+      localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInsts));
+      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInsts));
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // Direct Firestore sync
+    if (activeUserId) {
+      saveSingleDebtorToFirestore(activeUserId, updated).catch(console.warn);
+      saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
+      saveInstallmentsToFirestore(activeUserId, nextInsts).catch(console.warn);
+      savePurchasesToFirestore(activeUserId, nextPurchases).catch(console.warn);
+    }
+
+    addAuditLog('EDICAO_DEVEDOR_SISTEMA', `Dados cadastrais e foto do devedor "${updated.name}" atualizados no Firestore.`, updated.name, 'FIRESTORE_SAVED');
     showToast(`Devedor ${updated.name} atualizado com sucesso!`);
   };
 
@@ -1459,37 +1608,53 @@ export default function App() {
 
   // Handler para assinar o contrato digital
   const handleSignContract = (debtorId: string, signatureUrl: string, signDate: string) => {
-    setDebtors((prev) =>
-      prev.map((d) =>
-        d.id === debtorId
-          ? {
-              ...d,
-              contractSigned: true,
-              contractSignedDate: signDate,
-              contractSignatureUrl: signatureUrl,
-            }
-          : d
-      )
+    const nextDebtors = debtors.map((d) =>
+      d.id === debtorId
+        ? {
+            ...d,
+            contractSigned: true,
+            contractSignedDate: signDate,
+            contractSignatureUrl: signatureUrl,
+          }
+        : d
     );
+    setDebtors(nextDebtors);
+
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    if (activeUserId) {
+      const updated = nextDebtors.find((d) => d.id === debtorId);
+      if (updated) saveSingleDebtorToFirestore(activeUserId, updated).catch(console.warn);
+      saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
+    }
+
     showToast('Contrato digital assinado e registrado com sucesso!');
   };
 
   // Handler para atualizar dados do devedor (ex: pré-preenchimento para usuário leigo)
   const handleUpdateDebtorData = (debtorId: string, updatedData: Partial<Debtor>) => {
-    setDebtors((prev) =>
-      prev.map((d) => (d.id === debtorId ? { ...d, ...updatedData } : d))
-    );
+    const nextDebtors = debtors.map((d) => (d.id === debtorId ? { ...d, ...updatedData } : d));
+    setDebtors(nextDebtors);
+
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    if (activeUserId) {
+      const updated = nextDebtors.find((d) => d.id === debtorId);
+      if (updated) saveSingleDebtorToFirestore(activeUserId, updated).catch(console.warn);
+      saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
+    }
+
     if (updatedData.name) {
-      setInstallments((prev) =>
-        prev.map((i) =>
-          i.debtorId === debtorId ? { ...i, debtorName: updatedData.name! } : i
-        )
+      const nextInsts = installments.map((i) =>
+        i.debtorId === debtorId ? { ...i, debtorName: updatedData.name! } : i
       );
-      setPurchases((prev) =>
-        prev.map((p) =>
-          p.debtorId === debtorId ? { ...p, debtorName: updatedData.name! } : p
-        )
+      const nextPurchases = purchases.map((p) =>
+        p.debtorId === debtorId ? { ...p, debtorName: updatedData.name! } : p
       );
+      setInstallments(nextInsts);
+      setPurchases(nextPurchases);
+      if (activeUserId) {
+        saveInstallmentsToFirestore(activeUserId, nextInsts).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, nextPurchases).catch(console.warn);
+      }
     }
   };
 
@@ -1561,36 +1726,43 @@ export default function App() {
 
     // 3. Atualizar devedor existente ou cadastrar novo devedor
     if (existingDebtor) {
-      setDebtors((prev) =>
-        prev.map((d) => {
-          if (d.id === existingDebtor.id) {
-            const updatedOwed = d.totalOwed + totalAmount;
-            const updatedActive = (d.activePurchases || 0) + 1;
-            const tempDebtor = {
-              ...d,
-              totalOwed: updatedOwed,
-              activePurchases: updatedActive,
-              contractSigned: true,
-              contractSignedDate: parsed.contract.signDate || new Date().toLocaleDateString('pt-BR'),
-              contractHash: parsed.contract.authHash,
-              contractPreFilled: false,
-              documentNumber: parsed.debtor.cpf || d.documentNumber,
-              phone: parsed.debtor.phone || d.phone,
-              email: parsed.debtor.email || d.email,
-            };
-            const scoreRes = calculateDebtorScore(
-              tempDebtor,
-              updatedAllInstallments.filter((i) => i.debtorId === d.id)
-            );
-            return {
-              ...tempDebtor,
-              score: scoreRes.score,
-              scoreTier: scoreRes.tier,
-            };
-          }
-          return d;
-        })
-      );
+      const updatedDebtors = debtors.map((d) => {
+        if (d.id === existingDebtor.id) {
+          const updatedOwed = d.totalOwed + totalAmount;
+          const updatedActive = (d.activePurchases || 0) + 1;
+          const tempDebtor = {
+            ...d,
+            totalOwed: updatedOwed,
+            activePurchases: updatedActive,
+            contractSigned: true,
+            contractSignedDate: parsed.contract.signDate || new Date().toLocaleDateString('pt-BR'),
+            contractHash: parsed.contract.authHash,
+            contractPreFilled: false,
+            documentNumber: parsed.debtor.cpf || d.documentNumber,
+            phone: parsed.debtor.phone || d.phone,
+            email: parsed.debtor.email || d.email,
+          };
+          const scoreRes = calculateDebtorScore(
+            tempDebtor,
+            updatedAllInstallments.filter((i) => i.debtorId === d.id)
+          );
+          return {
+            ...tempDebtor,
+            score: scoreRes.score,
+            scoreTier: scoreRes.tier,
+          };
+        }
+        return d;
+      });
+      setDebtors(updatedDebtors);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveDebtorsToFirestore(activeUserId, updatedDebtors).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, [newPurchase, ...purchases]).catch(console.warn);
+        saveInstallmentsToFirestore(activeUserId, updatedAllInstallments).catch(console.warn);
+      }
     } else {
       const newDebtor: Debtor = {
         id: activeDebtorId,
@@ -1617,7 +1789,16 @@ export default function App() {
         contractHash: parsed.contract.authHash,
         contractPreFilled: false,
       };
-      setDebtors((prev) => [newDebtor, ...prev]);
+      const updatedDebtors = [newDebtor, ...debtors];
+      setDebtors(updatedDebtors);
+
+      // Direct Firestore sync
+      const activeUserId = currentUser?.id || DEFAULT_USER.id;
+      if (activeUserId) {
+        saveDebtorsToFirestore(activeUserId, updatedDebtors).catch(console.warn);
+        savePurchasesToFirestore(activeUserId, [newPurchase, ...purchases]).catch(console.warn);
+        saveInstallmentsToFirestore(activeUserId, updatedAllInstallments).catch(console.warn);
+      }
     }
 
     setTargetDebtorId(activeDebtorId);
@@ -1876,9 +2057,18 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
     setIsAuthOpen(false);
-    if (isNewAccount || user.isFirstLogin || !user.hasSeenWelcome) {
+
+    // Controle estrito de apresentação: exibida APENAS no primeiro acesso de cada usuário
+    const completedLocally = localStorage.getItem(`haspaho_welcome_completed_${user.id}`) === 'true';
+    const completedRemotely = user.hasSeenWelcome === true;
+    const isFirstAccess = (isNewAccount || user.isFirstLogin === true) && !completedLocally && !completedRemotely;
+
+    if (isFirstAccess) {
       setIsWelcomeOpen(true);
+    } else {
+      setIsWelcomeOpen(false);
     }
+
     try {
       await saveUserToFirestore(user);
     } catch (err) {
@@ -1930,16 +2120,34 @@ export default function App() {
     showToast('Perfil e dados sincronizados com o banco seguro!');
   };
 
-  const handleDismissWelcome = () => {
+  const handleDismissWelcome = async () => {
     setIsWelcomeOpen(false);
-    if (currentUser) {
-      const updated: UserAccount = {
-        ...currentUser,
-        isFirstLogin: false,
-        hasSeenWelcome: true,
-      };
-      setCurrentUser(updated);
-      localStorage.setItem('haspaho_auth_user', JSON.stringify(updated));
+    if (!currentUser) return;
+
+    const userId = currentUser.id;
+    const updatedUser: UserAccount = {
+      ...currentUser,
+      isFirstLogin: false,
+      hasSeenWelcome: true,
+      welcomeCompletedAt: new Date().toISOString(),
+    };
+
+    setCurrentUser(updatedUser);
+
+    try {
+      localStorage.setItem('haspaho_auth_user', JSON.stringify(updatedUser));
+      localStorage.setItem(`haspaho_welcome_completed_${userId}`, 'true');
+    } catch (e) {
+      console.warn('LocalStorage error:', e);
+    }
+
+    // Grava de forma permanente no Firebase Firestore vinculado ao UID
+    try {
+      await markWelcomeCompletedInFirestore(userId);
+      await saveUserToFirestore(updatedUser);
+      console.log(`[Firestore:WELCOME] Apresentação concluída para UID: ${userId}`);
+    } catch (err) {
+      console.error('[Firestore:WELCOME] Erro ao salvar status de apresentação:', err);
     }
   };
 
@@ -1948,18 +2156,20 @@ export default function App() {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-hidden">
         <FuturisticCosmicBackground />
-        <InitialWelcomeLoginScreen
-          currentUser={null}
-          debtors={[]}
-          installments={[]}
-          onLoginSuccess={(user, isNew) => {
-            handleLoginSuccess(user, isNew);
-            handleNavigate('dashboard');
-          }}
-          onEnterDashboard={() => handleNavigate('dashboard')}
-          onOpenGeminiScanner={() => setIsGeminiScannerOpen(true)}
-          onLogout={handleLogout}
-        />
+        <div className="w-full max-w-5xl relative z-20 pointer-events-auto">
+          <InitialWelcomeLoginScreen
+            currentUser={null}
+            debtors={[]}
+            installments={[]}
+            onLoginSuccess={(user, isNew) => {
+              handleLoginSuccess(user, isNew);
+              handleNavigate('dashboard');
+            }}
+            onEnterDashboard={() => handleNavigate('dashboard')}
+            onOpenGeminiScanner={() => setIsGeminiScannerOpen(true)}
+            onLogout={handleLogout}
+          />
+        </div>
 
         {/* Global Toast Notification */}
         {toastMessage && (
@@ -2040,9 +2250,6 @@ export default function App() {
             installments={installments}
             onLoginSuccess={(user, isNew) => {
               handleLoginSuccess(user, isNew);
-              if (isNew) {
-                setIsWelcomeOpen(true);
-              }
               handleNavigate('dashboard');
             }}
             onEnterDashboard={() => handleNavigate('dashboard')}
@@ -2303,7 +2510,7 @@ export default function App() {
 
       {/* Auth Screen (Login / Criar Novo Usuário / Gmail / Facebook / WhatsApp) */}
       <AuthScreen
-        isOpen={isAuthOpen || !currentUser}
+        isOpen={isAuthOpen}
         canClose={currentUser !== null}
         onClose={() => setIsAuthOpen(false)}
         onLoginSuccess={handleLoginSuccess}

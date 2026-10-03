@@ -237,13 +237,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           )}
 
           {mode === 'login' ? (
-            <div className="space-y-4">
+            <div className="space-y-4 relative z-10 pointer-events-auto">
               {/* Prominent Google Quick Login Button */}
               <button
                 type="button"
                 onClick={handleGoogleDirect}
                 disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
               >
                 <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                   <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
@@ -251,7 +251,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
                   <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                 </svg>
-                <span>Entrar com Google</span>
+                <span className="font-extrabold tracking-wide">ENTRAR COM GOOGLE</span>
               </button>
 
               {/* Prominent Facebook Quick Login Button */}
@@ -259,12 +259,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 type="button"
                 onClick={handleFacebookDirect}
                 disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
               >
                 <svg className="w-5 h-5 shrink-0" fill="#1877F2" viewBox="0 0 24 24">
                   <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                 </svg>
-                <span>Entrar com Facebook</span>
+                <span className="font-extrabold tracking-wide">ENTRAR COM FACEBOOK</span>
               </button>
 
               {/* Prominent WhatsApp Quick Login Button */}
@@ -274,28 +274,28 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   setErrorMessage('O login com WhatsApp requer a ativação do provedor Telefone/SMS no Console do Firebase.');
                 }}
                 disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-emerald-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-emerald-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
               >
                 <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">chat</span>
-                <span>Entrar com WhatsApp</span>
+                <span className="font-extrabold tracking-wide">ENTRAR COM WHATSAPP</span>
               </button>
 
               <div className="relative flex items-center justify-center my-2">
                 <div className="border-t border-slate-200 w-full" />
-                <span className="bg-white px-3 text-[11px] text-slate-400 uppercase font-bold shrink-0">
-                  ou entre com e-mail
+                <span className="bg-white px-3 text-[11px] text-slate-500 uppercase font-bold shrink-0">
+                  ──────── ou entre com e-mail ────────
                 </span>
               </div>
 
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <form onSubmit={handleLoginSubmit} className="space-y-4 relative z-10">
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">E-mail ou Usuário</label>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">E-mail</label>
                   <input
                     type="text"
                     value={loginIdentifier}
                     onChange={(e) => setLoginIdentifier(e.target.value)}
                     placeholder="seu.email@exemplo.com"
-                    className="w-full px-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium"
+                    className="w-full px-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium relative z-10"
                     required
                   />
                 </div>
@@ -310,13 +310,13 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                       value={loginPassword}
                       onChange={(e) => setLoginPassword(e.target.value)}
                       placeholder="••••••••"
-                      className="w-full px-3.5 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium"
+                      className="w-full px-3.5 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium relative z-10"
                       required
                     />
                     <button
                       type="button"
                       onClick={() => setShowPassword(!showPassword)}
-                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                      className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 z-20"
                       title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                     >
                       <span className="material-symbols-outlined text-xl">
@@ -329,9 +329,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 shadow-md transition-colors disabled:opacity-50 cursor-pointer relative z-20 pointer-events-auto opacity-100"
                 >
-                  {isLoading ? 'Autenticando...' : 'Acessar Conta'}
+                  {isLoading ? 'VALIDANDO CREDENCIAIS...' : 'ENTRAR'}
                 </button>
 
                 {/* Master Developer Fast Login */}

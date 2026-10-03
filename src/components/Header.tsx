@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScreenTab, UserAccount, Debtor } from '../types';
 import { APP_IMAGES } from '../data/mockData';
 import { HaspahoLogo } from './HaspahoLogo';
+import { testConnection } from '../lib/firebase';
 
 interface HeaderProps {
   currentTab: ScreenTab;
@@ -28,6 +29,7 @@ interface HeaderProps {
   onRestoreAllData?: () => void;
   isDarkMode?: boolean;
   onToggleTheme?: () => void;
+  onToast?: (msg: string) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -55,7 +57,28 @@ export const Header: React.FC<HeaderProps> = ({
   onRestoreAllData,
   isDarkMode,
   onToggleTheme,
+  onToast,
 }) => {
+  const [isTestingFirebase, setIsTestingFirebase] = useState(false);
+
+  const handleTestFirebase = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setIsTestingFirebase(true);
+    const start = Date.now();
+    try {
+      const ok = await testConnection();
+      const elapsed = Date.now() - start;
+      if (ok) {
+        if (onToast) onToast(`🔥 Conectividade Firebase 100% OK! Ping: ${elapsed}ms • Cloud Firestore Ativo`);
+      } else {
+        if (onToast) onToast('⚠️ Resposta do Firebase não confirmada. Verifique sua conexão.');
+      }
+    } catch {
+      if (onToast) onToast('⚠️ Erro ao verificar resposta do Firebase.');
+    } finally {
+      setIsTestingFirebase(false);
+    }
+  };
   const getSubLabel = () => {
     switch (currentTab) {
       case 'inicio': return 'Início 3D • Login & Boas-Vindas';

@@ -13,6 +13,7 @@ import {
   doc,
   setDoc,
   getDoc,
+  deleteDoc,
   collection,
   getDocs,
   getDocFromServer,
@@ -188,7 +189,8 @@ export const TIAGO_DIAS_USER: UserAccount = {
   neighborhood: 'Centro',
   createdAt: '2026-01-10T10:00:00.000Z',
   isFirstLogin: false,
-  hasSeenWelcome: false,
+  hasSeenWelcome: true,
+  welcomeCompletedAt: '2026-01-10T10:00:00.000Z',
   isMasterAdmin: true,
   isFullStackDev: true,
   status: 'ativo',
@@ -262,11 +264,34 @@ export async function loginWithRealCredentials(
 
     try {
       const remote = await getUserFromFirestore(masterUid);
+      const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
       return remote
-        ? { ...TIAGO_DIAS_USER, ...remote, id: masterUid, isMasterAdmin: true, isFullStackDev: true }
-        : { ...TIAGO_DIAS_USER, id: masterUid, isMasterAdmin: true, isFullStackDev: true };
+        ? {
+            ...TIAGO_DIAS_USER,
+            ...remote,
+            id: masterUid,
+            isMasterAdmin: true,
+            isFullStackDev: true,
+            hasSeenWelcome: hasSeen,
+            isFirstLogin: false,
+          }
+        : {
+            ...TIAGO_DIAS_USER,
+            id: masterUid,
+            isMasterAdmin: true,
+            isFullStackDev: true,
+            hasSeenWelcome: true,
+            isFirstLogin: false,
+          };
     } catch {
-      return { ...TIAGO_DIAS_USER, id: masterUid, isMasterAdmin: true, isFullStackDev: true };
+      return {
+        ...TIAGO_DIAS_USER,
+        id: masterUid,
+        isMasterAdmin: true,
+        isFullStackDev: true,
+        hasSeenWelcome: true,
+        isFirstLogin: false,
+      };
     }
   }
 
@@ -320,7 +345,14 @@ export async function loginWithRealCredentials(
 
   try {
     const remote = await getUserFromFirestore(authUid);
-    if (remote) return { ...remote, id: authUid };
+    if (remote) {
+      return {
+        ...remote,
+        id: authUid,
+        hasSeenWelcome: remote.hasSeenWelcome ?? cred.user?.hasSeenWelcome ?? false,
+        isFirstLogin: remote.isFirstLogin ?? cred.user?.isFirstLogin ?? false,
+      };
+    }
   } catch {
     // fallback
   }
@@ -417,7 +449,7 @@ export async function registerRealUser(
   saveLocalRegisteredCredentials(localRegistry);
 
   try {
-    await setDoc(doc(db, 'registered_credentials', safeDocKey), credRecord);
+    await setDoc(doc(db, 'registered_credentials', safeDocKey), cleanFirestoreObject(credRecord));
     await saveUserToFirestore(newUser);
   } catch (err) {
     console.warn('[Firebase] Registered credentials write note:', err);
@@ -437,15 +469,21 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
   const userId = fbUser.uid;
 
   if (isMaster) {
+    const remote = await getUserFromFirestore(userId).catch(() => null);
+    const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
     const user: UserAccount = {
       ...TIAGO_DIAS_USER,
+      ...remote,
       id: userId,
       email,
-      name: fbUser.displayName || TIAGO_DIAS_USER.name,
-      avatar: fbUser.photoURL || TIAGO_DIAS_USER.avatar,
+      name: fbUser.displayName || remote?.name || TIAGO_DIAS_USER.name,
+      avatar: fbUser.photoURL || remote?.avatar || TIAGO_DIAS_USER.avatar,
       authProvider: 'gmail',
       isMasterAdmin: true,
       isFullStackDev: true,
+      hasSeenWelcome: hasSeen,
+      isFirstLogin: false,
+      welcomeCompletedAt: remote?.welcomeCompletedAt || '2026-01-10T10:00:00.000Z',
     };
     await saveUserToFirestore(user);
     return user;
@@ -453,7 +491,12 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
 
   const existingUser = await getUserFromFirestore(userId);
   if (existingUser) {
-    return { ...existingUser, id: userId };
+    return {
+      ...existingUser,
+      id: userId,
+      isFirstLogin: false,
+      hasSeenWelcome: existingUser.hasSeenWelcome ?? true,
+    };
   }
 
   const newUser: UserAccount = {
@@ -494,47 +537,89 @@ export async function logoutSession(): Promise<void> {
 // =========================================================================
 
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
+  if (!user || !user.id) {
+    console.warn('[Firestore:SAVE_USER] Aborted: user or user.id is invalid.', user);
+    return;
+  }
   const path = `users/${user.id}`;
   try {
     const userRef = doc(db, 'users', user.id);
-    await setDoc(
-      userRef,
-      {
-        ...user,
-        updatedAt: new Date().toISOString(),
-      },
-      { merge: true }
-    );
+    const cleaned = cleanFirestoreObject({
+      ...user,
+      updatedAt: new Date().toISOString(),
+    });
+    console.log(`[Firestore:SAVE_USER] Sending user profile to ${path}:`, { id: user.id, email: user.email, name: user.name });
+    await setDoc(userRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_USER] Success: User ${user.id} persisted to Firestore.`);
   } catch (err) {
+    console.error(`[Firestore:SAVE_USER_ERROR] Failed to save user ${user.id}:`, err);
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
-export async function getUserFromFirestore(userId: string): Promise<UserAccount | null> {
+/**
+ * Marks the welcome presentation as completed for the authenticated user in Firebase Firestore.
+ * Ensures the presentation is never displayed again on subsequent logins or page refreshes.
+ */
+export async function markWelcomeCompletedInFirestore(userId: string): Promise<void> {
+  if (!userId) return;
   const path = `users/${userId}`;
   try {
     const userRef = doc(db, 'users', userId);
+    await setDoc(
+      userRef,
+      cleanFirestoreObject({
+        hasSeenWelcome: true,
+        isFirstLogin: false,
+        welcomeCompletedAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
+    console.log(`[Firestore:MARK_WELCOME] User ${userId} successfully marked as completed welcome presentation.`);
+  } catch (err) {
+    console.warn(`[Firestore:MARK_WELCOME] Note marking welcome for ${userId}:`, err);
+  }
+}
+
+export async function getUserFromFirestore(userId: string): Promise<UserAccount | null> {
+  if (!userId) return null;
+  const path = `users/${userId}`;
+  try {
+    const userRef = doc(db, 'users', userId);
+    console.log(`[Firestore:GET_USER] Reading user profile from ${path}...`);
     const snap = await getDoc(userRef);
     if (snap.exists()) {
-      return snap.data() as UserAccount;
+      const data = snap.data() as UserAccount;
+      console.log(`[Firestore:GET_USER] Found user ${userId}:`, data.name || data.email);
+      return data;
     }
+    console.log(`[Firestore:GET_USER] User ${userId} does not exist in Firestore.`);
     return null;
   } catch (err) {
+    console.error(`[Firestore:GET_USER_ERROR] Failed reading user ${userId}:`, err);
     handleFirestoreError(err, OperationType.GET, path);
   }
 }
 
-// Helper function to recursively remove undefined properties before saving to Firestore
+// Deep clean function: Strips undefined and functions, serializes Dates, handles nested structures cleanly
 export function cleanFirestoreObject<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
+  if (typeof obj === 'function') return undefined as unknown as T;
+  if (obj instanceof Date) {
+    return obj.toISOString() as unknown as T;
+  }
   if (Array.isArray(obj)) {
-    return obj.map(cleanFirestoreObject) as unknown as T;
+    return obj.map(cleanFirestoreObject).filter((item) => item !== undefined) as unknown as T;
   }
   if (typeof obj === 'object') {
     const res: Record<string, any> = {};
     for (const [key, value] of Object.entries(obj as Record<string, any>)) {
-      if (value !== undefined) {
-        res[key] = cleanFirestoreObject(value);
+      if (value !== undefined && typeof value !== 'function') {
+        const cleanedVal = cleanFirestoreObject(value);
+        if (cleanedVal !== undefined) {
+          res[key] = cleanedVal;
+        }
       }
     }
     return res as T;
@@ -544,27 +629,70 @@ export function cleanFirestoreObject<T>(obj: T): T {
 
 // USER DEBTORS FIRESTORE OPERATIONS (Isolated per userId)
 export async function saveDebtorsToFirestore(userId: string, debtors: Debtor[]): Promise<void> {
+  if (!userId) {
+    console.warn('[Firestore:SAVE_DEBTORS] Aborted: userId is empty.');
+    return;
+  }
   const path = `users/${userId}/debtors`;
+  console.log(`[Firestore:SAVE_DEBTORS] Received ${debtors?.length || 0} debtors for path: ${path}`);
   try {
-    const batch = writeBatch(db);
-    for (const d of debtors) {
-      const docRef = doc(db, 'users', userId, 'debtors', d.id);
-      batch.set(docRef, cleanFirestoreObject({ ...d, userId }), { merge: true });
+    const safeDebtors = Array.isArray(debtors) ? debtors : [];
+    if (safeDebtors.length === 0) {
+      console.log(`[Firestore:SAVE_DEBTORS] Debtors array is empty. 0 operations to commit.`);
+      return;
     }
-    await batch.commit();
+    const chunks: Debtor[][] = [];
+    for (let i = 0; i < safeDebtors.length; i += 400) {
+      chunks.push(safeDebtors.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const d of chunk) {
+        if (!d || !d.id) continue;
+        const docRef = doc(db, 'users', userId, 'debtors', d.id);
+        const cleaned = cleanFirestoreObject({ ...d, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
+      }
+      await batch.commit();
+    }
+    console.log(`[Firestore:SAVE_DEBTORS] Successfully committed ${safeDebtors.length} debtors to Firestore at ${path}!`);
   } catch (err) {
+    console.error(`[Firestore:SAVE_DEBTORS_ERROR] Failed committing debtors for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function saveSingleDebtorToFirestore(userId: string, debtor: Debtor): Promise<void> {
+  if (!userId || !debtor || !debtor.id) return;
+  const path = `users/${userId}/debtors/${debtor.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'debtors', debtor.id);
+    const cleaned = cleanFirestoreObject({ ...debtor, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Saving debtor "${debtor.name}" (${debtor.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Success: Debtor ${debtor.id} persisted to Firestore.`);
+  } catch (err) {
+    console.error(`[Firestore:SAVE_SINGLE_DEBTOR_ERROR] Failed saving debtor ${debtor.id}:`, err);
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]> {
+  if (!userId) return [];
   const path = `users/${userId}/debtors`;
+  console.log(`[Firestore:GET_DEBTORS] Fetching debtors collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'debtors');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data() as Debtor);
+    if (snap.empty) {
+      console.log(`[Firestore:GET_DEBTORS] Path ${path} is empty (0 debtors found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => d.data() as Debtor);
+    console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors from Firestore.`);
+    return result;
   } catch (err) {
+    console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors at ${path}:`, err);
     handleFirestoreError(err, OperationType.LIST, path);
   }
 }
@@ -574,27 +702,70 @@ export async function savePurchasesToFirestore(
   userId: string,
   purchases: Purchase[]
 ): Promise<void> {
+  if (!userId) {
+    console.warn('[Firestore:SAVE_PURCHASES] Aborted: userId is empty.');
+    return;
+  }
   const path = `users/${userId}/purchases`;
+  console.log(`[Firestore:SAVE_PURCHASES] Received ${purchases?.length || 0} purchases for path: ${path}`);
   try {
-    const batch = writeBatch(db);
-    for (const p of purchases) {
-      const docRef = doc(db, 'users', userId, 'purchases', p.id);
-      batch.set(docRef, cleanFirestoreObject({ ...p, userId }), { merge: true });
+    const safePurchases = Array.isArray(purchases) ? purchases : [];
+    if (safePurchases.length === 0) {
+      console.log(`[Firestore:SAVE_PURCHASES] Purchases array is empty. 0 operations to commit.`);
+      return;
     }
-    await batch.commit();
+    const chunks: Purchase[][] = [];
+    for (let i = 0; i < safePurchases.length; i += 400) {
+      chunks.push(safePurchases.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const p of chunk) {
+        if (!p || !p.id) continue;
+        const docRef = doc(db, 'users', userId, 'purchases', p.id);
+        const cleaned = cleanFirestoreObject({ ...p, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
+      }
+      await batch.commit();
+    }
+    console.log(`[Firestore:SAVE_PURCHASES] Successfully committed ${safePurchases.length} purchases to Firestore at ${path}!`);
   } catch (err) {
+    console.error(`[Firestore:SAVE_PURCHASES_ERROR] Failed committing purchases for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function saveSinglePurchaseToFirestore(userId: string, purchase: Purchase): Promise<void> {
+  if (!userId || !purchase || !purchase.id) return;
+  const path = `users/${userId}/purchases/${purchase.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'purchases', purchase.id);
+    const cleaned = cleanFirestoreObject({ ...purchase, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Saving purchase "${purchase.product}" (${purchase.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Success: Purchase ${purchase.id} persisted to Firestore.`);
+  } catch (err) {
+    console.error(`[Firestore:SAVE_SINGLE_PURCHASE_ERROR] Failed saving purchase ${purchase.id}:`, err);
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getPurchasesFromFirestore(userId: string): Promise<Purchase[]> {
+  if (!userId) return [];
   const path = `users/${userId}/purchases`;
+  console.log(`[Firestore:GET_PURCHASES] Fetching purchases collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'purchases');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data() as Purchase);
+    if (snap.empty) {
+      console.log(`[Firestore:GET_PURCHASES] Path ${path} is empty (0 purchases found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => d.data() as Purchase);
+    console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases from Firestore.`);
+    return result;
   } catch (err) {
+    console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases at ${path}:`, err);
     handleFirestoreError(err, OperationType.LIST, path);
   }
 }
@@ -604,41 +775,93 @@ export async function saveInstallmentsToFirestore(
   userId: string,
   installments: Installment[]
 ): Promise<void> {
+  if (!userId) {
+    console.warn('[Firestore:SAVE_INSTALLMENTS] Aborted: userId is empty.');
+    return;
+  }
   const path = `users/${userId}/installments`;
+  console.log(`[Firestore:SAVE_INSTALLMENTS] Received ${installments?.length || 0} installments for path: ${path}`);
   try {
-    // Firestore batch supports up to 500 writes
+    const safeInsts = Array.isArray(installments) ? installments : [];
+    if (safeInsts.length === 0) {
+      console.log(`[Firestore:SAVE_INSTALLMENTS] Installments array is empty. 0 operations to commit.`);
+      return;
+    }
     const chunks: Installment[][] = [];
-    for (let i = 0; i < installments.length; i += 400) {
-      chunks.push(installments.slice(i, i + 400));
+    for (let i = 0; i < safeInsts.length; i += 400) {
+      chunks.push(safeInsts.slice(i, i + 400));
     }
     for (const chunk of chunks) {
       const batch = writeBatch(db);
       for (const inst of chunk) {
+        if (!inst || !inst.id) continue;
         const docRef = doc(db, 'users', userId, 'installments', inst.id);
-        batch.set(docRef, cleanFirestoreObject({ ...inst, userId }), { merge: true });
+        const cleaned = cleanFirestoreObject({ ...inst, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
       }
       await batch.commit();
     }
+    console.log(`[Firestore:SAVE_INSTALLMENTS] Successfully committed ${safeInsts.length} installments to Firestore at ${path}!`);
   } catch (err) {
+    console.error(`[Firestore:SAVE_INSTALLMENTS_ERROR] Failed committing installments for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
+}
+
+export async function saveSingleInstallmentToFirestore(userId: string, installment: Installment): Promise<void> {
+  if (!userId || !installment || !installment.id) return;
+  const path = `users/${userId}/installments/${installment.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'installments', installment.id);
+    const cleaned = cleanFirestoreObject({ ...installment, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Saving installment #${installment.installmentNumber} (${installment.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Success: Installment ${installment.id} persisted to Firestore.`);
+  } catch (err) {
+    console.error(`[Firestore:SAVE_SINGLE_INSTALLMENT_ERROR] Failed saving installment ${installment.id}:`, err);
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getInstallmentsFromFirestore(userId: string): Promise<Installment[]> {
+  if (!userId) return [];
   const path = `users/${userId}/installments`;
+  console.log(`[Firestore:GET_INSTALLMENTS] Fetching installments collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'installments');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data() as Installment);
+    if (snap.empty) {
+      console.log(`[Firestore:GET_INSTALLMENTS] Path ${path} is empty (0 installments found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => d.data() as Installment);
+    console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments from Firestore.`);
+    return result;
   } catch (err) {
+    console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments at ${path}:`, err);
     handleFirestoreError(err, OperationType.LIST, path);
+  }
+}
+
+// DELETE INSTALLMENT FROM FIRESTORE
+export async function deleteInstallmentFromFirestore(userId: string, installmentId: string): Promise<void> {
+  if (!userId || !installmentId) return;
+  const path = `users/${userId}/installments/${installmentId}`;
+  try {
+    console.log(`[Firestore:DELETE_INSTALLMENT] Deleting installment ${installmentId} from ${path}...`);
+    const docRef = doc(db, 'users', userId, 'installments', installmentId);
+    await deleteDoc(docRef);
+    console.log(`[Firestore:DELETE_INSTALLMENT] Success: Installment ${installmentId} deleted from Firestore.`);
+  } catch (err) {
+    console.error(`[Firestore:DELETE_INSTALLMENT_ERROR] Failed deleting installment ${installmentId}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, path);
   }
 }
 
 // DELETE DEBTOR AND RELATED RECORDS FROM FIRESTORE
 export async function deleteDebtorFromFirestore(userId: string, debtorId: string): Promise<void> {
   const path = `users/${userId}/debtors/${debtorId}`;
+  console.log(`[Firestore:DELETE_DEBTOR] Initiating cascade delete for debtor ${debtorId} from ${path}...`);
   try {
     const batch = writeBatch(db);
     batch.delete(doc(db, 'users', userId, 'debtors', debtorId));
@@ -668,7 +891,9 @@ export async function deleteDebtorFromFirestore(userId: string, debtorId: string
     }
 
     await batch.commit();
+    console.log(`[Firestore:DELETE_DEBTOR] Success: Debtor ${debtorId} and sub-records deleted from Firestore.`);
   } catch (err) {
+    console.error(`[Firestore:DELETE_DEBTOR_ERROR] Failed deleting debtor ${debtorId}:`, err);
     handleFirestoreError(err, OperationType.DELETE, path);
   }
 }

@@ -342,7 +342,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   };
 
   return (
-    <div className="w-full flex flex-col items-center justify-center py-6 px-3 sm:px-6">
+    <div className="w-full flex flex-col items-center justify-center py-6 px-3 sm:px-6 relative z-10 pointer-events-auto">
       {/* Social Modal */}
       <SocialAuthDialog
         isOpen={socialModalOpen}
@@ -351,9 +351,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         onSuccess={(u) => onLoginSuccess(u, false)}
       />
 
-      <div className="w-full max-w-5xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden">
+      <div className="w-full max-w-5xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden relative z-20 pointer-events-auto">
         {/* Left Column: Brand & Security Presentation */}
-        <div className="w-full md:w-[48%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex flex-col justify-between text-white relative overflow-hidden shrink-0">
+        <div className="w-full md:w-[48%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex flex-col justify-between text-white relative z-10 overflow-hidden shrink-0">
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
 
@@ -368,7 +368,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             </div>
 
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-              Gestão Financeira &amp; Recebíveis Parcelados
+              RECEBÍVEIS PRO
             </h2>
             <p className="text-xs text-slate-300 mt-2 leading-relaxed">
               Plataforma com isolamento individual de dados, autenticação real e integração direta com o banco de dados Firebase.
@@ -403,15 +403,17 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               </div>
               <div className="flex items-center gap-2">
                 <button
+                  type="button"
                   onClick={onEnterDashboard}
-                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs transition-colors cursor-pointer relative z-10"
                 >
                   Entrar
                 </button>
                 {onLogout && (
                   <button
+                    type="button"
                     onClick={onLogout}
-                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer"
+                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer relative z-10"
                     title="Sair da Conta"
                   >
                     <span className="material-symbols-outlined text-[16px]">logout</span>
@@ -427,8 +429,14 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         </div>
 
         {/* Right Column: Authentication Form */}
-        <div className="w-full md:w-[52%] p-6 sm:p-8 flex flex-col justify-between bg-white">
+        <div className="w-full md:w-[52%] p-6 sm:p-8 flex flex-col justify-between bg-white relative z-20 pointer-events-auto">
           <div>
+            {/* Header Titles */}
+            <div className="mb-4">
+              <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
+              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Entre na sua conta</h3>
+            </div>
+
             {/* Tabs */}
             <div className="flex items-center border-b border-slate-200 pb-3 mb-5 gap-4">
               <button
@@ -493,13 +501,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
             {/* TAB 1: LOGIN */}
             {activeTab === 'login' && (
-              <div className="space-y-4">
-                {/* Prominent Google Quick Login Button */}
+              <div className="space-y-3.5 relative z-10 pointer-events-auto">
+                {/* 1. Google Button */}
                 <button
                   type="button"
                   onClick={handleGoogleAuthDirect}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 hover:bg-slate-50 bg-white text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
                 >
                   <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
@@ -507,49 +515,50 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                     <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
                     <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                   </svg>
-                  <span>Continuar com Google</span>
+                  <span className="font-extrabold tracking-wide">ENTRAR COM GOOGLE</span>
                 </button>
 
-                {/* Prominent Facebook Quick Login Button */}
+                {/* 2. Facebook Button */}
                 <button
                   type="button"
                   onClick={handleFacebookAuthDirect}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-200 hover:border-blue-600 hover:bg-slate-50 bg-white text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
                 >
                   <svg className="w-5 h-5 shrink-0" fill="#1877F2" viewBox="0 0 24 24">
                     <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
                   </svg>
-                  <span>Entrar com Facebook</span>
+                  <span className="font-extrabold tracking-wide">ENTRAR COM FACEBOOK</span>
                 </button>
 
-                {/* Prominent WhatsApp Quick Login Button */}
+                {/* 3. WhatsApp Button */}
                 <button
                   type="button"
                   onClick={() => {
                     setErrorMessage('O login com WhatsApp requer a ativação do provedor Telefone/SMS no Console do Firebase. Utilize E-mail/Senha, Google ou Facebook para acesso imediato.');
                   }}
                   disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-200 hover:border-emerald-600 hover:bg-slate-50 bg-white text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
                 >
                   <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">chat</span>
-                  <span>Entrar com WhatsApp</span>
+                  <span className="font-extrabold tracking-wide">ENTRAR COM WHATSAPP</span>
                 </button>
 
-                <div className="relative flex items-center justify-center my-2">
+                {/* Divider */}
+                <div className="relative flex items-center justify-center my-3">
                   <div className="border-t border-slate-200 w-full" />
-                  <span className="bg-white px-3 text-[11px] text-slate-400 uppercase font-bold shrink-0">
-                    ou entre com e-mail
+                  <span className="bg-white px-3 text-[11px] text-slate-500 uppercase font-bold shrink-0">
+                    ──────── ou entre com e-mail ────────
                   </span>
                 </div>
 
-                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                <form onSubmit={handleLoginSubmit} className="space-y-3.5 relative z-10">
                   <div>
                     <label className="block text-xs font-bold text-slate-700 mb-1">
-                      E-mail ou Nome de Usuário
+                      E-mail
                     </label>
                     <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg">
+                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg pointer-events-none">
                         person
                       </span>
                       <input
@@ -557,7 +566,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                         value={loginIdentifier}
                         onChange={(e) => setLoginIdentifier(e.target.value)}
                         placeholder="seu.email@exemplo.com ou usuário"
-                        className="w-full pl-10 pr-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium"
+                        className="w-full pl-10 pr-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium relative z-10"
                         required
                       />
                     </div>
@@ -565,10 +574,10 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
                   <div>
                     <div className="flex items-center justify-between mb-1">
-                      <label className="text-xs font-bold text-slate-700">Senha de Acesso</label>
+                      <label className="text-xs font-bold text-slate-700">Senha</label>
                     </div>
                     <div className="relative">
-                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg">
+                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg pointer-events-none">
                         lock
                       </span>
                       <input
@@ -576,13 +585,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium"
+                        className="w-full pl-10 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium relative z-10"
                         required
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
-                        className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                        className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5 z-20"
                         title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                       >
                         <span className="material-symbols-outlined text-xl">
@@ -592,23 +601,37 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                     </div>
                   </div>
 
+                  {/* 4. ENTRAR Button */}
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 shadow-md transition-colors disabled:opacity-50 cursor-pointer relative z-20 pointer-events-auto opacity-100"
                   >
                     {isLoading ? (
                       <>
                         <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                        <span>Validando Credenciais...</span>
+                        <span>VALIDANDO CREDENCIAIS...</span>
                       </>
                     ) : (
                       <>
                         <span className="material-symbols-outlined text-[18px]">login</span>
-                        <span>Entrar no Sistema</span>
+                        <span>ENTRAR</span>
                       </>
                     )}
                   </button>
+
+                  <div className="text-center pt-1">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setActiveTab('recover');
+                        setErrorMessage('');
+                      }}
+                      className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition-colors cursor-pointer relative z-20"
+                    >
+                      Esqueci minha senha
+                    </button>
+                  </div>
 
                   {/* Master Developer Quick Fill Button */}
                   <button
@@ -617,7 +640,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                       setLoginIdentifier('tiagodias8888@gmail.com');
                       setLoginPassword('haspaho2026');
                     }}
-                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-[11px] font-bold flex items-center justify-between transition-all cursor-pointer"
+                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-[11px] font-bold flex items-center justify-between transition-colors cursor-pointer relative z-20"
                   >
                     <div className="flex items-center gap-1.5">
                       <span className="material-symbols-outlined text-amber-500 text-[16px] font-bold">crown</span>
@@ -630,7 +653,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                 </form>
 
                 {/* Switch to Register footer */}
-                <div className="mt-6 pt-4 border-t border-slate-200 text-center">
+                <div className="mt-4 pt-3 border-t border-slate-200 text-center relative z-20">
                   <p className="text-xs text-slate-600 mb-2">Não possui uma conta?</p>
                   <button
                     type="button"
@@ -638,10 +661,10 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                       setActiveTab('register');
                       setErrorMessage('');
                     }}
-                    className="w-full py-3 px-4 rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                    className="w-full py-3 px-4 rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-black text-xs sm:text-sm tracking-wider flex items-center justify-center gap-2 transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
                   >
                     <span className="material-symbols-outlined text-lg">person_add</span>
-                    <span>Cadastrar Nova Conta</span>
+                    <span>CADASTRAR</span>
                   </button>
                 </div>
               </div>

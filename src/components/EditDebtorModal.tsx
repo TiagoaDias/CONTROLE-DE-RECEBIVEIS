@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Debtor } from '../types';
 import { APP_IMAGES } from '../data/mockData';
 
@@ -60,6 +60,9 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
   const [creditLimit, setCreditLimit] = useState('');
   const [avatar, setAvatar] = useState('');
   const [notes, setNotes] = useState('');
+  const [isNewPhotoSelected, setIsNewPhotoSelected] = useState(false);
+  const [photoError, setPhotoError] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (debtor) {
@@ -82,10 +85,90 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
       setCreditLimit(debtor.creditLimit ? debtor.creditLimit.toString() : '');
       setAvatar(debtor.avatar || APP_IMAGES.carlos);
       setNotes(debtor.notes || '');
+      setIsNewPhotoSelected(false);
+      setPhotoError('');
     }
   }, [debtor]);
 
   if (!isOpen || !debtor) return null;
+
+  const hasCustomPhoto = Boolean(
+    avatar &&
+    avatar.trim().length > 0 &&
+    avatar !== APP_IMAGES.carlos
+  );
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setPhotoError('');
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPhotoError('Por favor, selecione um arquivo de imagem válido (PNG, JPG, JPEG, WEBP).');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      setPhotoError('A imagem selecionada deve ter no máximo 10MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const result = event.target?.result as string;
+      if (!result) return;
+
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          const size = 360; // 360x360 px
+          canvas.width = size;
+          canvas.height = size;
+          const ctx = canvas.getContext('2d');
+          if (!ctx) {
+            setAvatar(result);
+            setIsNewPhotoSelected(true);
+            return;
+          }
+          ctx.imageSmoothingEnabled = true;
+          ctx.imageSmoothingQuality = 'high';
+
+          // Center crop square
+          const scale = Math.max(size / img.width, size / img.height);
+          const w = img.width * scale;
+          const h = img.height * scale;
+          const x = (size - w) / 2;
+          const y = (size - h) / 2;
+
+          ctx.drawImage(img, x, y, w, h);
+          const optimized = canvas.toDataURL('image/jpeg', 0.88);
+          setAvatar(optimized);
+          setIsNewPhotoSelected(true);
+          setPhotoError('');
+        } catch (err) {
+          console.warn('Canvas optimization error, fallback to raw data:', err);
+          setAvatar(result);
+          setIsNewPhotoSelected(true);
+        }
+      };
+      img.onerror = () => {
+        setPhotoError('Não foi possível carregar a imagem. Tente outro arquivo.');
+      };
+      img.src = result;
+    };
+    reader.onerror = () => {
+      setPhotoError('Erro ao ler arquivo do dispositivo.');
+    };
+    reader.readAsDataURL(file);
+    e.target.value = '';
+  };
+
+  const handleRemovePhoto = () => {
+    setAvatar(APP_IMAGES.carlos);
+    setIsNewPhotoSelected(false);
+    setPhotoError('');
+  };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -149,104 +232,144 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
         {/* Form Body Scrollable em Colunas */}
         <form onSubmit={handleSubmit} className="overflow-y-auto p-4 sm:p-5 flex flex-col gap-4">
           
-          {/* Barra Superior de Seleção Rápida: Foto/Avatar à Esquerda & Vínculo à Direita (Idêntico ao topo do card) */}
-          <div className="w-full flex flex-col gap-2 relative">
-            <div className="bg-slate-50 p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 w-full select-none">
-              
-              {/* 1. LADO ESQUERDO: FOTO / AVATAR */}
-              <div className="relative flex-1 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsAvatarListOpen((prev) => !prev);
-                    setIsRelationListOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isAvatarListOpen
-                      ? 'bg-blue-50 border-blue-400 text-slate-900 ring-2 ring-blue-200'
-                      : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
-                  }`}
-                  title="Clique para escolher foto / avatar"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
+          {/* ============================================================ */}
+          {/* ÁREA DEDICADA: FOTO DO DEVEDOR (SIMPLES, CLARA E INTUITIVA)   */}
+          {/* ============================================================ */}
+          <div className="bg-slate-50 p-4 rounded-2xl border border-slate-200 shadow-xs flex flex-col gap-3">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-[17px] text-blue-600">account_circle</span>
+                <span>Foto do devedor</span>
+              </label>
+
+              {isNewPhotoSelected ? (
+                <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  Nova foto selecionada (Pré-visualização)
+                </span>
+              ) : hasCustomPhoto ? (
+                <span className="text-[10px] font-semibold text-slate-500 bg-white border border-slate-200 px-2 py-0.5 rounded-full">
+                  Foto atual
+                </span>
+              ) : (
+                <span className="text-[10px] font-semibold text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+                  Sem foto personalizada
+                </span>
+              )}
+            </div>
+
+            {/* FOTO ATUAL + BOTÕES DE AÇÃO */}
+            <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+              {/* [ FOTO ATUAL / PRÉ-VISUALIZAÇÃO ] */}
+              <div className="relative shrink-0">
+                <div className="w-24 h-24 rounded-2xl overflow-hidden border-2 border-slate-300 shadow-md bg-white flex items-center justify-center ring-4 ring-slate-100/80">
+                  {avatar ? (
                     <img
-                      src={avatar || APP_IMAGES.carlos}
-                      alt="Avatar"
+                      src={avatar}
+                      alt={name || 'Foto do devedor'}
                       referrerPolicy="no-referrer"
-                      className="w-7 h-7 rounded-lg object-cover shadow-xs border border-slate-200 shrink-0"
+                      className="w-full h-full object-cover"
                     />
-                    <div className="min-w-0 leading-tight">
-                      <span className="text-xs font-bold text-slate-900 truncate block">
-                        Foto / Avatar
-                      </span>
-                      <span className="text-[9.5px] text-slate-500 truncate block font-medium">
-                        Toque para alterar
-                      </span>
+                  ) : (
+                    <div className="w-full h-full bg-slate-100 text-slate-400 flex flex-col items-center justify-center">
+                      <span className="material-symbols-outlined text-4xl">person</span>
+                      <span className="text-[9px] font-bold text-slate-500">Sem foto</span>
                     </div>
-                  </div>
-                  <span className={`material-symbols-outlined text-[16px] text-slate-500 transition-transform shrink-0 ${isAvatarListOpen ? 'rotate-180 text-blue-600' : ''}`}>
-                    expand_more
+                  )}
+                </div>
+
+                {isNewPhotoSelected && (
+                  <span
+                    className="absolute -top-1.5 -right-1.5 bg-emerald-600 text-white rounded-full w-5 h-5 flex items-center justify-center shadow-md ring-2 ring-white"
+                    title="Pré-visualização pronta para salvar"
+                  >
+                    <span className="material-symbols-outlined text-[13px] font-black">check</span>
                   </span>
-                </button>
+                )}
               </div>
 
-              {/* 2. LADO DIREITO: VÍNCULO / PARENTESCO */}
-              <div className="relative flex-1 min-w-0">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsRelationListOpen((prev) => !prev);
-                    setIsAvatarListOpen(false);
-                  }}
-                  className={`w-full flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-left transition-all cursor-pointer ${
-                    isRelationListOpen
-                      ? 'bg-indigo-50 border-indigo-400 text-slate-900 ring-2 ring-indigo-200'
-                      : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
-                  }`}
-                  title="Clique para escolher o vínculo"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-[16px]">
-                        {getRelationIcon(isCustomRelation ? 'Outro Vínculo Particular' : relation)}
-                      </span>
-                    </div>
-                    <div className="min-w-0 leading-tight">
-                      <span className="text-xs font-bold text-slate-900 truncate block">
-                        {isCustomRelation ? (customRelationText || 'Personalizado') : relation}
-                      </span>
-                      <span className="text-[9.5px] text-slate-500 truncate block font-medium">
-                        Vínculo
-                      </span>
-                    </div>
+              {/* CONTROLES */}
+              <div className="flex-1 flex flex-col justify-center gap-2 w-full">
+                {/* Input de arquivo invisível (suporta câmera e galeria em mobile) */}
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileChange}
+                  accept="image/*"
+                  className="hidden"
+                  id="debtor-photo-file-input"
+                />
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Botão [ 📷 Trocar foto ] ou [ 📷 Adicionar foto ] */}
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    className="px-4 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">photo_camera</span>
+                    <span>{hasCustomPhoto ? '📷 Trocar foto' : '📷 Adicionar foto'}</span>
+                  </button>
+
+                  {/* Botão Remover Foto */}
+                  {hasCustomPhoto && (
+                    <button
+                      type="button"
+                      onClick={handleRemovePhoto}
+                      className="px-3 py-2 rounded-xl bg-white hover:bg-red-50 text-red-600 hover:text-red-700 font-bold text-xs border border-slate-200 hover:border-red-300 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      title="Remover foto e voltar ao avatar padrão"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete</span>
+                      <span>Remover foto</span>
+                    </button>
+                  )}
+
+                  {/* Botão Avatares Padrão */}
+                  <button
+                    type="button"
+                    onClick={() => setIsAvatarListOpen((prev) => !prev)}
+                    className="px-3 py-2 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-semibold text-xs border border-slate-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-slate-500">face</span>
+                    <span>Avatares padrão</span>
+                    <span className="material-symbols-outlined text-[13px] text-slate-400">
+                      {isAvatarListOpen ? 'expand_less' : 'expand_more'}
+                    </span>
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-slate-500 leading-tight">
+                  {isNewPhotoSelected
+                    ? 'Foto carregada! Clique em "Salvar Alterações" no rodapé para gravar permanentemente.'
+                    : 'Selecione uma imagem do seu computador ou escolha/tire uma foto no celular.'}
+                </p>
+
+                {photoError && (
+                  <div className="p-2 rounded-lg bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-1.5 animate-in fade-in">
+                    <span className="material-symbols-outlined text-[15px]">error</span>
+                    <span>{photoError}</span>
                   </div>
-                  <span className={`material-symbols-outlined text-[16px] text-slate-500 transition-transform shrink-0 ${isRelationListOpen ? 'rotate-180 text-indigo-600' : ''}`}>
-                    expand_more
-                  </span>
-                </button>
+                )}
               </div>
             </div>
 
-            {/* ============================================================ */}
-            {/* A LISTINHA DE FOTOS/AVATARES QUE ABRE AO CLICAR               */}
-            {/* ============================================================ */}
+            {/* Galeria retrátil de avatares predefinidos */}
             {isAvatarListOpen && (
-              <div className="bg-white p-3 rounded-2xl border border-blue-200 shadow-xl flex flex-col gap-2 animate-in fade-in zoom-in-95 duration-150 z-30">
-                <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 text-xs">
-                  <span className="font-bold text-slate-800 text-[11.5px] flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-[15px] text-blue-600">account_circle</span>
-                    <span>Escolha a Foto / Avatar ({AVATAR_OPTIONS.length})</span>
+              <div className="pt-3 border-t border-slate-200/80 mt-1 animate-in fade-in zoom-in-95 duration-150">
+                <div className="flex items-center justify-between pb-1.5 mb-1.5 text-xs">
+                  <span className="font-bold text-slate-700 text-[11px]">
+                    Ou selecione um avatar do sistema:
                   </span>
                   <button
                     type="button"
                     onClick={() => setIsAvatarListOpen(false)}
                     className="text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-[16px]">close</span>
+                    <span className="material-symbols-outlined text-[15px]">close</span>
                   </button>
                 </div>
 
-                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2 py-1">
+                <div className="grid grid-cols-4 sm:grid-cols-8 gap-2">
                   {AVATAR_OPTIONS.map((opt) => {
                     const isSelected = avatar === opt.url;
                     return (
@@ -255,12 +378,14 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
                         type="button"
                         onClick={() => {
                           setAvatar(opt.url);
+                          setIsNewPhotoSelected(false);
+                          setPhotoError('');
                           setIsAvatarListOpen(false);
                         }}
                         className={`flex flex-col items-center gap-1 p-1.5 rounded-xl border transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-blue-50 border-blue-500 ring-2 ring-blue-300 scale-105 shadow-xs'
-                            : 'bg-slate-50 hover:bg-slate-100 border-slate-200'
+                            : 'bg-white hover:bg-slate-100 border-slate-200'
                         }`}
                       >
                         <div className="relative">
@@ -285,6 +410,45 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
                 </div>
               </div>
             )}
+          </div>
+
+          {/* ============================================================ */}
+          {/* SELEÇÃO DE VÍNCULO / PARENTESCO COM O CREDOR                  */}
+          {/* ============================================================ */}
+          <div className="w-full flex flex-col gap-2 relative">
+            <div className="bg-slate-50 p-2 sm:p-2.5 rounded-2xl border border-slate-200 shadow-xs flex items-center justify-between gap-2 w-full select-none">
+              <div className="relative flex-1 min-w-0">
+                <button
+                  type="button"
+                  onClick={() => setIsRelationListOpen((prev) => !prev)}
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-xl border text-left transition-all cursor-pointer ${
+                    isRelationListOpen
+                      ? 'bg-indigo-50 border-indigo-400 text-slate-900 ring-2 ring-indigo-200'
+                      : 'bg-white hover:bg-slate-100 border-slate-200 text-slate-800'
+                  }`}
+                  title="Clique para escolher o vínculo"
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[18px]">
+                        {getRelationIcon(isCustomRelation ? 'Outro Vínculo Particular' : relation)}
+                      </span>
+                    </div>
+                    <div className="min-w-0 leading-tight">
+                      <span className="text-xs font-bold text-slate-900 truncate block">
+                        {isCustomRelation ? (customRelationText || 'Personalizado') : relation}
+                      </span>
+                      <span className="text-[10px] text-slate-500 truncate block font-medium">
+                        Vínculo com o Credor
+                      </span>
+                    </div>
+                  </div>
+                  <span className={`material-symbols-outlined text-[18px] text-slate-500 transition-transform shrink-0 ${isRelationListOpen ? 'rotate-180 text-indigo-600' : ''}`}>
+                    expand_more
+                  </span>
+                </button>
+              </div>
+            </div>
 
             {/* ============================================================ */}
             {/* A LISTINHA DE VÍNCULOS QUE ABRE AO CLICAR                     */}
