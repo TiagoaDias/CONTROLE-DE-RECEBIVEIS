@@ -1,0 +1,549 @@
+@import "tailwindcss";
+
+@layer utilities {
+  /* Safe area padding for modern mobile gesture bars */
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom, 16px);
+  }
+  
+  .no-scrollbar::-webkit-scrollbar,
+  .custom-scrollbar::-webkit-scrollbar,
+  .scrollbar-thin::-webkit-scrollbar {
+    display: none !important;
+  }
+  .no-scrollbar,
+  .custom-scrollbar,
+  .scrollbar-thin {
+    -ms-overflow-style: none !important;
+    scrollbar-width: none !important;
+  }
+}
+
+/* ==========================================================================
+   REGRAS E MEDIA QUERIES ESPECÍFICAS PARA DISPOSITIVOS MÓVEIS (MOBILE)
+   Garante exibição vertical harmônica, sem rolagem lateral no corpo da página
+   e sem distorção ou quebra indevida de textos, logos e tabelas.
+   ========================================================================== */
+
+@media screen and (max-width: 767px) {
+  /* Box-sizing universal para prevenir estouros de largura */
+  *, *::before, *::after {
+    box-sizing: border-box;
+  }
+
+  html, body {
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    position: relative;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Força o container principal (#root) a ter overflow-x: hidden e largura exata da viewport */
+  #root {
+    width: 100% !important;
+    max-width: 100vw !important;
+    overflow-x: hidden !important;
+    position: relative;
+    box-sizing: border-box;
+  }
+
+  /* Garante que imagens, ícones e mídias fiquem contidos na largura da tela */
+  img, svg, video, canvas {
+    max-width: 100% !important;
+    height: auto;
+  }
+
+  /* Botões e controles contidos sem vazar das bordas */
+  button, [role="button"], input, select, textarea {
+    box-sizing: border-box !important;
+  }
+
+  /* Proteção rigorosa para textos de marcas, logos e badges nunca quebrarem em letras */
+  .brand-logo-text,
+  .brand-text,
+  [data-brand-logo="true"] {
+    white-space: nowrap !important;
+    word-break: keep-all !important;
+    overflow-wrap: normal !important;
+  }
+
+  /* Espaçamento inferior garantido para a barra de navegação mobile */
+  main {
+    padding-bottom: calc(5rem + env(safe-area-inset-bottom, 16px)) !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Utilitários de fluxo vertical para mobile */
+  .mobile-vertical-flow {
+    display: flex !important;
+    flex-direction: column !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+  }
+
+  /* Containers de tabelas financeiras com ajuste perfeito na tela */
+  .table-scroll-container,
+  .financial-table-container {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    -webkit-overflow-scrolling: touch;
+    box-sizing: border-box !important;
+  }
+
+  /* Mantém flexbox em containers de abas e chips horizontais com overflow-x-auto */
+  .flex.overflow-x-auto,
+  .overflow-x-auto.flex {
+    display: flex !important;
+  }
+
+  /* Compactação harmônica das tabelas no mobile: 100% da largura da tela sem sobras ou cortes */
+  .table-scroll-container > table,
+  .financial-table-container > table,
+  .overflow-x-auto > table {
+    width: 100% !important;
+    min-width: 0 !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse;
+  }
+
+  /* Células de tabelas financeiras compactadas no mobile para deixar parcelas, vencimento, valor, status e ação juntinhos e caber na tela */
+  .table-scroll-container th,
+  .table-scroll-container td,
+  .financial-table-container th,
+  .financial-table-container td {
+    padding-left: 1px !important;
+    padding-right: 1px !important;
+    padding-top: 0.15rem !important;
+    padding-bottom: 0.15rem !important;
+    font-size: 8.5px !important;
+    white-space: nowrap !important;
+    word-break: normal !important;
+    overflow-wrap: normal !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* Regra específica para orientação vertical (Portrait em Smartphones) */
+@media screen and (max-width: 767px) and (orientation: portrait) {
+  body {
+    touch-action: manipulation;
+  }
+}
+
+/* ==========================================================================
+   REGRAS DE IMPRESSÃO PROFISSIONAL (PRINT MEDIA)
+   Oculta controles de navegação, modais de fundo, barras de ferramentas
+   e foca na impressão nítida do documento / extrato / recibo.
+   ========================================================================== */
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm;
+  }
+
+  body, html {
+    background: #ffffff !important;
+    color: #000000 !important;
+    overflow: visible !important;
+    width: 100% !important;
+    height: auto !important;
+  }
+
+  /* Oculta barras de navegação, cabeçalhos do app e botões de ação */
+  header,
+  nav,
+  .no-print,
+  button,
+  [role="button"],
+  .fixed.bottom-0,
+  .fixed.top-0,
+  .bottom-nav {
+    display: none !important;
+  }
+
+  /* Foca nos conteúdos imprimíveis */
+  .printable-area,
+  [data-printable="true"] {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* Garante nitidez de cores no papel */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
+  }
+}
+
+/* ==========================================================================
+   ANIMAÇÕES CÓSMICAS: ESTRELINHAS E FOGUETINHOS INDO PARA A LUA
+   ========================================================================== */
+@keyframes twinkle-star {
+  0%, 100% {
+    opacity: 0.25;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.25);
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+  }
+}
+
+@keyframes rocket-glide {
+  0% {
+    transform: translate(0px, 0px) rotate(-35deg);
+  }
+  50% {
+    transform: translate(12px, -8px) rotate(-30deg);
+  }
+  100% {
+    transform: translate(24px, -18px) rotate(-38deg);
+  }
+}
+
+@keyframes rocket-launch {
+  0% {
+    transform: translate(-15px, 20px) rotate(-40deg);
+    opacity: 0;
+  }
+  20% {
+    opacity: 1;
+  }
+  80% {
+    opacity: 1;
+  }
+  100% {
+    transform: translate(95px, -55px) rotate(-40deg);
+    opacity: 0;
+  }
+}
+
+@keyframes moon-glow-pulse {
+  0%, 100% {
+    filter: drop-shadow(0 0 6px rgba(254, 240, 138, 0.5)) drop-shadow(0 0 12px rgba(250, 204, 21, 0.3));
+    transform: scale(1);
+  }
+  50% {
+    filter: drop-shadow(0 0 14px rgba(254, 240, 138, 0.9)) drop-shadow(0 0 24px rgba(250, 204, 21, 0.5));
+    transform: scale(1.06);
+  }
+}
+
+.animate-star-twinkle-1 {
+  animation: twinkle-star 2.2s ease-in-out infinite;
+}
+
+.animate-star-twinkle-2 {
+  animation: twinkle-star 3s ease-in-out infinite 0.7s;
+}
+
+.animate-star-twinkle-3 {
+  animation: twinkle-star 1.8s ease-in-out infinite 1.3s;
+}
+
+.animate-rocket-to-moon {
+  animation: rocket-glide 3.5s ease-in-out infinite alternate;
+}
+
+.animate-rocket-flyby {
+  animation: rocket-launch 6.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+}
+
+.animate-moon-celestial {
+  animation: moon-glow-pulse 3.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   ANIMAÇÃO DIVERTIDA: NOMES DE PRODUTOS VIAJANDO NO DECK E NA TELA
+   ========================================================================== */
+@keyframes product-travel-stream {
+  0% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(-50%);
+  }
+}
+
+@keyframes product-capsule-float {
+  0%, 100% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  25% {
+    transform: translateY(-5px) rotate(-1.5deg);
+  }
+  50% {
+    transform: translateY(0px) rotate(0deg);
+  }
+  75% {
+    transform: translateY(5px) rotate(1.5deg);
+  }
+}
+
+@keyframes deck-floating-wave {
+  0%, 100% {
+    transform: translateY(0px) translateX(0px);
+  }
+  50% {
+    transform: translateY(-7px) translateX(4px);
+  }
+}
+
+.animate-product-stream {
+  display: flex;
+  width: max-content;
+  animation: product-travel-stream 32s linear infinite;
+}
+
+.animate-product-stream:hover {
+  animation-play-state: paused;
+}
+
+.animate-product-capsule {
+  animation: product-capsule-float 4.5s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   METEOROS E ESTRELAS CADENTES DENTRO DOS CARDS
+   ========================================================================== */
+@keyframes card-meteor-fast {
+  0% {
+    opacity: 0;
+    transform: translate(180px, -50px) rotate(-34deg) scaleX(0.4);
+  }
+  6% {
+    opacity: 1;
+    transform: translate(100px, 0px) rotate(-34deg) scaleX(1);
+  }
+  24% {
+    opacity: 0.95;
+    transform: translate(-140px, 150px) rotate(-34deg) scaleX(1.3);
+  }
+  36% {
+    opacity: 0;
+    transform: translate(-300px, 250px) rotate(-34deg) scaleX(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-340px, 280px) rotate(-34deg) scaleX(0.3);
+  }
+}
+
+@keyframes card-meteor-medium {
+  0%, 35% {
+    opacity: 0;
+    transform: translate(220px, -70px) rotate(-38deg) scaleX(0.3);
+  }
+  42% {
+    opacity: 1;
+    transform: translate(110px, 0px) rotate(-38deg) scaleX(1);
+  }
+  60% {
+    opacity: 0.95;
+    transform: translate(-120px, 160px) rotate(-38deg) scaleX(1.35);
+  }
+  72% {
+    opacity: 0;
+    transform: translate(-260px, 250px) rotate(-38deg) scaleX(0.6);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-290px, 270px) rotate(-38deg) scaleX(0.3);
+  }
+}
+
+@keyframes card-meteor-slow {
+  0%, 55% {
+    opacity: 0;
+    transform: translate(260px, -90px) rotate(-32deg) scaleX(0.3);
+  }
+  62% {
+    opacity: 0.9;
+    transform: translate(130px, -10px) rotate(-32deg) scaleX(1.1);
+  }
+  80% {
+    opacity: 0.85;
+    transform: translate(-150px, 160px) rotate(-32deg) scaleX(1.4);
+  }
+  90% {
+    opacity: 0;
+    transform: translate(-320px, 270px) rotate(-32deg) scaleX(0.5);
+  }
+  100% {
+    opacity: 0;
+    transform: translate(-350px, 290px) rotate(-32deg) scaleX(0.3);
+  }
+}
+
+.animate-meteor-fast {
+  animation: card-meteor-fast 4.8s cubic-bezier(0.2, 0.7, 0.35, 1) infinite;
+}
+
+.animate-meteor-medium {
+  animation: card-meteor-medium 7.4s cubic-bezier(0.2, 0.7, 0.35, 1) infinite 1.8s;
+}
+
+.animate-meteor-slow {
+  animation: card-meteor-slow 10.2s cubic-bezier(0.2, 0.7, 0.35, 1) infinite 3.5s;
+}
+
+.animate-card-meteor-1 {
+  animation: card-meteor-fast 5.2s cubic-bezier(0.2, 0.7, 0.35, 1) infinite;
+}
+
+.animate-card-meteor-2 {
+  animation: card-meteor-medium 7.8s cubic-bezier(0.2, 0.7, 0.35, 1) infinite 2s;
+}
+
+/* ==========================================================================
+   ANIMAÇÕES DE GALÁXIAS, SISTEMAS PLANETÁRIOS E TELEMETRIA EM MOVIMENTO
+   ========================================================================== */
+@keyframes galaxy-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes planetary-orbit-mini {
+  0% {
+    transform: rotate(0deg) translateX(24px) rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg) translateX(24px) rotate(-360deg);
+  }
+}
+
+@keyframes planetary-orbit-mini-2 {
+  0% {
+    transform: rotate(180deg) translateX(36px) rotate(-180deg);
+  }
+  100% {
+    transform: rotate(540deg) translateX(36px) rotate(-540deg);
+  }
+}
+
+@keyframes pulsar-beam {
+  0%, 100% {
+    opacity: 0.3;
+    transform: scale(0.9) rotate(-20deg);
+  }
+  50% {
+    opacity: 0.95;
+    transform: scale(1.15) rotate(20deg);
+    filter: drop-shadow(0 0 16px rgba(168, 85, 247, 0.9));
+  }
+}
+
+@keyframes cosmic-telemetry-pulse {
+  0%, 100% {
+    opacity: 0.8;
+    transform: translateY(0px);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-2px);
+    filter: drop-shadow(0 0 6px rgba(56, 189, 248, 0.6));
+  }
+}
+
+.animate-galaxy-spin {
+  animation: galaxy-spin 26s linear infinite;
+}
+
+.animate-galaxy-spin-reverse {
+  animation: galaxy-spin 34s linear infinite reverse;
+}
+
+.animate-moon-orbit-1 {
+  animation: planetary-orbit-mini 6.5s linear infinite;
+}
+
+.animate-moon-orbit-2 {
+  animation: planetary-orbit-mini-2 11s linear infinite;
+}
+
+.animate-pulsar-beam {
+  animation: pulsar-beam 3.2s ease-in-out infinite;
+}
+
+.animate-cosmic-telemetry {
+  animation: cosmic-telemetry-pulse 2.8s ease-in-out infinite;
+}
+
+@keyframes planetary-orbit-mini-3 {
+  0% {
+    transform: rotate(90deg) translateX(46px) rotate(-90deg);
+  }
+  100% {
+    transform: rotate(450deg) translateX(46px) rotate(-450deg);
+  }
+}
+
+@keyframes binary-stars-spin {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes radar-scan-pulse {
+  0% {
+    transform: scale(0.6);
+    opacity: 0.8;
+  }
+  50% {
+    opacity: 0.4;
+  }
+  100% {
+    transform: scale(1.6);
+    opacity: 0;
+  }
+}
+
+@keyframes cosmic-shimmer-pass {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-moon-orbit-3 {
+  animation: planetary-orbit-mini-3 16s linear infinite;
+}
+
+.animate-binary-spin {
+  animation: binary-stars-spin 4.5s linear infinite;
+}
+
+.animate-radar-ping {
+  animation: radar-scan-pulse 2.4s cubic-bezier(0, 0.2, 0.8, 1) infinite;
+}
+
+.animate-cosmic-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: cosmic-shimmer-pass 3s infinite linear;
+}
+

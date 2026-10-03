@@ -1,0 +1,137 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile with personal and financial preferences",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "phoneWhatsapp": { "type": "string" },
+        "authProvider": { "type": "string", "enum": ["local", "gmail", "facebook", "whatsapp"] },
+        "avatar": { "type": "string" },
+        "companyName": { "type": "string" },
+        "city": { "type": "string" },
+        "state": { "type": "string" },
+        "role": { "type": "string" },
+        "pixKey": { "type": "string" },
+        "cep": { "type": "string" },
+        "address": { "type": "string" },
+        "addressNumber": { "type": "string" },
+        "neighborhood": { "type": "string" },
+        "cpfCnpj": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "isFirstLogin": { "type": "boolean" },
+        "hasSeenWelcome": { "type": "boolean" }
+      },
+      "required": ["id", "name", "email"]
+    },
+    "Debtor": {
+      "title": "Debtor",
+      "description": "Debtor record managed by the user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "name": { "type": "string" },
+        "cpf": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "notes": { "type": "string" },
+        "totalDebt": { "type": "number" },
+        "totalPaid": { "type": "number" },
+        "totalRemaining": { "type": "number" },
+        "installmentsCount": { "type": "number" },
+        "paidCount": { "type": "number" },
+        "status": { "type": "string", "enum": ["adimplente", "atrasado", "quitado"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "userId", "name", "totalDebt"]
+    },
+    "Purchase": {
+      "title": "Purchase",
+      "description": "Original debt/purchase contract",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "debtorId": { "type": "string" },
+        "description": { "type": "string" },
+        "originalAmount": { "type": "number" },
+        "date": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["id", "userId", "debtorId", "description", "originalAmount"]
+    },
+    "Installment": {
+      "title": "Installment",
+      "description": "Individual payment installment for a debtor",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "debtorId": { "type": "string" },
+        "purchaseId": { "type": "string" },
+        "number": { "type": "number" },
+        "totalInstallments": { "type": "number" },
+        "amount": { "type": "number" },
+        "dueDate": { "type": "string" },
+        "paymentDate": { "type": "string" },
+        "paidAmount": { "type": "number" },
+        "status": { "type": "string", "enum": ["overdue", "soon", "ontime", "paid"] },
+        "notes": { "type": "string" },
+        "proofOfPayment": { "type": "string" },
+        "receiptGenerated": { "type": "boolean" },
+        "receiptNumber": { "type": "string" }
+      },
+      "required": ["id", "userId", "debtorId", "number", "amount", "dueDate", "status"]
+    },
+    "ForumTopic": {
+      "title": "ForumTopic",
+      "description": "Closed discussion topic and feedback for master developer Tiago Dias",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "authorId": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorEmail": { "type": "string" },
+        "authorAvatar": { "type": "string" },
+        "authorRole": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "category": { "type": "string", "enum": ["sugestao", "melhoria", "bug", "duvida", "conformidade"] },
+        "status": { "type": "string", "enum": ["aberto", "em_analise", "em_desenvolvimento", "concluido", "rejeitado"] },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "upvotes": { "type": "number" },
+        "devResponse": { "type": "string" },
+        "devResponseAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "authorName", "authorEmail", "title", "content", "category", "status"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profile with PIX, address, and credentials"
+    },
+    "/users/{userId}/debtors/{debtorId}": {
+      "schema": "Debtor",
+      "description": "Debtors associated with the user account"
+    },
+    "/users/{userId}/purchases/{purchaseId}": {
+      "schema": "Purchase",
+      "description": "Purchases and debt contracts associated with the debtor"
+    },
+    "/users/{userId}/installments/{installmentId}": {
+      "schema": "Installment",
+      "description": "Payment installments associated with the debtor"
+    },
+    "/forum_topics/{topicId}": {
+      "schema": "ForumTopic",
+      "description": "Closed community forum topics and feedback suggestions for developer Tiago Dias"
+    }
+  }
+}

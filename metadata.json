@@ -1,0 +1,6 @@
+{
+  "name": "Recebíveis & Parcelas",
+  "description": "Sistema de gestão e controle de devedores e pagamentos parcelados da HASPAHO Tecnologia da Informação, desenvolvido por Tiago Dias.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
