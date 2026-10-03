@@ -4,6 +4,8 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut,
+  createUserWithEmailAndPassword,
+  signInWithEmailAndPassword,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -199,12 +201,24 @@ export async function loginWithRealCredentials(
     if (cleanPass !== 'haspaho2026' && cleanPass !== '8888') {
       throw new Error('Senha incorreta para a conta de Administrador Mestre / Desenvolvedor.');
     }
-    // Fetch latest profile from Firestore or return TIAGO_DIAS_USER
+    let masterUid = TIAGO_DIAS_USER.id;
     try {
-      const remote = await getUserFromFirestore(TIAGO_DIAS_USER.id);
-      return remote ? { ...TIAGO_DIAS_USER, ...remote, isMasterAdmin: true, isFullStackDev: true } : TIAGO_DIAS_USER;
+      const fbCred = await signInWithEmailAndPassword(auth, 'tiagodias8888@gmail.com', 'haspaho2026');
+      masterUid = fbCred.user.uid;
     } catch {
-      return TIAGO_DIAS_USER;
+      try {
+        const fbCred = await createUserWithEmailAndPassword(auth, 'tiagodias8888@gmail.com', 'haspaho2026');
+        masterUid = fbCred.user.uid;
+      } catch {}
+    }
+
+    try {
+      const remote = await getUserFromFirestore(masterUid);
+      return remote
+        ? { ...TIAGO_DIAS_USER, ...remote, id: masterUid, isMasterAdmin: true, isFullStackDev: true }
+        : { ...TIAGO_DIAS_USER, id: masterUid, isMasterAdmin: true, isFullStackDev: true };
+    } catch {
+      return { ...TIAGO_DIAS_USER, id: masterUid, isMasterAdmin: true, isFullStackDev: true };
     }
   }
 
@@ -225,7 +239,6 @@ export async function loginWithRealCredentials(
     const localRegistry = getLocalRegisteredCredentials();
     cred = localRegistry[cleanId] || null;
     if (!cred) {
-      // Find by username in local registry
       const byUser = Object.values(localRegistry).find(
         (c) => c.username.toLowerCase() === cleanId
       );
@@ -239,26 +252,37 @@ export async function loginWithRealCredentials(
     );
   }
 
-  // Verify password (base64 encoded hash)
   const incomingHash = btoa(cleanPass);
   if (cred.passwordHash !== incomingHash && cred.passwordHash !== cleanPass) {
     throw new Error('Senha incorreta para este usuário.');
   }
 
-  // Load latest profile from Firestore if available
+  let authUid = cred.userId;
   try {
-    const remote = await getUserFromFirestore(cred.userId);
-    if (remote) return remote;
-  } catch {
-    // fallback to stored user profile
+    const fbCred = await signInWithEmailAndPassword(auth, cred.email, cleanPass);
+    authUid = fbCred.user.uid;
+  } catch (e) {
+    try {
+      const fbCred = await createUserWithEmailAndPassword(auth, cred.email, cleanPass);
+      authUid = fbCred.user.uid;
+    } catch (err) {
+      // fallback
+    }
   }
 
-  return cred.user;
+  try {
+    const remote = await getUserFromFirestore(authUid);
+    if (remote) return { ...remote, id: authUid };
+  } catch {
+    // fallback
+  }
+
+  return { ...cred.user, id: authUid };
 }
 
 /**
  * Real user registration.
- * Creates an isolated user account with 0 external records.
+ * Creates an isolated user account with Firebase Auth UID.
  */
 export async function registerRealUser(
   userData: Partial<UserAccount>,
@@ -274,7 +298,6 @@ export async function registerRealUser(
     throw new Error('A senha deve ter no mínimo 6 caracteres.');
   }
 
-  // Check collision with Tiago Dias account
   if (
     email === 'tiagodias8888@gmail.com' ||
     username === 'tiagodias' ||
@@ -283,7 +306,6 @@ export async function registerRealUser(
     throw new Error('Este e-mail já pertence a uma conta mestra registrada.');
   }
 
-  // Check collision in Firestore or local registry
   const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
   try {
     const checkDoc = await getDoc(doc(db, 'registered_credentials', safeDocKey));
@@ -299,7 +321,20 @@ export async function registerRealUser(
     throw new Error('Este e-mail já está cadastrado no sistema.');
   }
 
-  const newUserId = `usr_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  let authUid = '';
+  try {
+    const fbCred = await createUserWithEmailAndPassword(auth, email, rawPassword.trim());
+    authUid = fbCred.user.uid;
+  } catch (err: any) {
+    try {
+      const fbCred = await signInWithEmailAndPassword(auth, email, rawPassword.trim());
+      authUid = fbCred.user.uid;
+    } catch (innerErr: any) {
+      throw new Error(err.message || 'Erro ao registrar usuário no Firebase Authentication.');
+    }
+  }
+
+  const newUserId = authUid;
   const newUser: UserAccount = {
     id: newUserId,
     name,
@@ -329,12 +364,10 @@ export async function registerRealUser(
     user: newUser,
   };
 
-  // Save in local registry
   localRegistry[email] = credRecord;
   localRegistry[username] = credRecord;
   saveLocalRegisteredCredentials(localRegistry);
 
-  // Save to Firestore
   try {
     await setDoc(doc(db, 'registered_credentials', safeDocKey), credRecord);
     await saveUserToFirestore(newUser);
@@ -353,23 +386,26 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
   const fbUser = result.user;
   const email = (fbUser.email || '').toLowerCase();
   const isMaster = email === 'tiagodias8888@gmail.com';
+  const userId = fbUser.uid;
 
   if (isMaster) {
     const user: UserAccount = {
       ...TIAGO_DIAS_USER,
+      id: userId,
       email,
       name: fbUser.displayName || TIAGO_DIAS_USER.name,
       avatar: fbUser.photoURL || TIAGO_DIAS_USER.avatar,
       authProvider: 'gmail',
+      isMasterAdmin: true,
+      isFullStackDev: true,
     };
     await saveUserToFirestore(user);
     return user;
   }
 
-  const userId = `usr_google_${fbUser.uid}`;
   const existingUser = await getUserFromFirestore(userId);
   if (existingUser) {
-    return existingUser;
+    return { ...existingUser, id: userId };
   }
 
   const newUser: UserAccount = {

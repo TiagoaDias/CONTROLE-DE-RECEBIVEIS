@@ -31,7 +31,9 @@ import {
   clearAllUserDataFromFirestore,
   logoutSession,
   TIAGO_DIAS_USER,
+  auth,
 } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -158,58 +160,62 @@ export default function App() {
     return false;
   });
 
-  // Domain data in state - with robust LocalStorage persistence and fallback
+  // Domain data in state - with robust LocalStorage persistence and fallback per user ID
   const [debtors, setDebtors] = useState<Debtor[]>(() => {
     try {
-      const saved = localStorage.getItem('haspaho_debtors');
+      const activeUser = currentUser || DEFAULT_USER;
+      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      const saved = localStorage.getItem(`haspaho_debtors_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_debtors') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
+      return isMaster ? INITIAL_DEBTORS : [];
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_DEBTORS;
+    return [];
   });
 
   const [purchases, setPurchases] = useState<Purchase[]>(() => {
     try {
-      const saved = localStorage.getItem('haspaho_purchases');
+      const activeUser = currentUser || DEFAULT_USER;
+      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      const saved = localStorage.getItem(`haspaho_purchases_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_purchases') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
+      return isMaster ? INITIAL_PURCHASES : [];
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_PURCHASES;
+    return [];
   });
 
   const [installments, setInstallments] = useState<Installment[]>(() => {
     try {
-      const saved = localStorage.getItem('haspaho_installments');
+      const activeUser = currentUser || DEFAULT_USER;
+      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      const saved = localStorage.getItem(`haspaho_installments_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_installments') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          return parsed;
-        }
+        if (Array.isArray(parsed)) return parsed;
       }
+      return isMaster ? INITIAL_INSTALLMENTS : [];
     } catch (e) {
       console.error(e);
     }
-    return INITIAL_INSTALLMENTS;
+    return [];
   });
 
   const [institutions] = useState<BankInstitution[]>(INITIAL_INSTITUTIONS);
 
-  // Deleted Debtors Trash Bin (Lixeira) - LocalStorage Persistence
+  // Deleted Debtors Trash Bin (Lixeira) - LocalStorage Persistence per user
   const [deletedDebtors, setDeletedDebtors] = useState<Debtor[]>(() => {
     try {
-      const saved = localStorage.getItem('haspaho_deleted_debtors');
+      const activeUser = currentUser || DEFAULT_USER;
+      const saved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`) || localStorage.getItem('haspaho_deleted_debtors');
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) return parsed;
@@ -225,14 +231,54 @@ export default function App() {
 
   const isInitialLoadRef = useRef(true);
 
+  // Enforce Firebase Auth as the single source of truth for identity
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser) {
+        const authUid = fbUser.uid;
+        setCurrentUser((prev) => {
+          if (!prev || prev.id !== authUid) {
+            try {
+              const saved = localStorage.getItem('haspaho_auth_user');
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                return { ...parsed, id: authUid };
+              }
+            } catch {}
+            return {
+              id: authUid,
+              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuário',
+              email: fbUser.email || '',
+              authProvider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'gmail' : 'local',
+              createdAt: new Date().toISOString(),
+              isFirstLogin: false,
+              hasSeenWelcome: true,
+            };
+          }
+          return prev;
+        });
+      } else {
+        // No active Firebase Auth session - clear user and private data
+        setCurrentUser(null);
+        setDebtors([]);
+        setPurchases([]);
+        setInstallments([]);
+      }
+    });
+    return () => unsubscribe();
+  }, []);
+
   // Sync initial user data from Firebase Firestore
   useEffect(() => {
-    const activeUser = currentUser || DEFAULT_USER;
-    if (!activeUser) return;
+    const activeUser = currentUser;
+    const authUid = auth.currentUser?.uid;
+    if (!activeUser || !authUid || activeUser.id !== authUid) return;
     let isMounted = true;
 
     async function loadUserData(user: UserAccount) {
       try {
+        if (!auth.currentUser || auth.currentUser.uid !== user.id) return;
+
         const remoteUser = await getUserFromFirestore(user.id);
         if (remoteUser && isMounted) {
           setCurrentUser(remoteUser);
@@ -248,6 +294,8 @@ export default function App() {
         ]);
 
         if (isMounted) {
+          const isMaster = user.id === 'usr_thiago_dias' || user.email === 'tiagodias8888@gmail.com';
+
           if (remoteDebtors && remoteDebtors.length > 0) {
             setDebtors(
               remoteDebtors.map((d) => ({
@@ -256,13 +304,13 @@ export default function App() {
               }))
             );
           } else {
-            setDebtors((prev) => (prev && prev.length > 0 ? prev : INITIAL_DEBTORS));
+            setDebtors(isMaster ? INITIAL_DEBTORS : []);
           }
 
           if (remotePurchases && remotePurchases.length > 0) {
             setPurchases(remotePurchases);
           } else {
-            setPurchases((prev) => (prev && prev.length > 0 ? prev : INITIAL_PURCHASES));
+            setPurchases(isMaster ? INITIAL_PURCHASES : []);
           }
 
           if (remoteInstallments && remoteInstallments.length > 0) {
@@ -290,12 +338,12 @@ export default function App() {
               })
             );
           } else {
-            setInstallments((prev) => (prev && prev.length > 0 ? prev : INITIAL_INSTALLMENTS));
+            setInstallments(isMaster ? INITIAL_INSTALLMENTS : []);
           }
 
-          // Se o banco ainda não foi inicializado para este usuário, salvar os dados iniciais uma única vez
+          // Se o banco ainda não foi inicializado para o usuário Mestre, salvar os dados iniciais uma única vez
           const hasInitKey = `haspaho_db_init_${user.id}`;
-          if (!localStorage.getItem(hasInitKey) && (!remoteDebtors || remoteDebtors.length === 0)) {
+          if (isMaster && !localStorage.getItem(hasInitKey) && (!remoteDebtors || remoteDebtors.length === 0)) {
             localStorage.setItem(hasInitKey, 'true');
             saveDebtorsToFirestore(user.id, INITIAL_DEBTORS).catch(() => {});
             savePurchasesToFirestore(user.id, INITIAL_PURCHASES).catch(() => {});
