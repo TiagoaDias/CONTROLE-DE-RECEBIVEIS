@@ -6,6 +6,7 @@ import {
   loginWithRealCredentials,
   registerRealUser,
   signInWithGoogleOAuth,
+  signInWithFacebook,
 } from '../lib/firebase';
 
 interface InitialWelcomeLoginScreenProps {
@@ -149,10 +150,32 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     }
   };
 
+  // Trigger Facebook Login
+  const handleFacebookAuthDirect = async () => {
+    setErrorMessage('');
+    setIsLoading(true);
+    try {
+      const user = await signInWithFacebook();
+      onLoginSuccess(user, false);
+    } catch (err: any) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        setErrorMessage('A janela de autenticação do Facebook foi cancelada.');
+      } else {
+        setErrorMessage(err.message || 'Não foi possível entrar com Facebook. Verifique a configuração no console do Firebase.');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Trigger Social Auth Modal
   const openSocialAuth = (provider: 'gmail' | 'facebook' | 'whatsapp') => {
     if (provider === 'gmail') {
       handleGoogleAuthDirect();
+      return;
+    }
+    if (provider === 'facebook') {
+      handleFacebookAuthDirect();
       return;
     }
     setSocialProvider(provider);
@@ -470,159 +493,158 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
             {/* TAB 1: LOGIN */}
             {activeTab === 'login' && (
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
-                <div>
-                  <label className="block text-xs font-bold text-slate-700 mb-1">
-                    E-mail ou Nome de Usuário
-                  </label>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">
-                      person
-                    </span>
-                    <input
-                      type="text"
-                      value={loginIdentifier}
-                      onChange={(e) => setLoginIdentifier(e.target.value)}
-                      placeholder="seu.email@exemplo.com ou usuário"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 outline-hidden transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <div className="flex items-center justify-between mb-1">
-                    <label className="text-xs font-bold text-slate-700">Senha de Acesso</label>
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="text-[11px] text-blue-600 hover:underline cursor-pointer"
-                    >
-                      {showPassword ? 'Ocultar' : 'Exibir'}
-                    </button>
-                  </div>
-                  <div className="relative">
-                    <span className="material-symbols-outlined absolute left-3 top-2.5 text-slate-400 text-lg">
-                      lock
-                    </span>
-                    <input
-                      type={showPassword ? 'text' : 'password'}
-                      value={loginPassword}
-                      onChange={(e) => setLoginPassword(e.target.value)}
-                      placeholder="••••••••"
-                      className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 outline-hidden transition-all"
-                      required
-                    />
-                  </div>
-                </div>
-
+              <div className="space-y-4">
+                {/* Prominent Google Quick Login Button */}
                 <button
-                  type="submit"
+                  type="button"
+                  onClick={handleGoogleAuthDirect}
                   disabled={isLoading}
-                  className="w-full py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
+                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                 >
-                  {isLoading ? (
-                    <>
-                      <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                      <span>Validando Credenciais...</span>
-                    </>
-                  ) : (
-                    <>
-                      <span className="material-symbols-outlined text-[18px]">login</span>
-                      <span>Acessar o Sistema</span>
-                    </>
-                  )}
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
+                    <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
+                    <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                    <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                    <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+                  </svg>
+                  <span>Continuar com Google</span>
                 </button>
 
-                {/* Master Developer Quick Fill Button */}
+                {/* Prominent Facebook Quick Login Button */}
+                <button
+                  type="button"
+                  onClick={handleFacebookAuthDirect}
+                  disabled={isLoading}
+                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-blue-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
+                >
+                  <svg className="w-5 h-5 shrink-0" fill="#1877F2" viewBox="0 0 24 24">
+                    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                  </svg>
+                  <span>Entrar com Facebook</span>
+                </button>
+
+                {/* Prominent WhatsApp Quick Login Button */}
                 <button
                   type="button"
                   onClick={() => {
-                    setLoginIdentifier('tiagodias8888@gmail.com');
-                    setLoginPassword('haspaho2026');
+                    setErrorMessage('O login com WhatsApp requer a ativação do provedor Telefone/SMS no Console do Firebase. Utilize E-mail/Senha, Google ou Facebook para acesso imediato.');
                   }}
-                  className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-[11px] font-bold flex items-center justify-between transition-all cursor-pointer"
+                  disabled={isLoading}
+                  className="w-full py-3.5 px-4 rounded-2xl border-2 border-slate-200 hover:border-emerald-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-all active:scale-[0.98] cursor-pointer"
                 >
-                  <div className="flex items-center gap-1.5">
-                    <span className="material-symbols-outlined text-amber-500 text-[16px] font-bold">crown</span>
-                    <span>Entrar como: Tiago Augusto Dias (Full Stack Dev &amp; Admin)</span>
-                  </div>
-                  <span className="text-[9px] bg-blue-600 text-white font-mono font-black px-1.5 py-0.5 rounded">
-                    ADMIN
-                  </span>
+                  <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">chat</span>
+                  <span>Entrar com WhatsApp</span>
                 </button>
 
-                {/* Password Recovery Help Direct Link */}
-                <div className="pt-2 text-center border-t border-slate-100">
-                  <p className="text-[11px] text-slate-500">
-                    Esqueceu sua senha ou precisa de recuperação de acesso?
-                  </p>
-                  <a
-                    href="https://wa.me/5514997339863?text=Ol%C3%A1%20Tiago%20Augusto%20Dias%2C%20preciso%20de%20ajuda%20com%20a%20minha%20senha%20de%20acesso%20no%20Haspaho."
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="text-xs text-blue-600 hover:text-blue-800 font-bold inline-flex items-center gap-1 mt-0.5"
-                  >
-                    <span className="material-symbols-outlined text-[15px] text-emerald-600">chat</span>
-                    <span>Suporte com Desenvolvedor Tiago Dias (WhatsApp: 014 99733-9863)</span>
-                  </a>
-                </div>
-
-                <div className="relative flex items-center justify-center my-3">
+                <div className="relative flex items-center justify-center my-2">
                   <div className="border-t border-slate-200 w-full" />
                   <span className="bg-white px-3 text-[11px] text-slate-400 uppercase font-bold shrink-0">
-                    Ou acesse com
+                    ou entre com e-mail
                   </span>
                 </div>
 
-                {/* Social Login Options */}
-                <div className="grid grid-cols-3 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => openSocialAuth('gmail')}
-                    className="py-2 px-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 flex items-center justify-center gap-2 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
-                    title="Entrar com Conta Google Oficial"
-                  >
-                    <svg className="w-4 h-4" viewBox="0 0 24 24">
-                      <path
-                        fill="#4285F4"
-                        d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"
+                <form onSubmit={handleLoginSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">
+                      E-mail ou Nome de Usuário
+                    </label>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg">
+                        person
+                      </span>
+                      <input
+                        type="text"
+                        value={loginIdentifier}
+                        onChange={(e) => setLoginIdentifier(e.target.value)}
+                        placeholder="seu.email@exemplo.com ou usuário"
+                        className="w-full pl-10 pr-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium"
+                        required
                       />
-                      <path
-                        fill="#34A853"
-                        d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-bold text-slate-700">Senha de Acesso</label>
+                    </div>
+                    <div className="relative">
+                      <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg">
+                        lock
+                      </span>
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="w-full pl-10 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium"
+                        required
                       />
-                      <path
-                        fill="#FBBC05"
-                        d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"
-                      />
-                      <path
-                        fill="#EA4335"
-                        d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"
-                      />
-                    </svg>
-                    <span>Google</span>
-                  </button>
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                        title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
+                      >
+                        <span className="material-symbols-outlined text-xl">
+                          {showPassword ? 'visibility_off' : 'visibility'}
+                        </span>
+                      </button>
+                    </div>
+                  </div>
 
                   <button
-                    type="button"
-                    onClick={() => openSocialAuth('facebook')}
-                    className="py-2 px-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm transition-all active:scale-[0.98] disabled:opacity-50 cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-blue-600 text-[18px]">public</span>
-                    <span>Facebook</span>
+                    {isLoading ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                        <span>Validando Credenciais...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">login</span>
+                        <span>Entrar no Sistema</span>
+                      </>
+                    )}
                   </button>
 
+                  {/* Master Developer Quick Fill Button */}
                   <button
                     type="button"
-                    onClick={() => openSocialAuth('whatsapp')}
-                    className="py-2 px-2.5 rounded-xl border border-slate-200 hover:border-slate-300 hover:bg-slate-50 flex items-center justify-center gap-1.5 text-xs font-bold text-slate-700 transition-colors cursor-pointer"
+                    onClick={() => {
+                      setLoginIdentifier('tiagodias8888@gmail.com');
+                      setLoginPassword('haspaho2026');
+                    }}
+                    className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-[11px] font-bold flex items-center justify-between transition-all cursor-pointer"
                   >
-                    <span className="material-symbols-outlined text-emerald-600 text-[18px]">chat</span>
-                    <span>WhatsApp</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="material-symbols-outlined text-amber-500 text-[16px] font-bold">crown</span>
+                      <span>Entrar como: Tiago Augusto Dias (Admin)</span>
+                    </div>
+                    <span className="text-[9px] bg-blue-600 text-white font-mono font-black px-1.5 py-0.5 rounded">
+                      ADMIN
+                    </span>
+                  </button>
+                </form>
+
+                {/* Switch to Register footer */}
+                <div className="mt-6 pt-4 border-t border-slate-200 text-center">
+                  <p className="text-xs text-slate-600 mb-2">Não possui uma conta?</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('register');
+                      setErrorMessage('');
+                    }}
+                    className="w-full py-3 px-4 rounded-xl border-2 border-blue-600 text-blue-600 hover:bg-blue-50 font-bold text-xs sm:text-sm flex items-center justify-center gap-2 transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-lg">person_add</span>
+                    <span>Cadastrar Nova Conta</span>
                   </button>
                 </div>
-              </form>
+              </div>
             )}
 
             {/* TAB 2: REGISTER */}

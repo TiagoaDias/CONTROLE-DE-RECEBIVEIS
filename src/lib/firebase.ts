@@ -3,6 +3,7 @@ import {
   getAuth,
   signInWithPopup,
   GoogleAuthProvider,
+  FacebookAuthProvider,
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
@@ -34,6 +35,53 @@ export const db = firebaseConfig.firestoreDatabaseId
 // Google OAuth Provider
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+// Facebook OAuth Provider
+const facebookProvider = new FacebookAuthProvider();
+facebookProvider.setCustomParameters({ display: 'popup' });
+
+export async function signInWithFacebook(): Promise<UserAccount> {
+  try {
+    const result = await signInWithPopup(auth, facebookProvider);
+    const fbUser = result.user;
+    const email = (fbUser.email || '').toLowerCase();
+    const userId = fbUser.uid;
+
+    const existingUser = await getUserFromFirestore(userId);
+    if (existingUser) {
+      return { ...existingUser, id: userId };
+    }
+
+    const newUser: UserAccount = {
+      id: userId,
+      name: fbUser.displayName || email.split('@')[0] || 'Usuário Facebook',
+      username: email.split('@')[0] || `user_${userId.substring(0, 6)}`,
+      email: email || `${userId}@facebook.local`,
+      phoneWhatsapp: fbUser.phoneNumber || '',
+      authProvider: 'facebook',
+      avatar: fbUser.photoURL || undefined,
+      companyName: 'Gestão Financeira Facebook',
+      city: 'Brasil',
+      state: 'BR',
+      role: 'Usuário Gestor',
+      pixKey: email || '',
+      createdAt: new Date().toISOString(),
+      isFirstLogin: true,
+      hasSeenWelcome: false,
+    };
+
+    await saveUserToFirestore(newUser);
+    return newUser;
+  } catch (err: any) {
+    if (err.code === 'auth/popup-closed-by-user') {
+      throw new Error('A janela de autenticação do Facebook foi cancelada.');
+    }
+    if (err.code === 'auth/operation-not-allowed' || err.code === 'auth/account-exists-with-different-credential') {
+      throw new Error('O login com Facebook não está ativado no painel do Firebase Console. Por favor, ative o provedor Facebook no Console do Firebase ou utilize E-mail/Senha ou Google.');
+    }
+    throw new Error(err.message || 'Não foi possível entrar com Facebook. Verifique a configuração no console do Firebase.');
+  }
+}
 
 // MANDATED FIRESTORE ERROR HANDLING TYPES & FUNCTION
 export enum OperationType {

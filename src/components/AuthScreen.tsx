@@ -226,7 +226,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                   value={loginIdentifier}
                   onChange={(e) => setLoginIdentifier(e.target.value)}
                   placeholder="seu.email@exemplo.com"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-blue-500 text-xs text-slate-900 outline-hidden"
+                  className="w-full px-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium"
                   required
                 />
               </div>
@@ -234,22 +234,27 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <label className="text-xs font-bold text-slate-700">Senha</label>
+                </div>
+                <div className="relative">
+                  <input
+                    type={showPassword ? 'text' : 'password'}
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full px-3.5 pr-11 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden font-medium"
+                    required
+                  />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
-                    className="text-[11px] text-blue-600 hover:underline cursor-pointer"
+                    className="absolute right-3.5 top-3 text-slate-400 hover:text-slate-700 cursor-pointer p-0.5"
+                    title={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                   >
-                    {showPassword ? 'Ocultar' : 'Exibir'}
+                    <span className="material-symbols-outlined text-xl">
+                      {showPassword ? 'visibility_off' : 'visibility'}
+                    </span>
                   </button>
                 </div>
-                <input
-                  type={showPassword ? 'text' : 'password'}
-                  value={loginPassword}
-                  onChange={(e) => setLoginPassword(e.target.value)}
-                  placeholder="••••••••"
-                  className="w-full px-3 py-2 rounded-xl border border-slate-300 focus:border-blue-500 text-xs text-slate-900 outline-hidden"
-                  required
-                />
               </div>
 
               <button
