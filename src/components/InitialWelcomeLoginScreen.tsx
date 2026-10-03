@@ -28,9 +28,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 }) => {
   const [activeTab, setActiveTab] = useState<'login' | 'register' | 'recover'>('login');
 
-  // Form States - default to official fields for convenience, but STILL validated strictly
-  const [loginIdentifier, setLoginIdentifier] = useState('tiagodias8888@gmail.com');
-  const [loginPassword, setLoginPassword] = useState('haspaho2026');
+  // Form States - start empty to allow explicit method choice without autofill overriding
+  const [loginIdentifier, setLoginIdentifier] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
 
   // Social Auth Modal State

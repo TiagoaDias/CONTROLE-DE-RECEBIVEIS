@@ -117,34 +117,9 @@ export default function App() {
     });
   };
 
-  // Authentication & Welcome States
+  // Authentication & Welcome States - start null so login screen is displayed on startup
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
-    try {
-      const saved = localStorage.getItem('haspaho_auth_user');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (
-          parsed.email === 'tiagodias8888@gmail.com' ||
-          parsed.username === 'tiagodias' ||
-          parsed.id === 'usr_thiago_dias'
-        ) {
-          return {
-            ...TIAGO_DIAS_USER,
-            ...parsed,
-            name: 'Tiago Augusto Dias',
-            cpfCnpj: '368.497.448-01',
-            phoneWhatsapp: '(14) 99733-9863',
-            role: 'Desenvolvedor e Programador Full Stack | Administrador Master',
-            isMasterAdmin: true,
-            isFullStackDev: true,
-          };
-        }
-        return parsed;
-      }
-    } catch (e) {
-      console.error(e);
-    }
-    return DEFAULT_USER;
+    return null;
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [isWelcomeOpen, setIsWelcomeOpen] = useState<boolean>(() => {
