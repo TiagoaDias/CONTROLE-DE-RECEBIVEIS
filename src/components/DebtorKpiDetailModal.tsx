@@ -38,6 +38,11 @@ interface ItemGroup {
   pendingCount: number;
   overdueCount: number;
   totalProductInstallments: number;
+  monthPaidCount: number;
+  monthPendingCount: number;
+  monthOverdueCount: number;
+  isMonthAllPaid: boolean;
+  lastPaymentDate?: string;
 }
 
 export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
@@ -63,6 +68,7 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
   // 1. Filtra estritamente as parcelas do devedor selecionado (Hook incondicional)
   const debtorInstallments = useMemo(() => {
     if (!debtor) return [];
+    if (debtor.id === 'general' || debtor.id === 'all') return installments || [];
     return (installments || []).filter(
       (i) =>
         i.debtorId === debtor.id ||
@@ -141,6 +147,12 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
       const overdueCount = allForProduct.filter((i) => i.status === 'overdue' || (i.delayDays || 0) > 0).length;
       const pendingCount = allForProduct.filter((i) => i.status !== 'paid').length;
 
+      const monthPaidCount = instList.filter((i) => i.status === 'paid').length;
+      const monthOverdueCount = instList.filter((i) => i.status === 'overdue' || (i.delayDays || 0) > 0).length;
+      const monthPendingCount = instList.filter((i) => i.status !== 'paid').length;
+      const isMonthAllPaid = instList.length > 0 && monthPaidCount === instList.length;
+      const lastPayment = instList.find((i) => i.status === 'paid' && i.paidAt);
+
       result.push({
         product,
         icon: getProductIcon(product),
@@ -152,6 +164,11 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
         pendingCount,
         overdueCount,
         totalProductInstallments,
+        monthPaidCount,
+        monthPendingCount,
+        monthOverdueCount,
+        isMonthAllPaid,
+        lastPaymentDate: lastPayment?.paidAt,
       });
     });
 
@@ -163,6 +180,11 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
     if (selectedProductFilter === 'all') return itemGroups;
     return itemGroups.filter((g) => g.product === selectedProductFilter);
   }, [itemGroups, selectedProductFilter]);
+
+  // Verifica se todas as parcelas filtradas do mês estão quitadas
+  const isEveryMonthInstallmentPaid = useMemo(() => {
+    return filteredInstallments.length > 0 && filteredInstallments.every((i) => i.status === 'paid');
+  }, [filteredInstallments]);
 
   // 6. Configurações de textos e títulos para cada tipo de métrica (Hook incondicional)
   const debtorName = debtor?.name || 'Devedor';
@@ -231,7 +253,7 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-2xl bg-white border-2 ${config.borderHighlight} ring-2 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.3)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col text-slate-800 animate-in zoom-in-95 duration-200 max-h-[82vh] my-auto`}
+        className={`w-full max-w-2xl bg-white border-2 ${config.borderHighlight} ring-2 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.3)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col text-slate-800 animate-in zoom-in-95 duration-200 max-h-[85dvh] sm:max-h-[88vh] my-auto`}
       >
         {/* ============================================================ */}
         {/* CABEÇALHO COMPACTO E REENQUADRADO                            */}
@@ -288,13 +310,28 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
             </div>
           </div>
 
-          <div className="bg-white px-3 py-1 rounded-xl border border-slate-200 text-right shrink-0 shadow-2xs">
+          <div className={`px-3 py-1 rounded-xl border text-right shrink-0 shadow-2xs ${
+            type === 'month' && isEveryMonthInstallmentPaid
+              ? 'bg-emerald-50 border-emerald-200'
+              : 'bg-white border-slate-200'
+          }`}>
             <span className="text-[9px] text-slate-400 font-bold uppercase tracking-wider block">
-              Total {config.badgeText}:
+              {type === 'month'
+                ? isEveryMonthInstallmentPaid
+                  ? `TOTAL QUITADO (${currentMonthAbbr}):`
+                  : `TOTAL DO MÊS (${currentMonthAbbr}):`
+                : `Total ${config.badgeText}:`}
             </span>
-            <span className={`text-sm sm:text-base font-black font-mono leading-none block ${config.amountColor}`}>
+            <span className={`text-sm sm:text-base font-black font-mono leading-none block ${
+              type === 'month' && isEveryMonthInstallmentPaid ? 'text-emerald-700' : config.amountColor
+            }`}>
               R$ {safeToFixed(totalAmount)}
             </span>
+            {type === 'month' && isEveryMonthInstallmentPaid && (
+              <span className="text-[8.5px] font-black text-emerald-700 uppercase tracking-tight block mt-0.5">
+                ✓ 100% Liquidado
+              </span>
+            )}
           </div>
         </div>
 
@@ -364,17 +401,36 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
                   {/* Cabeçalho do Item */}
                   <div className="px-3.5 py-2.5 bg-gradient-to-r from-slate-50/90 via-white to-slate-50/90 border-b border-slate-200/80 flex items-center justify-between gap-2.5">
                     <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-8 h-8 rounded-xl bg-cyan-50 border border-cyan-200 flex items-center justify-center shrink-0 text-cyan-700 shadow-2xs">
-                        <span className="material-symbols-outlined text-[17px]">{grp.icon}</span>
+                      <div className={`w-8 h-8 rounded-xl border flex items-center justify-center shrink-0 shadow-2xs ${
+                        type === 'month' && grp.isMonthAllPaid
+                          ? 'bg-emerald-50 border-emerald-200 text-emerald-700'
+                          : 'bg-cyan-50 border-cyan-200 text-cyan-700'
+                      }`}>
+                        <span className="material-symbols-outlined text-[17px]">
+                          {type === 'month' && grp.isMonthAllPaid ? 'task_alt' : grp.icon}
+                        </span>
                       </div>
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h4 className="font-black text-xs sm:text-sm text-slate-900 truncate">
-                            {config.itemPrefix} <span className="text-cyan-800">{grp.product}</span>
+                            {type === 'month' && grp.isMonthAllPaid
+                              ? 'Fatura quitada do '
+                              : type === 'month' && grp.monthOverdueCount > 0
+                              ? 'Fatura em atraso do '
+                              : config.itemPrefix}{' '}
+                            <span className={type === 'month' && grp.isMonthAllPaid ? 'text-emerald-800' : 'text-cyan-800'}>
+                              {grp.product}
+                            </span>
                           </h4>
                           {grp.cardName && (
                             <span className="text-[9.5px] font-mono px-1.5 py-0.2 rounded bg-purple-50 text-purple-700 border border-purple-200 font-bold">
                               {grp.cardName}
+                            </span>
+                          )}
+                          {type === 'month' && grp.isMonthAllPaid && (
+                            <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1">
+                              <span className="material-symbols-outlined text-[12px]">verified</span>
+                              Paga
                             </span>
                           )}
                         </div>
@@ -400,19 +456,38 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
                             </span>
                           )}
                           {type === 'month' && (
-                            <span className="text-amber-700 font-bold">
-                              Vence neste mês ({currentMonthAbbr})
-                            </span>
+                            grp.isMonthAllPaid ? (
+                              <span className="text-emerald-700 font-extrabold flex items-center gap-1 bg-emerald-50/80 px-2 py-0.5 rounded-md border border-emerald-200/80">
+                                <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                {grp.lastPaymentDate ? `Paga em ${grp.lastPaymentDate} (${currentMonthAbbr})` : `Paga neste mês (${currentMonthAbbr})`}
+                              </span>
+                            ) : grp.monthOverdueCount > 0 ? (
+                              <span className="text-red-700 font-extrabold flex items-center gap-1 bg-red-50/80 px-2 py-0.5 rounded-md border border-red-200/80">
+                                <span className="material-symbols-outlined text-[13px]">warning</span>
+                                Vencida em atraso ({currentMonthAbbr})
+                              </span>
+                            ) : (
+                              <span className="text-amber-700 font-bold flex items-center gap-1 bg-amber-50/80 px-2 py-0.5 rounded-md border border-amber-200/80">
+                                <span className="material-symbols-outlined text-[13px]">schedule</span>
+                                A vencer neste mês ({currentMonthAbbr})
+                              </span>
+                            )
                           )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="bg-slate-50 px-2.5 py-1 rounded-xl border border-slate-200 text-right shrink-0">
+                    <div className={`px-2.5 py-1 rounded-xl border text-right shrink-0 ${
+                      type === 'month' && grp.isMonthAllPaid
+                        ? 'bg-emerald-50/60 border-emerald-200'
+                        : 'bg-slate-50 border-slate-200'
+                    }`}>
                       <span className="text-[8.5px] text-slate-400 font-bold uppercase block">
-                        Subtotal:
+                        {type === 'month' && grp.isMonthAllPaid ? 'Total Quitado:' : 'Subtotal:'}
                       </span>
-                      <span className={`text-xs sm:text-sm font-black font-mono leading-none block ${config.amountColor}`}>
+                      <span className={`text-xs sm:text-sm font-black font-mono leading-none block ${
+                        type === 'month' && grp.isMonthAllPaid ? 'text-emerald-700' : config.amountColor
+                      }`}>
                         R$ {safeToFixed(grp.totalItemAmount)}
                       </span>
                     </div>

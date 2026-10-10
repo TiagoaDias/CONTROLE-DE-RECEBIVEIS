@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ScreenTab, UserAccount } from '../types';
 import { APP_IMAGES } from '../data/mockData';
 import { HaspahoLogo } from './HaspahoLogo';
+import { ImageCropperModal } from './ImageCropperModal';
 
 interface PerfilViewProps {
   currentUser: UserAccount | null;
@@ -42,6 +43,8 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
   const [zoom, setZoom] = useState(1);
   const [cropShape, setCropShape] = useState<'circle' | 'square'>('circle');
   const [isPhotoEditorOpen, setIsPhotoEditorOpen] = useState(false);
+  const [rawUploadImage, setRawUploadImage] = useState<string | null>(null);
+  const [isCropperOpen, setIsCropperOpen] = useState(false);
 
   // Sincroniza estado quando o usuário ativo muda
   useEffect(() => {
@@ -151,7 +154,10 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
 
           <button
             type="button"
-            onClick={() => setIsPhotoEditorOpen(true)}
+            onClick={() => {
+              setRawUploadImage(currentAvatar);
+              setIsCropperOpen(true);
+            }}
             className="px-3.5 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-purple-200"
           >
             <span className="material-symbols-outlined text-[16px]">crop</span>
@@ -597,8 +603,8 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
                       const reader = new FileReader();
                       reader.onload = (event) => {
                         if (event.target?.result) {
-                          setCurrentAvatar(event.target.result as string);
-                          setZoom(1);
+                          setRawUploadImage(event.target.result as string);
+                          setIsCropperOpen(true);
                         }
                       };
                       reader.readAsDataURL(file);
@@ -628,6 +634,27 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Recorte Manual Interativo da Foto do Perfil */}
+      <ImageCropperModal
+        isOpen={isCropperOpen}
+        imageSrc={rawUploadImage}
+        shape={cropShape}
+        title="Recorte Manual da Foto de Perfil"
+        onConfirm={(croppedUrl) => {
+          setCurrentAvatar(croppedUrl);
+          setIsCropperOpen(false);
+          setRawUploadImage(null);
+          if (currentUser && onSaveUser) {
+            onSaveUser({ ...currentUser, avatar: croppedUrl });
+          }
+          onToast('Foto de perfil recortada e salva!');
+        }}
+        onCancel={() => {
+          setIsCropperOpen(false);
+          setRawUploadImage(null);
+        }}
+      />
     </div>
   );
 };

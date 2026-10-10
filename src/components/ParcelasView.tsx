@@ -12,6 +12,7 @@ import { SearchableDropdown, DropdownItem } from './SearchableDropdown';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { safeToNumber, safeToFixed, safeFormatCurrency } from '../utils/numberUtils';
 import { DebtorKpiDetailModal, DebtorKpiType } from './DebtorKpiDetailModal';
+import { playAppSound } from '../utils/soundUtils';
 
 // Configuração de Posicionamento Interativo dos Botões
 export interface ActionButtonsLayoutConfig {
@@ -1091,40 +1092,96 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
 
                 {/* Métricas Financeiras Completas */}
                 <div className="grid grid-cols-2 gap-2.5">
-                  <div className="p-3 rounded-2xl bg-amber-50/70 border border-amber-200/90">
-                    <span className="text-[10px] uppercase font-bold text-amber-800 block">Total em Aberto</span>
-                    <span className="text-base font-black font-mono text-amber-700 block mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playAppSound('pop');
+                      setActiveKpiModal('open');
+                    }}
+                    className="indicator-card financial-container p-3 rounded-2xl bg-amber-50/70 hover:bg-amber-100/90 border-2 border-amber-200/90 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/50 hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden"
+                    title={`Toque para ver o detalhamento do total em aberto de ${activeDebtor.name}`}
+                  >
+                    {/* Animação de brilho suave e halo radial */}
+                    <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-amber-400/30" />
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-amber-300/30 to-transparent skew-x-12" />
+
+                    <div className="relative z-10 flex items-center justify-between gap-1">
+                      <span className="text-[10px] uppercase font-bold text-amber-800 block truncate group-hover:text-amber-950 transition-colors">Total em Aberto</span>
+                      <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0 flex items-center gap-0.5 group-hover:bg-amber-300/90 transition-colors">
+                        <span className="w-1 h-1 rounded-full bg-amber-600 animate-pulse"></span>
+                        Interativo
+                      </span>
+                    </div>
+                    <span className="relative z-10 text-base font-black font-mono text-amber-700 block mt-0.5 group-hover:text-amber-800 transition-colors">
                       R$ {activeDebtorStats.totalDevido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[10px] text-amber-600 font-medium">
+                    <span className="relative z-10 text-[10px] text-amber-600 font-medium block">
                       {activeDebtorStats.pendingCount} parcela(s) pendente(s)
                     </span>
-                  </div>
+                    <div className="relative z-10 mt-1 pt-1 border-t border-amber-200/60 flex items-center justify-between text-[9px] font-bold text-amber-700 group-hover:text-amber-900">
+                      <span>Ver faturas</span>
+                      <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                    </div>
+                  </button>
 
-                  <div className="p-3 rounded-2xl bg-emerald-50/70 border border-emerald-200/90">
-                    <span className="text-[10px] uppercase font-bold text-emerald-800 block">Total Quitado</span>
-                    <span className="text-base font-black font-mono text-emerald-700 block mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playAppSound('success');
+                      setActiveKpiModal('paid');
+                    }}
+                    className="indicator-card financial-container p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100/90 border-2 border-emerald-200/90 hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/50 hover:shadow-[0_0_24px_rgba(16,185,129,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden"
+                    title={`Toque para ver o detalhamento do total quitado de ${activeDebtor.name}`}
+                  >
+                    {/* Animação de brilho suave e halo radial */}
+                    <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-emerald-400/30" />
+                    <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-emerald-300/30 to-transparent skew-x-12" />
+
+                    <div className="relative z-10 flex items-center justify-between gap-1">
+                      <span className="text-[10px] uppercase font-bold text-emerald-800 block truncate group-hover:text-emerald-950 transition-colors">Total Quitado</span>
+                      <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-200/90 text-emerald-900 border border-emerald-300 shrink-0 flex items-center gap-0.5 group-hover:bg-emerald-300/90 transition-colors">
+                        <span className="w-1 h-1 rounded-full bg-emerald-600 animate-pulse"></span>
+                        Interativo
+                      </span>
+                    </div>
+                    <span className="relative z-10 text-base font-black font-mono text-emerald-700 block mt-0.5 group-hover:text-emerald-800 transition-colors">
                       R$ {activeDebtorStats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
-                    <span className="text-[10px] text-emerald-600 font-medium">
+                    <span className="relative z-10 text-[10px] text-emerald-600 font-medium block">
                       {activeDebtorStats.paidCount} parcela(s) liquidada(s)
                     </span>
-                  </div>
+                    <div className="relative z-10 mt-1 pt-1 border-t border-emerald-200/60 flex items-center justify-between text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900">
+                      <span>Ver faturas</span>
+                      <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                    </div>
+                  </button>
                 </div>
 
-                {/* Barra de Progresso Geral de Quitação */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-slate-600">Progresso Geral</span>
-                    <span className="font-mono text-cyan-700">{activeDebtorStats.percentPaid}% pago</span>
+                {/* Barra de Progresso Geral de Quitação (Interativa com Brilho Suave) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    playAppSound('success');
+                    setActiveKpiModal('paid');
+                  }}
+                  className="indicator-card financial-container flex flex-col gap-1.5 p-2 rounded-xl bg-slate-50/80 hover:bg-cyan-50/60 border border-slate-200 hover:border-cyan-300 hover:shadow-[0_0_18px_rgba(6,182,212,0.3)] transition-all duration-300 cursor-pointer text-left group relative overflow-hidden"
+                  title="Toque para ver o histórico e percentual detalhado de quitação"
+                >
+                  <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent skew-x-12" />
+                  <div className="relative z-10 flex items-center justify-between text-[11px] font-bold">
+                    <span className="text-slate-600 group-hover:text-slate-900 flex items-center gap-1">
+                      <span>Progresso Geral</span>
+                      <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-cyan-100 text-cyan-800">Interativo</span>
+                    </span>
+                    <span className="font-mono text-cyan-700 group-hover:text-cyan-800 font-black">{activeDebtorStats.percentPaid}% pago</span>
                   </div>
-                  <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
+                  <div className="relative z-10 w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
                     <div
-                      className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full transition-all duration-300"
+                      className="h-full bg-gradient-to-r from-cyan-500 to-emerald-500 rounded-full transition-all duration-300 group-hover:brightness-110"
                       style={{ width: `${Math.min(100, activeDebtorStats.percentPaid)}%` }}
                     />
                   </div>
-                </div>
+                </button>
 
                 {/* Itens / Produtos Vinculados */}
                 {activeDebtorStats.unitaryItems.length > 0 && (
@@ -1551,7 +1608,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  onSettleInstallment(item);
+                                  setSelectedInstallmentForDetail(item);
                                 }}
                                 className="w-8 h-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-600 border border-blue-200 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95 shrink-0"
                                 title="Ver detalhes da situação e ações da parcela"
@@ -1891,7 +1948,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                         {isPaid ? (
                           <button
                             type="button"
-                            onClick={() => onSettleInstallment(item)}
+                            onClick={() => setSelectedInstallmentForDetail(item)}
                             className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center active:scale-95 shadow-2xs transition-all cursor-pointer"
                             title="Ver detalhes da situação e ações da parcela"
                           >
@@ -2171,14 +2228,14 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
         <div
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-[400] flex items-center justify-center p-3 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200"
+          className="fixed inset-0 z-[400] flex items-center justify-center p-2 sm:p-4 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
           onClick={(e) => {
             if (e.target === e.currentTarget) setSelectedInstallmentForDetail(null);
           }}
         >
-          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_0_40px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400/50 border-2 border-cyan-400/60 w-full max-w-md max-h-[88dvh] sm:max-h-[85vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 my-auto text-slate-850">
+          <div className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_0_40px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400/50 border-2 border-cyan-400/60 w-full max-w-md max-h-[88dvh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-200 m-auto text-slate-850">
             {/* Header do Drawer 100% Branco com Luz */}
-            <div className="bg-white text-slate-900 px-3.5 sm:px-4 py-3 flex items-center justify-between gap-2 border-b border-slate-200 shrink-0">
+            <div className="bg-white text-slate-900 px-3.5 sm:px-4 py-2.5 sm:py-3 flex items-center justify-between gap-2 border-b border-slate-200 shrink-0">
               {/* Botão Voltar */}
               <button
                 type="button"
@@ -2211,7 +2268,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
             </div>
 
             {/* Conteúdo do Drawer */}
-            <div className="p-3.5 sm:p-4 space-y-3 text-xs flex-1 overflow-y-auto scrollbar-thin bg-slate-50/50">
+            <div className="p-3 sm:p-4 space-y-2.5 text-xs flex-1 overflow-y-auto scrollbar-thin bg-slate-50/50">
               {/* Devedor info */}
               <div className="p-3 bg-white rounded-2xl border border-slate-200 shadow-2xs flex items-center justify-between">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -2349,57 +2406,20 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 </p>
               </div>
 
-              {/* Ações em Grid */}
+              {/* Ações Otimizadas e Reenquadradas */}
               <div className="space-y-2 pt-1">
-                {/* Botão Principal: Visualizar Recibo */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    const item = selectedInstallmentForDetail;
-                    const authCode = item.authCode || generateAuthCode();
-                    if (onShowProof) {
-                      onShowProof(
-                        item.debtorName,
-                        `R$ ${(item.amount || item.originalAmount).toFixed(2).replace('.', ',')}`,
-                        item.paidAt || item.dueDate,
-                        item.paymentMethod || 'PIX / Asaas',
-                        authCode,
-                        `${item.product} (Parcela ${item.installmentNumber}/${item.totalInstallments})`
-                      );
-                    }
-                  }}
-                  className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-[0_0_15px_rgba(16,185,129,0.35)] cursor-pointer active:scale-95 transition-all"
-                  title="Visualizar Recibo de Pagamento"
-                >
-                  <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-                  <span>Visualizar Recibo</span>
-                </button>
-
                 {selectedInstallmentForDetail.status !== 'paid' && (
-                  <div className="grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onSettleInstallment(selectedInstallmentForDetail);
-                        setSelectedInstallmentForDetail(null);
-                      }}
-                      className="py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">check_circle</span>
-                      <span>Quitar Parcela</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        handleCopyBillingData(selectedInstallmentForDetail, e);
-                      }}
-                      className="py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1 border border-slate-200 cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[16px]">content_copy</span>
-                      <span>Copiar PIX</span>
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onSettleInstallment(selectedInstallmentForDetail);
+                      setSelectedInstallmentForDetail(null);
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm cursor-pointer active:scale-95 transition-all"
+                  >
+                    <span className="material-symbols-outlined text-[17px]">check_circle</span>
+                    <span>Quitar Parcela</span>
+                  </button>
                 )}
 
                 {(selectedInstallmentForDetail.status === 'overdue' || (selectedInstallmentForDetail.delayDays || 0) > 0) && (
@@ -2417,27 +2437,13 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                   </button>
                 )}
 
-                {onOpenExtratoTotal && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onOpenExtratoTotal(selectedInstallmentForDetail.purchaseId, selectedInstallmentForDetail.debtorId);
-                      setSelectedInstallmentForDetail(null);
-                    }}
-                    className="w-full py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs border border-slate-200 flex items-center justify-center gap-1.5 cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">description</span>
-                    <span>Extrato Completo</span>
-                  </button>
-                )}
-
                 <button
                   type="button"
                   onClick={() => setSelectedInstallmentForDetail(null)}
                   className="w-full py-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200 active:scale-95"
                 >
-                  <span className="material-symbols-outlined text-[16px]">arrow_back</span>
-                  <span>Voltar / Fechar Detalhes</span>
+                  <span className="material-symbols-outlined text-[17px]">done</span>
+                  <span>Concluir</span>
                 </button>
               </div>
             </div>

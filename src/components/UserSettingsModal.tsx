@@ -4,6 +4,7 @@ import { HaspahoLogo } from './HaspahoLogo';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { systemHealthSentinel, SystemHealthReport } from '../utils/systemHealthSentinel';
 import { capturePanelScreenshot } from '../utils/screenshotHelper';
+import { ImageCropperModal } from './ImageCropperModal';
 
 interface UserSettingsModalProps {
   isOpen: boolean;
@@ -977,63 +978,22 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
       </div>
 
       {/* Avatar Cropping Modal Overlay */}
-      {cropModalOpen && rawUploadImage && (
-        <div className="fixed inset-0 z-60 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm animate-in fade-in">
-          <div className="bg-white w-full max-w-md rounded-3xl p-6 shadow-2xl space-y-5 text-center">
-            <h3 className="text-lg font-black text-slate-900">Recortar & Ajustar Foto de Perfil</h3>
-            <p className="text-xs text-slate-500">
-              Ajuste o zoom para centralizar seu rosto ou imagem perfeitamente no formato circular.
-            </p>
-
-            <div className="flex justify-center items-center py-4 bg-slate-100 rounded-2xl overflow-hidden relative">
-              <div className="w-36 h-36 rounded-full overflow-hidden border-4 border-white shadow-lg relative flex items-center justify-center bg-slate-200">
-                <img
-                  src={rawUploadImage}
-                  alt="Crop Preview"
-                  style={{ transform: `scale(${cropZoom})` }}
-                  className="w-full h-full object-cover transition-transform"
-                />
-              </div>
-            </div>
-
-            <div className="space-y-2">
-              <div className="flex justify-between text-xs text-slate-600 font-bold">
-                <span>Zoom</span>
-                <span>{cropZoom.toFixed(1)}x</span>
-              </div>
-              <input
-                type="range"
-                min="1"
-                max="3"
-                step="0.1"
-                value={cropZoom}
-                onChange={(e) => setCropZoom(parseFloat(e.target.value))}
-                className="w-full accent-blue-600 cursor-pointer"
-              />
-            </div>
-
-            <div className="flex items-center justify-end gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  setCropModalOpen(false);
-                  setRawUploadImage(null);
-                }}
-                className="px-4 py-2 rounded-xl border border-slate-200 text-slate-600 text-xs font-semibold hover:bg-slate-50 cursor-pointer"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={handleApplyCrop}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-md cursor-pointer"
-              >
-                Recortar e Aplicar Foto
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ImageCropperModal
+        isOpen={cropModalOpen}
+        imageSrc={rawUploadImage}
+        shape="circle"
+        title="Recorte Manual da Foto do Credor"
+        onConfirm={(croppedDataUrl) => {
+          setAvatar(croppedDataUrl);
+          setCropModalOpen(false);
+          setRawUploadImage(null);
+          onToast('Foto do credor recortada e aplicada com sucesso!');
+        }}
+        onCancel={() => {
+          setCropModalOpen(false);
+          setRawUploadImage(null);
+        }}
+      />
     </div>
   );
 };

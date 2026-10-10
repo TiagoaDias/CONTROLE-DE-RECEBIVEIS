@@ -50,12 +50,30 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 }) => {
   // Seletor de Devedor: ID do devedor individual
   const [selectedDebtorId, setSelectedDebtorId] = useState<string>(
-    initialDebtorId && initialDebtorId !== 'all' ? initialDebtorId : (debtors.length > 0 ? debtors[0].id : '')
+    initialDebtorId !== undefined ? initialDebtorId : 'all'
   );
   const [reportPeriod, setReportPeriod] = useState<'2026' | 'q3' | 'sept' | 'all'>('2026');
   const [activeChartTab, setActiveChartTab] = useState<'comparative' | 'surplus'>('comparative');
   const [selectedMonthKey, setSelectedMonthKey] = useState<string>('09'); // Setembro
   const [downloadingType, setDownloadingType] = useState<'pdf' | 'excel' | 'csv' | null>(null);
+
+  // Estados para a janela inteligente interativa de detalhes (Regra A, B, C)
+  const [reportModalData, setReportModalData] = useState<{
+    isOpen: boolean;
+    title: string;
+    description: string;
+    type: 'faturado' | 'liquidado' | 'a_vencer' | 'atrasado' | 'mes_serie' | null;
+    monthKey?: string;
+  }>({
+    isOpen: false,
+    title: '',
+    description: '',
+    type: null,
+  });
+
+  const [modalSearch, setModalSearch] = useState('');
+  const [modalStatusFilter, setModalStatusFilter] = useState<'all' | 'paid' | 'overdue' | 'ontime'>('all');
+  const [modalSortOrder, setModalSortOrder] = useState<'date_desc' | 'amount_desc' | 'name_asc'>('date_desc');
 
   // Estados de expansão para a árvore ramificada interativa de fluxo de caixa
   const [treeExpandedNodes, setTreeExpandedNodes] = useState<{ [key: string]: boolean }>({
@@ -89,6 +107,42 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         (inst.debtorName && (inst.debtorName || '').toLowerCase() === currentName)
     );
   }, [installments, selectedDebtor]);
+
+  const modalFilteredInstallments = useMemo(() => {
+    let items = filteredInstallments;
+
+    if (reportModalData.type === 'liquidado') {
+      items = items.filter(i => i.status === 'paid');
+    } else if (reportModalData.type === 'atrasado') {
+      items = items.filter(i => i.status === 'overdue');
+    } else if (reportModalData.type === 'a_vencer') {
+      items = items.filter(i => i.status !== 'paid' && i.status !== 'overdue');
+    } else if (reportModalData.type === 'mes_serie' && reportModalData.monthKey) {
+      items = items.filter(i => getMonthPart(i.dueDate) === reportModalData.monthKey);
+    }
+
+    if (modalStatusFilter !== 'all') {
+      if (modalStatusFilter === 'paid') items = items.filter(i => i.status === 'paid');
+      if (modalStatusFilter === 'overdue') items = items.filter(i => i.status === 'overdue');
+      if (modalStatusFilter === 'ontime') items = items.filter(i => i.status !== 'paid' && i.status !== 'overdue');
+    }
+
+    if (modalSearch.trim()) {
+      const q = modalSearch.toLowerCase();
+      items = items.filter(i => 
+        (i.debtorName && i.debtorName.toLowerCase().includes(q)) ||
+        (i.product && i.product.toLowerCase().includes(q)) ||
+        (i.dueDate && i.dueDate.includes(q)) ||
+        (i.authCode && i.authCode.toLowerCase().includes(q))
+      );
+    }
+
+    return [...items].sort((a, b) => {
+      if (modalSortOrder === 'amount_desc') return b.amount - a.amount;
+      if (modalSortOrder === 'name_asc') return (a.debtorName || '').localeCompare(b.debtorName || '');
+      return (b.dueDate || '').localeCompare(a.dueDate || '');
+    });
+  }, [filteredInstallments, reportModalData, modalStatusFilter, modalSearch, modalSortOrder]);
 
   // Compras filtradas conforme o devedor selecionado
   const filteredPurchases = useMemo(() => {
@@ -143,21 +197,25 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return Math.round(((totalPaid + totalOntime) / (totalInvoiced || 1)) * 100);
   }, [selectedDebtor, totalPaid, totalOntime, totalInvoiced]);
 
+  // Helper seguro para extrair mês da data
+  const getMonthPart = (dueDate?: string) => {
+    if (!dueDate || typeof dueDate !== 'string') return '';
+    const parts = dueDate.includes('/') ? dueDate.split('/') : dueDate.split('-');
+    return parts.length > 1 ? parts[1] : '';
+  };
+
   // Série mensal calculada especificamente para este devedor (ou global)
   const monthlyDataSeries = useMemo(() => {
     return MONTH_NAMES.slice(4, 12).map((m) => {
       // Filtrar parcelas cujo vencimento seja neste mês
       const monthInsts = filteredInstallments.filter((inst) => {
-        // Formato dd/mm/aaaa ou aaaa-mm-dd
-        const parts = inst.dueDate.includes('/') ? inst.dueDate.split('/') : inst.dueDate.split('-');
-        const monthPart = inst.dueDate.includes('/') ? parts[1] : parts[1];
-        return monthPart === m.key;
+        return getMonthPart(inst.dueDate) === m.key;
       });
 
-      const totalMonth = monthInsts.reduce((acc, curr) => acc + curr.amount, 0);
+      const totalMonth = monthInsts.reduce((acc, curr) => acc + (curr.amount || 0), 0);
       const paidMonth = monthInsts
         .filter((i) => i.status === 'paid')
-        .reduce((acc, curr) => acc + curr.amount, 0);
+        .reduce((acc, curr) => acc + (curr.amount || 0), 0);
       const pendingMonth = totalMonth - paidMonth;
 
       const simulatedTotal = totalMonth;
@@ -187,15 +245,13 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
     return sixMonths.map((m) => {
       // Buscar parcelas vinculadas a este mês de vencimento
       const monthInsts = filteredInstallments.filter((inst) => {
-        const parts = inst.dueDate.includes('/') ? inst.dueDate.split('/') : inst.dueDate.split('-');
-        const monthPart = parts[1];
-        return monthPart === m.key;
+        return getMonthPart(inst.dueDate) === m.key;
       });
 
-      const previstoInst = monthInsts.reduce((acc, curr) => acc + curr.amount, 0);
+      const previstoInst = monthInsts.reduce((acc, curr) => acc + (curr.amount || curr.originalAmount || 0), 0);
       const realizadoInst = monthInsts
         .filter((i) => i.status === 'paid')
-        .reduce((acc, curr) => acc + (curr.paidAmount || curr.amount), 0);
+        .reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || curr.originalAmount || 0), 0);
 
       const previsto = previstoInst;
       const realizado = realizadoInst;
@@ -496,7 +552,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         doc.text(`#${inst.installmentNumber}/${inst.totalInstallments}`, margin + 3, currentY + 4.3);
         doc.text(inst.product.slice(0, 30), margin + 30, currentY + 4.3);
         doc.text(inst.dueDate, margin + 85, currentY + 4.3);
-        doc.text(`R$ ${inst.amount.toFixed(2).replace('.', ',')}`, margin + 115, currentY + 4.3);
+        doc.text(`R$ ${(Number(inst?.amount) || 0).toFixed(2).replace('.', ',')}`, margin + 115, currentY + 4.3);
 
         if (inst.status === 'paid') {
           doc.setTextColor(5, 150, 105);
@@ -687,7 +743,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
         inst.cardName,
         `${inst.installmentNumber}/${inst.totalInstallments}`,
         inst.dueDate,
-        inst.amount.toFixed(2).replace('.', ','),
+        (Number(inst?.amount) || 0).toFixed(2).replace('.', ','),
         inst.status === 'paid' ? 'PAGO' : inst.status === 'overdue' ? 'ATRASADO' : 'EM DIA',
         inst.delayDays || 0,
         inst.authCode || '',
@@ -962,9 +1018,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
               onChange={(e) => setSelectedDebtorId(e.target.value)}
               className="w-full sm:w-auto bg-slate-50 text-xs font-bold text-slate-900 px-3.5 py-2.5 rounded-xl border border-slate-300 shadow-2xs outline-none focus:ring-2 focus:ring-emerald-500/20 cursor-pointer"
             >
+              <option value="all">🌐 Consolidado Geral (Todos os Devedores)</option>
               {debtors.map((deb) => (
                 <option key={deb.id} value={deb.id}>
-                  👤 {deb.name} • {deb.overdueCount > 0 ? `(1 atrasada)` : `(R$ ${deb.totalOwed.toFixed(0)} pendente)`}
+                  👤 {deb.name} • {(Number(deb.overdueCount) || 0) > 0 ? `(1 atrasada)` : `(R$ ${(Number(deb.totalOwed) || 0).toFixed(0)} pendente)`}
                 </option>
               ))}
             </select>
@@ -1042,7 +1099,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                       </span>
                     </div>
                     <span className="text-[10px] text-slate-500 block truncate font-medium mt-0.5">
-                      {hasOverdue ? `${deb.overdueCount} em atraso` : `${deb.relation || 'Cliente'} • R$ ${deb.totalOwed.toFixed(0)}`}
+                      {hasOverdue ? `${Number(deb.overdueCount) || 0} em atraso` : `${deb.relation || 'Cliente'} • R$ ${(Number(deb.totalOwed) || 0).toFixed(0)}`}
                     </span>
                   </div>
                 </button>
@@ -1328,9 +1385,10 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: '#94a3b8', fontSize: 11 }}
-                tickFormatter={(val: number) =>
-                  val >= 1000 ? `R$ ${(val / 1000).toFixed(1)}k` : `R$ ${val}`
-                }
+                tickFormatter={(val: number) => {
+                  const num = Number(val) || 0;
+                  return num >= 1000 ? `R$ ${(num / 1000).toFixed(1)}k` : `R$ ${num}`;
+                }}
               />
               <Tooltip
                 cursor={{ fill: 'rgba(241, 245, 249, 0.7)' }}
@@ -1458,7 +1516,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                     Mês Atual
                   </span>
                 )}
-                {selected6MonthsItem.taxaRealizacao === 100 ? (
+                {(selected6MonthsItem?.taxaRealizacao || 0) === 100 ? (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-black flex items-center gap-0.5">
                     <span className="material-symbols-outlined text-[12px]">check</span>
                     100% Quitado
@@ -1466,23 +1524,23 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                 ) : (
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-red-100 text-red-700 font-black flex items-center gap-0.5">
                     <span className="material-symbols-outlined text-[12px]">warning</span>
-                    {selected6MonthsItem.taxaRealizacao}% Quitado
+                    {selected6MonthsItem?.taxaRealizacao || 0}% Quitado
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-3 mt-1 text-slate-600 flex-wrap">
                 <span>
-                  Previsto: <strong className="text-slate-900">R$ {selected6MonthsItem.previsto.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                  Previsto: <strong className="text-slate-900">R$ {(selected6MonthsItem?.previsto || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                 </span>
                 <span>•</span>
                 <span>
-                  Realizado: <strong className="text-emerald-700">R$ {selected6MonthsItem.realizado.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
+                  Realizado: <strong className="text-emerald-700">R$ {(selected6MonthsItem?.realizado || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</strong>
                 </span>
-                {selected6MonthsItem.pendente > 0 && (
+                {(selected6MonthsItem?.pendente || 0) > 0 && (
                   <>
                     <span>•</span>
                     <span className="text-red-600 font-bold">
-                      Pendente: R$ {selected6MonthsItem.pendente.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      Pendente: R$ {(selected6MonthsItem?.pendente || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
                   </>
                 )}
@@ -1626,7 +1684,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                                 <span className="text-[8.5px] sm:text-[9px] text-slate-500 font-medium truncate block">Contribuído via PIX / Comprovante</span>
                               </div>
                               <span className="font-mono font-bold text-[11px] sm:text-xs text-emerald-700 shrink-0">
-                                + R$ {paidAmount.toFixed(2)}
+                                + R$ {(Number(paidAmount) || 0).toFixed(2)}
                               </span>
                             </div>
                           </div>
@@ -1722,7 +1780,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                                     />
                                     <span className="font-bold text-[10px] sm:text-[10.5px] text-slate-700 truncate flex-1">{deb.name}</span>
                                     <span className="font-mono font-bold text-[10.5px] sm:text-[11px] text-indigo-600 shrink-0">
-                                      R$ {ontimeAmount.toFixed(2)}
+                                      R$ {(Number(ontimeAmount) || 0).toFixed(2)}
                                     </span>
                                   </div>
                                 </div>
@@ -1791,7 +1849,7 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
                                     />
                                     <span className="font-bold text-[10px] sm:text-[10.5px] text-slate-700 truncate flex-1">{deb.name}</span>
                                     <span className="font-mono font-bold text-[10.5px] sm:text-[11px] text-red-600 shrink-0">
-                                      R$ {lateAmount.toFixed(2)}
+                                      R$ {(Number(lateAmount) || 0).toFixed(2)}
                                     </span>
                                   </div>
                                 </div>
@@ -2048,6 +2106,144 @@ export const RelatoriosView: React.FC<RelatoriosViewProps> = ({
 
         </div>
       </div>
+
+      {/* Janela Inteligente Interativa de Detalhes (Regra A, B, C) */}
+      {reportModalData.isOpen && (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-6 animate-in fade-in duration-200">
+          <div className="bg-white rounded-3xl shadow-2xl border border-slate-200 w-full max-w-4xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+            {/* Modal Header */}
+            <div className="px-5 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600/30 border border-blue-400/40 text-blue-400 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[22px]">analytics</span>
+                </div>
+                <div>
+                  <h3 className="font-black text-sm sm:text-base tracking-tight">{reportModalData.title}</h3>
+                  <p className="text-[11px] text-slate-300">{reportModalData.description}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportModalData(prev => ({ ...prev, isOpen: false }))}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            {/* Modal Filter & Search Bar */}
+            <div className="p-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shrink-0">
+              <div className="relative flex-1">
+                <span className="absolute left-3 top-2.5 text-slate-400 material-symbols-outlined text-[18px]">search</span>
+                <input
+                  type="text"
+                  value={modalSearch}
+                  onChange={(e) => setModalSearch(e.target.value)}
+                  placeholder="Pesquisar devedor, produto ou autenticação..."
+                  className="w-full h-9 pl-9 pr-3 bg-white border border-slate-200 rounded-xl text-xs text-slate-800 focus:outline-none focus:border-blue-500 shadow-2xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <select
+                  value={modalStatusFilter}
+                  onChange={(e: any) => setModalStatusFilter(e.target.value)}
+                  className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none shadow-2xs cursor-pointer"
+                >
+                  <option value="all">Todas as Situações</option>
+                  <option value="paid">Apenas Pagos</option>
+                  <option value="ontime">A Vencer (Em dia)</option>
+                  <option value="overdue">Em Atraso</option>
+                </select>
+
+                <select
+                  value={modalSortOrder}
+                  onChange={(e: any) => setModalSortOrder(e.target.value)}
+                  className="h-9 px-3 bg-white border border-slate-200 rounded-xl text-xs font-semibold text-slate-700 focus:outline-none shadow-2xs cursor-pointer"
+                >
+                  <option value="date_desc">Mais Recentes</option>
+                  <option value="amount_desc">Maior Valor</option>
+                  <option value="name_asc">Nome do Devedor</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Modal Content / Scrollable List */}
+            <div className="flex-1 overflow-y-auto p-4 space-y-2.5 divide-y divide-slate-100">
+              <div className="flex items-center justify-between px-1 pb-2">
+                <span className="text-xs font-bold text-slate-500">
+                  Total de registros encontrados: <strong className="text-slate-900">{modalFilteredInstallments.length}</strong>
+                </span>
+                <span className="text-xs font-bold text-emerald-600 font-mono">
+                  Soma: R$ {modalFilteredInstallments.reduce((acc, curr) => acc + (curr.amount || 0), 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                </span>
+              </div>
+
+              {modalFilteredInstallments.length === 0 ? (
+                <div className="py-12 text-center">
+                  <span className="material-symbols-outlined text-[42px] text-slate-300 mb-2">folder_off</span>
+                  <p className="text-xs font-bold text-slate-700">Nenhum registro encontrado com os filtros atuais.</p>
+                  <p className="text-[11px] text-slate-400 mt-1">Tente remover os termos de busca ou alterar a situação.</p>
+                </div>
+              ) : (
+                modalFilteredInstallments.map((inst) => {
+                  const debtor = debtors.find(d => d.id === inst.debtorId || d.name.toLowerCase() === (inst.debtorName || '').toLowerCase());
+                  return (
+                    <div key={inst.id} className="pt-2.5 first:pt-0 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 hover:bg-slate-50 p-2.5 rounded-xl transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={getCleanDebtorAvatar(inst.debtorName, debtor?.avatar)}
+                          alt={inst.debtorName}
+                          className="w-9 h-9 rounded-xl object-cover shrink-0 ring-1 ring-slate-200"
+                        />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-xs text-slate-900 truncate">{inst.debtorName}</span>
+                            <span className={`text-[9.5px] font-bold px-2 py-0.5 rounded-full uppercase ${
+                              inst.status === 'paid' ? 'bg-emerald-100 text-emerald-800' :
+                              inst.status === 'overdue' ? 'bg-red-100 text-red-800' : 'bg-blue-100 text-blue-800'
+                            }`}>
+                              {inst.status === 'paid' ? 'Pago' : inst.status === 'overdue' ? `Atraso (${inst.delayDays || 0}d)` : 'Em Dia'}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-slate-500 truncate mt-0.5">
+                            {inst.product} • Parcela {inst.installmentNumber}/{inst.totalInstallments} • Vencimento: <strong className="text-slate-700">{inst.dueDate}</strong>
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between sm:justify-end gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="font-black text-xs sm:text-sm font-mono text-slate-900 block">
+                            R$ {(inst.amount || inst.originalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                          </span>
+                          <span className="text-[10px] text-slate-400 block font-mono">
+                            {inst.authCode ? `Auth: ${inst.authCode.slice(0, 10)}` : 'Pendente'}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+              <span className="text-[11px] text-slate-500 font-medium">
+                🔒 Dados sincronizados com o banco de dados oficial Firebase.
+              </span>
+              <button
+                type="button"
+                onClick={() => setReportModalData(prev => ({ ...prev, isOpen: false }))}
+                className="px-4 py-2 bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs rounded-xl shadow-xs transition-all cursor-pointer"
+              >
+                Fechar Janela
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

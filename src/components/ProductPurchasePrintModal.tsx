@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Purchase, Installment } from '../types';
 
 interface ProductPurchasePrintModalProps {
@@ -86,36 +87,36 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
   const totalInstallmentsCount = purchase?.installmentsTotal || installments.length || 10;
   const singleValue = purchase?.installmentValue || installments[0]?.amount || (totalAmount / (totalInstallmentsCount || 1));
 
-  return (
+  const modalElement = (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-in fade-in duration-200"
+      className="fixed inset-0 z-[150] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/85 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
-      {/* Janelinha Pequenininha e Elegante */}
+      {/* Janelinha Otimizada e Perfeitamente Enquadrada no Mobile */}
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full max-w-lg bg-slate-900 border border-cyan-400/40 rounded-3xl shadow-2xl overflow-hidden flex flex-col text-white animate-in zoom-in-95 duration-200"
+        className="w-full max-w-lg bg-slate-900 border border-cyan-400/40 rounded-2xl sm:rounded-3xl shadow-2xl overflow-hidden flex flex-col text-white animate-in zoom-in-95 duration-200 max-h-[85dvh] sm:max-h-[88vh] my-auto scrollbar-thin"
       >
         {/* Topo da Telinha */}
-        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-4 border-b border-cyan-500/30 flex items-center justify-between">
+        <div className="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 p-2.5 sm:p-3.5 border-b border-cyan-500/30 flex items-center justify-between shrink-0">
           <div className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-xs">
-              <span className="material-symbols-outlined text-[20px]">
+            <div className="w-8 h-8 sm:w-9 sm:h-9 rounded-xl sm:rounded-2xl bg-cyan-500/20 border border-cyan-400/40 text-cyan-300 flex items-center justify-center shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">
                 {isSmartTv ? 'tv' : 'receipt_long'}
               </span>
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-extrabold text-sm sm:text-base text-white truncate">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h3 className="font-extrabold text-xs sm:text-sm text-white truncate">
                   Print da Compra • {productName}
                 </h3>
-                <span className="px-2 py-0.5 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[10px] font-bold">
+                <span className="px-1.5 py-0.2 rounded-full bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 text-[9px] font-bold">
                   Comprovante
                 </span>
               </div>
-              <p className="text-[11px] text-cyan-200/80 truncate">
+              <p className="text-[10px] sm:text-[11px] text-cyan-200/80 truncate">
                 Devedor(a): <strong className="text-white">{debtorName}</strong> • {storeName}
               </p>
             </div>
@@ -132,32 +133,32 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
         </div>
 
         {/* Resumo Rápido da Compra */}
-        <div className="grid grid-cols-3 gap-2 p-3 bg-slate-950/60 border-b border-white/5 text-center text-xs">
-          <div className="bg-white/5 p-2 rounded-xl border border-white/5">
-            <span className="text-[9.5px] text-slate-400 block font-medium">Valor Total</span>
-            <span className="font-mono font-bold text-amber-300 text-xs sm:text-[13px]">
+        <div className="grid grid-cols-3 gap-1.5 sm:gap-2 p-2 sm:p-2.5 bg-slate-950/60 border-b border-white/5 text-center text-xs shrink-0">
+          <div className="bg-white/5 p-1.5 sm:p-2 rounded-xl border border-white/5">
+            <span className="text-[8.5px] sm:text-[9.5px] text-slate-400 block font-medium">Valor Total</span>
+            <span className="font-mono font-bold text-amber-300 text-[11px] sm:text-[13px]">
               R$ {totalAmount.toFixed(2).replace('.', ',')}
             </span>
           </div>
-          <div className="bg-white/5 p-2 rounded-xl border border-white/5">
-            <span className="text-[9.5px] text-slate-400 block font-medium">Parcelamento</span>
-            <span className="font-mono font-bold text-cyan-300 text-xs sm:text-[13px]">
-              {totalInstallmentsCount}x de R$ {singleValue.toFixed(2).replace('.', ',')}
+          <div className="bg-white/5 p-1.5 sm:p-2 rounded-xl border border-white/5">
+            <span className="text-[8.5px] sm:text-[9.5px] text-slate-400 block font-medium">Parcelamento</span>
+            <span className="font-mono font-bold text-cyan-300 text-[11px] sm:text-[13px]">
+              {totalInstallmentsCount}x R$ {singleValue.toFixed(2).replace('.', ',')}
             </span>
           </div>
-          <div className="bg-white/5 p-2 rounded-xl border border-white/5">
-            <span className="text-[9.5px] text-slate-400 block font-medium">Cartão</span>
-            <span className="font-mono font-bold text-purple-300 text-xs sm:text-[13px] truncate block" title={cardName}>
+          <div className="bg-white/5 p-1.5 sm:p-2 rounded-xl border border-white/5">
+            <span className="text-[8.5px] sm:text-[9.5px] text-slate-400 block font-medium">Cartão</span>
+            <span className="font-mono font-bold text-purple-300 text-[11px] sm:text-[13px] truncate block" title={cardName}>
               {cardName}
             </span>
           </div>
         </div>
 
-        {/* Área Central: Visualização do Print do Produto */}
-        <div className="p-3 sm:p-4 flex-1 flex flex-col gap-3">
-          <div className="flex items-center justify-between text-xs text-slate-300 px-1">
-            <span className="font-bold flex items-center gap-1.5 text-cyan-300">
-              <span className="material-symbols-outlined text-[16px]">photo_camera</span>
+        {/* Área Central Roleável (Scrollable Body) */}
+        <div className="p-2.5 sm:p-4 flex-1 flex flex-col gap-2.5 overflow-y-auto min-h-0">
+          <div className="flex items-center justify-between text-xs text-slate-300 px-1 shrink-0">
+            <span className="font-bold flex items-center gap-1.5 text-cyan-300 text-xs">
+              <span className="material-symbols-outlined text-[15px]">photo_camera</span>
               <span>{printImage ? 'Print Carregado' : 'Visualização do Print'}</span>
             </span>
             {printImage && (
@@ -174,9 +175,9 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
             )}
           </div>
 
-          {/* Contêiner de Imagem */}
-          <div className={`relative w-full rounded-2xl bg-black/60 border border-cyan-400/30 overflow-hidden flex items-center justify-center transition-all ${
-            isZoomed ? 'max-h-[380px]' : 'max-h-[220px]'
+          {/* Contêiner de Imagem com Altura Responsiva */}
+          <div className={`relative w-full rounded-2xl bg-black/60 border border-cyan-400/30 overflow-hidden flex items-center justify-center transition-all shrink-0 ${
+            isZoomed ? 'max-h-[280px] sm:max-h-[360px]' : 'max-h-[160px] sm:max-h-[220px]'
           }`}>
             {printImage ? (
               <img
@@ -188,10 +189,10 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
               />
             ) : (
               /* Print Realista Padrão Gerado Eletronicamente para o Produto */
-              <div className="w-full p-4 flex flex-col gap-2.5 bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200 select-none">
-                <div className="flex items-center justify-between pb-2 border-b border-white/10 text-[11px]">
+              <div className="w-full p-3 sm:p-4 flex flex-col gap-2 bg-gradient-to-b from-slate-900 to-slate-950 text-slate-200 select-none">
+                <div className="flex items-center justify-between pb-2 border-b border-white/10 text-[10px] sm:text-[11px]">
                   <div className="flex items-center gap-2">
-                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold text-[10px]">
+                    <span className="px-2 py-0.5 rounded-md bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 font-mono font-bold text-[9px] sm:text-[10px]">
                       COMPRA APROVADA
                     </span>
                     <span className="text-slate-400 font-mono">#MAGA-884920</span>
@@ -199,9 +200,9 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
                   <span className="text-[10px] text-slate-400 font-mono">10/08/2026 14:32</span>
                 </div>
 
-                <div className="flex items-start gap-3 pt-1">
-                  <div className="w-12 h-12 rounded-xl bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
-                    <span className="material-symbols-outlined text-[26px]">
+                <div className="flex items-start gap-2.5 pt-0.5">
+                  <div className="w-9 h-9 sm:w-11 sm:h-11 rounded-xl bg-blue-600/20 border border-blue-400/30 flex items-center justify-center text-blue-400 shrink-0">
+                    <span className="material-symbols-outlined text-[20px] sm:text-[24px]">
                       {isSmartTv ? 'tv' : 'shopping_bag'}
                     </span>
                   </div>
@@ -209,23 +210,23 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
                     <h4 className="font-black text-white text-xs sm:text-sm leading-tight truncate">
                       {isSmartTv ? 'Smart TV 50" Crystal 4K UHD Wi-Fi Bluetooth HDR' : productName}
                     </h4>
-                    <p className="text-[10.5px] text-slate-400 mt-0.5">
+                    <p className="text-[10px] text-slate-400 mt-0.5">
                       Vendido e entregue por: <strong className="text-slate-200">{storeName}</strong>
                     </p>
-                    <p className="text-[10.5px] text-slate-400">
+                    <p className="text-[10px] text-slate-400">
                       Destinatário: <strong className="text-cyan-300">{debtorName}</strong>
                     </p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-dashed border-white/10 flex items-center justify-between text-[11px] font-mono">
+                <div className="pt-2 border-t border-dashed border-white/10 flex items-center justify-between text-[10px] sm:text-[11px] font-mono">
                   <span className="text-slate-400">Total Pago:</span>
                   <span className="text-amber-300 font-bold text-xs">
                     R$ {totalAmount.toFixed(2).replace('.', ',')} ({totalInstallmentsCount}x no {cardName})
                   </span>
                 </div>
 
-                <div className="text-center pt-1 text-[10px] text-cyan-300/80 italic">
+                <div className="text-center pt-0.5 text-[9.5px] text-cyan-300/80 italic">
                   📸 Print padrão gerado. Você pode carregar a foto real da compra abaixo!
                 </div>
               </div>
@@ -242,22 +243,22 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
           />
 
           {/* Botões de Ação para o Print */}
-          <div className="flex items-center gap-2 pt-1 flex-wrap">
+          <div className="flex items-center gap-2 pt-1 shrink-0">
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="flex-1 py-2 px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer"
+              className="flex-1 py-2 sm:py-2.5 px-2.5 sm:px-3 rounded-xl bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-95 transition-all cursor-pointer min-w-0"
               title="Carregar imagem do print do produto"
             >
-              <span className="material-symbols-outlined text-[16px]">upload_file</span>
-              <span>{printImage ? 'Trocar Imagem do Print' : 'Carregar Imagem do Print'}</span>
+              <span className="material-symbols-outlined text-[16px] shrink-0">upload_file</span>
+              <span className="truncate">{printImage ? 'Trocar Print' : 'Carregar Imagem'}</span>
             </button>
 
             {printImage && (
               <button
                 type="button"
                 onClick={handleRemoveImage}
-                className="py-2 px-3 rounded-xl bg-white/10 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-white/15 hover:border-red-400/30 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                className="h-9 sm:h-10 px-2.5 sm:px-3 rounded-xl bg-white/10 hover:bg-red-500/20 text-slate-300 hover:text-red-300 border border-white/15 hover:border-red-400/30 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer shrink-0"
                 title="Remover imagem personalizada e voltar ao padrão"
               >
                 <span className="material-symbols-outlined text-[16px]">delete</span>
@@ -268,7 +269,7 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
             <button
               type="button"
               onClick={onClose}
-              className="py-2 px-3.5 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all cursor-pointer"
+              className="py-2 sm:py-2.5 px-3 sm:px-4 rounded-xl bg-white/10 hover:bg-white/20 text-white font-bold text-xs transition-all cursor-pointer shrink-0"
             >
               Concluído
             </button>
@@ -277,4 +278,6 @@ export const ProductPurchasePrintModal: React.FC<ProductPurchasePrintModalProps>
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined' ? createPortal(modalElement, document.body) : modalElement;
 };

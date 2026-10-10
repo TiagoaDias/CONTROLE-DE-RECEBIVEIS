@@ -200,8 +200,8 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2.5 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl bg-gradient-to-b from-slate-900 via-[#0d172a] to-slate-950 border border-cyan-500/30 rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.8)] flex flex-col max-h-[92vh] overflow-hidden text-white my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+      <div className="w-full max-w-2xl bg-gradient-to-b from-slate-900 via-[#0d172a] to-slate-950 border border-cyan-500/30 rounded-2xl sm:rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.8)] flex flex-col max-h-[88dvh] sm:max-h-[90vh] overflow-hidden text-white my-auto animate-in zoom-in-95 duration-150">
         
         {/* ============================================================ */}
         {/* 1. CABEÇALHO MODERNO                                         */}
@@ -470,32 +470,32 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         {/* ============================================================ */}
         {/* 3. TABS DOS TIPOS DE DOCUMENTO (Extrato, Recibo, Contrato)   */}
         {/* ============================================================ */}
-        <div className="shrink-0 flex items-center gap-1.5 p-1.5 bg-slate-950/70 border-b border-white/10">
+        <div className="shrink-0 grid grid-cols-3 gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-slate-950/70 border-b border-white/10">
           <button
             type="button"
             onClick={() => setActiveDocType('extrato')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
               activeDocType === 'extrato'
                 ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md ring-1 ring-amber-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">receipt_long</span>
-            <span className="truncate">Extrato Total</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">receipt_long</span>
+            <span className="truncate">Extrato</span>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveDocType('recibo')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
               activeDocType === 'recibo'
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md ring-1 ring-emerald-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">download_done</span>
-            <span className="truncate">Recibo Individual</span>
-            <span className="text-[9.5px] px-1.5 py-0.2 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-400/30">
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">download_done</span>
+            <span className="truncate">Recibo</span>
+            <span className="text-[9px] px-1 py-0.1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-400/30 shrink-0">
               {paidInstallments.length}
             </span>
           </button>
@@ -503,14 +503,14 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveDocType('contrato')}
-            className={`flex-1 py-2 px-2.5 rounded-xl text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
               activeDocType === 'contrato'
                 ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md ring-1 ring-cyan-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
             }`}
           >
-            <span className="material-symbols-outlined text-[16px]">history_edu</span>
-            <span className="truncate">Contrato Digital</span>
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">history_edu</span>
+            <span className="truncate">Contrato</span>
           </button>
         </div>
 

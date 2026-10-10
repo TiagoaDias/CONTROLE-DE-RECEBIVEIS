@@ -747,7 +747,7 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                             {d.name}
                           </h5>
                           <span className="text-[10px] text-slate-500 truncate block">
-                            {d.relation || 'Relacionado'} • Saldo: R$ {d.totalOwed.toFixed(2)}
+                            {d.relation || 'Relacionado'} • Saldo: R$ {(Number(d.totalOwed) || 0).toFixed(2)}
                           </span>
                         </div>
                       </div>

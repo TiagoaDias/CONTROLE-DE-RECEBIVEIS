@@ -37,6 +37,7 @@ import {
   logoutSession,
   TIAGO_DIAS_USER,
   auth,
+  isFirestoreQuotaExhausted,
 } from './lib/firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 
@@ -81,6 +82,24 @@ import { GeminiParsedContract } from './types';
 const DEFAULT_USER: UserAccount = TIAGO_DIAS_USER;
 
 export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): string => {
+  if (currentAvatar && currentAvatar.trim().length > 10) {
+    return currentAvatar.trim();
+  }
+  try {
+    const stored = localStorage.getItem('haspaho_debtors');
+    if (stored) {
+      const debtorsList = JSON.parse(stored);
+      const matched = debtorsList.find((d: any) => 
+        d.name && name && d.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+      if (matched && matched.avatar && matched.avatar.trim().length > 10) {
+        return matched.avatar.trim();
+      }
+    }
+  } catch (e) {
+    // silent
+  }
+
   const n = (name || '').toLowerCase();
   if (n.includes('jucelia')) return APP_IMAGES.jucelia;
   if (n.includes('marcos')) return APP_IMAGES.marcos;
@@ -90,9 +109,6 @@ export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): str
   if (n.includes('maria')) return APP_IMAGES.maria;
   if (n.includes('fátima') || n.includes('fatima')) return APP_IMAGES.fatima;
   if (n.includes('carlos')) return APP_IMAGES.carlos;
-  if (currentAvatar && !currentAvatar.includes('aida-public') && currentAvatar.length > 15) {
-    return currentAvatar;
-  }
   return APP_IMAGES.marcos;
 };
 
@@ -138,7 +154,14 @@ export default function App() {
       const saved = localStorage.getItem(`haspaho_debtors_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_debtors') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          return parsed.map((d: Debtor) => ({
+            ...d,
+            totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
+            totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : (Number(d.totalPaid) || 0),
+            overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : (Number(d.overdueCount) || 0),
+          }));
+        }
       }
       return isMaster ? INITIAL_DEBTORS : [];
     } catch (e) {
@@ -200,6 +223,7 @@ export default function App() {
   const [userSettingsTab, setUserSettingsTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'lixeira'>('profile');
 
   const isInitialLoadRef = useRef(true);
+  const lastSyncSignatureRef = useRef<string>('');
 
   // Enforce Firebase Auth session listener without wiping valid local user sessions
   useEffect(() => {
@@ -298,86 +322,187 @@ export default function App() {
         if (isMounted) {
           const isMaster = user.id === 'usr_thiago_dias' || user.email === 'tiagodias8888@gmail.com';
 
-          if (remoteDebtors && remoteDebtors.length > 0) {
-            setDebtors(
-              remoteDebtors.map((d) => ({
-                ...d,
-                avatar: getCleanDebtorAvatar(d.name, d.avatar),
-              }))
-            );
-          } else {
-            // Se não houver devedores no Firestore, verificar se há dados locais para sincronizar
-            const localSaved = localStorage.getItem(`haspaho_debtors_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_debtors') : null);
-            if (localSaved) {
-              try {
-                const parsed = JSON.parse(localSaved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  setDebtors(parsed);
-                  saveDebtorsToFirestore(user.id, parsed).catch((e) => console.warn('Sync debtors warning:', e));
-                }
-              } catch {}
-            } else if (isMaster) {
-              setDebtors(INITIAL_DEBTORS);
-              saveDebtorsToFirestore(user.id, INITIAL_DEBTORS).catch((e) => console.warn('Init master debtors warning:', e));
+          // 1. SMART MERGE DEBTORS
+          let localDebtorsArr: Debtor[] = [];
+          try {
+            const saved = localStorage.getItem(`haspaho_debtors_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_debtors') : null);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) localDebtorsArr = parsed;
             }
+          } catch {}
+
+          const localDebtorMap = new Map<string, Debtor>();
+          localDebtorsArr.forEach((d) => {
+            if (d && d.id) localDebtorMap.set(d.id, d);
+          });
+
+          const mergedDebtorsMap = new Map<string, Debtor>();
+          (remoteDebtors || []).forEach((remoteD) => {
+            if (!remoteD || !remoteD.id) return;
+            const localD = localDebtorMap.get(remoteD.id);
+            if (localD) {
+              mergedDebtorsMap.set(remoteD.id, {
+                ...remoteD,
+                ...localD,
+              });
+            } else {
+              mergedDebtorsMap.set(remoteD.id, remoteD);
+            }
+          });
+
+          localDebtorsArr.forEach((localD) => {
+            if (localD && localD.id && !mergedDebtorsMap.has(localD.id)) {
+              mergedDebtorsMap.set(localD.id, localD);
+            }
+          });
+
+          let finalDebtors = Array.from(mergedDebtorsMap.values());
+          if (finalDebtors.length === 0 && isMaster) {
+            finalDebtors = INITIAL_DEBTORS;
           }
 
-          if (remotePurchases && remotePurchases.length > 0) {
-            setPurchases(remotePurchases);
-          } else {
-            const localSaved = localStorage.getItem(`haspaho_purchases_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_purchases') : null);
-            if (localSaved) {
-              try {
-                const parsed = JSON.parse(localSaved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  setPurchases(parsed);
-                  savePurchasesToFirestore(user.id, parsed).catch((e) => console.warn('Sync purchases warning:', e));
-                }
-              } catch {}
-            } else if (isMaster) {
-              setPurchases(INITIAL_PURCHASES);
-              savePurchasesToFirestore(user.id, INITIAL_PURCHASES).catch((e) => console.warn('Init master purchases warning:', e));
-            }
+          const cleanedDebtors = finalDebtors.map((d) => ({
+            ...d,
+            totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
+            totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : (Number(d.totalPaid) || 0),
+            overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : (Number(d.overdueCount) || 0),
+            avatar: getCleanDebtorAvatar(d.name, d.avatar),
+          }));
+
+          setDebtors(cleanedDebtors);
+          try {
+            localStorage.setItem(`haspaho_debtors_${user.id}`, JSON.stringify(cleanedDebtors));
+            localStorage.setItem('haspaho_debtors', JSON.stringify(cleanedDebtors));
+          } catch {}
+          if ((!remoteDebtors || remoteDebtors.length === 0) && cleanedDebtors.length > 0 && !isFirestoreQuotaExhausted()) {
+            saveDebtorsToFirestore(user.id, cleanedDebtors).catch((e) => console.warn('Sync merged debtors note:', e));
           }
 
-          if (remoteInstallments && remoteInstallments.length > 0) {
-            setInstallments(
-              remoteInstallments.map((inst) => {
-                const persistentCode = inst.status === 'paid' && !inst.authCode ? generateAuthCode() : inst.authCode;
-                if (persistentCode && inst.status === 'paid') {
-                  registerAuthCode({
-                    auth: persistentCode,
-                    type: 'recibo',
-                    payer: inst.debtorName,
-                    amount: `R$ ${safeToFixed(inst.paidAmount || inst.amount).replace('.', ',')}`,
-                    date: inst.paidAt || inst.dueDate,
-                    bank: inst.paymentMethod || 'Nubank Croma / Asaas IP',
-                    item: `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`,
-                    destination: 'Tiago Dias (Credor)',
-                    status: 'AUTÊNTICO E LIQUIDADO',
-                  });
-                }
-                return {
-                  ...inst,
-                  authCode: persistentCode,
-                  debtorAvatar: getCleanDebtorAvatar(inst.debtorName, inst.debtorAvatar),
-                };
-              })
-            );
-          } else {
-            const localSaved = localStorage.getItem(`haspaho_installments_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_installments') : null);
-            if (localSaved) {
-              try {
-                const parsed = JSON.parse(localSaved);
-                if (Array.isArray(parsed) && parsed.length > 0) {
-                  setInstallments(parsed);
-                  saveInstallmentsToFirestore(user.id, parsed).catch((e) => console.warn('Sync installments warning:', e));
-                }
-              } catch {}
-            } else if (isMaster) {
-              setInstallments(INITIAL_INSTALLMENTS);
-              saveInstallmentsToFirestore(user.id, INITIAL_INSTALLMENTS).catch((e) => console.warn('Init master installments warning:', e));
+          // 2. SMART MERGE PURCHASES
+          let localPurchasesArr: Purchase[] = [];
+          try {
+            const saved = localStorage.getItem(`haspaho_purchases_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_purchases') : null);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) localPurchasesArr = parsed;
             }
+          } catch {}
+
+          const localPurchaseMap = new Map<string, Purchase>();
+          localPurchasesArr.forEach((p) => {
+            if (p && p.id) localPurchaseMap.set(p.id, p);
+          });
+
+          const mergedPurchasesMap = new Map<string, Purchase>();
+          (remotePurchases || []).forEach((remoteP) => {
+            if (!remoteP || !remoteP.id) return;
+            const localP = localPurchaseMap.get(remoteP.id);
+            if (localP) {
+              mergedPurchasesMap.set(remoteP.id, {
+                ...remoteP,
+                ...localP,
+              });
+            } else {
+              mergedPurchasesMap.set(remoteP.id, remoteP);
+            }
+          });
+
+          localPurchasesArr.forEach((localP) => {
+            if (localP && localP.id && !mergedPurchasesMap.has(localP.id)) {
+              mergedPurchasesMap.set(localP.id, localP);
+            }
+          });
+
+          let finalPurchases = Array.from(mergedPurchasesMap.values());
+          if (finalPurchases.length === 0 && isMaster) {
+            finalPurchases = INITIAL_PURCHASES;
+          }
+
+          setPurchases(finalPurchases);
+          try {
+            localStorage.setItem(`haspaho_purchases_${user.id}`, JSON.stringify(finalPurchases));
+            localStorage.setItem('haspaho_purchases', JSON.stringify(finalPurchases));
+          } catch {}
+          if ((!remotePurchases || remotePurchases.length === 0) && finalPurchases.length > 0 && !isFirestoreQuotaExhausted()) {
+            savePurchasesToFirestore(user.id, finalPurchases).catch((e) => console.warn('Sync merged purchases note:', e));
+          }
+
+          // 3. SMART MERGE INSTALLMENTS (Preserves local paid status on reload)
+          let localInstsArr: Installment[] = [];
+          try {
+            const saved = localStorage.getItem(`haspaho_installments_${user.id}`) || (isMaster ? localStorage.getItem('haspaho_installments') : null);
+            if (saved) {
+              const parsed = JSON.parse(saved);
+              if (Array.isArray(parsed)) localInstsArr = parsed;
+            }
+          } catch {}
+
+          const localInstMap = new Map<string, Installment>();
+          localInstsArr.forEach((inst) => {
+            if (inst && inst.id) localInstMap.set(inst.id, inst);
+          });
+
+          const mergedInstsMap = new Map<string, Installment>();
+          (remoteInstallments || []).forEach((remoteInst) => {
+            if (!remoteInst || !remoteInst.id) return;
+            const localInst = localInstMap.get(remoteInst.id);
+            if (localInst) {
+              // If local version is paid while remote is not, preserve local paid status!
+              if (localInst.status === 'paid' && remoteInst.status !== 'paid') {
+                mergedInstsMap.set(remoteInst.id, localInst);
+              } else {
+                mergedInstsMap.set(remoteInst.id, {
+                  ...remoteInst,
+                  ...localInst,
+                  authCode: remoteInst.authCode || localInst.authCode,
+                });
+              }
+            } else {
+              mergedInstsMap.set(remoteInst.id, remoteInst);
+            }
+          });
+
+          localInstsArr.forEach((localInst) => {
+            if (localInst && localInst.id && !mergedInstsMap.has(localInst.id)) {
+              mergedInstsMap.set(localInst.id, localInst);
+            }
+          });
+
+          let finalInsts = Array.from(mergedInstsMap.values());
+          if (finalInsts.length === 0 && isMaster) {
+            finalInsts = INITIAL_INSTALLMENTS;
+          }
+
+          const cleanedInsts = finalInsts.map((inst) => {
+            const persistentCode = inst.status === 'paid' && !inst.authCode ? generateAuthCode() : inst.authCode;
+            if (persistentCode && inst.status === 'paid') {
+              registerAuthCode({
+                auth: persistentCode,
+                type: 'recibo',
+                payer: inst.debtorName,
+                amount: `R$ ${safeToFixed(inst.paidAmount || inst.amount).replace('.', ',')}`,
+                date: inst.paidAt || inst.dueDate,
+                bank: inst.paymentMethod || 'Nubank Croma / Asaas IP',
+                item: `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`,
+                destination: 'Tiago Dias (Credor)',
+                status: 'AUTÊNTICO E LIQUIDADO',
+              });
+            }
+            return {
+              ...inst,
+              authCode: persistentCode,
+              debtorAvatar: getCleanDebtorAvatar(inst.debtorName, inst.debtorAvatar),
+            };
+          });
+
+          setInstallments(cleanedInsts);
+          try {
+            localStorage.setItem(`haspaho_installments_${user.id}`, JSON.stringify(cleanedInsts));
+            localStorage.setItem('haspaho_installments', JSON.stringify(cleanedInsts));
+          } catch {}
+          if ((!remoteInstallments || remoteInstallments.length === 0) && cleanedInsts.length > 0 && !isFirestoreQuotaExhausted()) {
+            saveInstallmentsToFirestore(user.id, cleanedInsts).catch((e) => console.warn('Sync merged installments note:', e));
           }
         }
       } catch (err) {
@@ -385,6 +510,7 @@ export default function App() {
       } finally {
         if (isMounted) {
           isInitialLoadRef.current = false;
+          lastSyncSignatureRef.current = `${activeUser?.id || 'default'}_d:${debtors.length}_p:${purchases.length}_i:${installments.length}`;
           console.log('[Firestore:LOAD_DATA] Initial data load complete. Live auto-sync is ready.');
         }
       }
@@ -416,16 +542,26 @@ export default function App() {
     }
 
     if (isInitialLoadRef.current) {
-      console.log('[Firestore:AUTO_SYNC] Waiting for initial load to finish...');
+      return;
+    }
+
+    if (isFirestoreQuotaExhausted()) {
+      return;
+    }
+
+    const currentSignature = `${activeUserId}_d:${debtors.length}_p:${purchases.length}_i:${installments.length}_${installments.map((i) => i.id + i.status).join(',')}`;
+    if (lastSyncSignatureRef.current === currentSignature) {
       return;
     }
 
     const timer = setTimeout(() => {
+      if (isFirestoreQuotaExhausted()) return;
+      lastSyncSignatureRef.current = currentSignature;
       console.log(`[Firestore:AUTO_SYNC] Syncing current state to Firestore for user: ${activeUserId}...`);
-      saveDebtorsToFirestore(activeUserId, debtors).catch((err) => console.error('[Firestore:AUTO_SYNC_DEBTORS_FAIL]', err));
-      savePurchasesToFirestore(activeUserId, purchases).catch((err) => console.error('[Firestore:AUTO_SYNC_PURCHASES_FAIL]', err));
-      saveInstallmentsToFirestore(activeUserId, installments).catch((err) => console.error('[Firestore:AUTO_SYNC_INSTALLMENTS_FAIL]', err));
-    }, 500);
+      saveDebtorsToFirestore(activeUserId, debtors).catch((err) => console.warn('[Firestore:AUTO_SYNC_DEBTORS_NOTE]', err));
+      savePurchasesToFirestore(activeUserId, purchases).catch((err) => console.warn('[Firestore:AUTO_SYNC_PURCHASES_NOTE]', err));
+      saveInstallmentsToFirestore(activeUserId, installments).catch((err) => console.warn('[Firestore:AUTO_SYNC_INSTALLMENTS_NOTE]', err));
+    }, 2500);
 
     return () => clearTimeout(timer);
   }, [debtors, purchases, installments, deletedDebtors, currentUser?.id]);
@@ -1150,11 +1286,14 @@ export default function App() {
     setInstallments(updatedInstallments);
     setTargetInstallmentId(installmentId);
 
+    const updatedInst = updatedInstallments.find((i) => i.id === installmentId);
+
     // Atualiza a contagem de parcelas pagas na Compra
     const nextPurchases = purchases.map((p) => {
       const prodA = (p.product || '').toLowerCase().trim();
       const prodB = (inst.product || '').toLowerCase().trim();
-      if (p.id === inst.purchaseId || (p.debtorId === inst.debtorId && prodA === prodB)) {
+      const matchDebtor = (p.debtorId && p.debtorId === inst.debtorId) || (p.debtorName && inst.debtorName && p.debtorName.trim().toLowerCase() === inst.debtorName.trim().toLowerCase());
+      if (p.id === inst.purchaseId || (matchDebtor && prodA === prodB)) {
         const newPaidCount = (p.paidCount || 0) + 1;
         const newPendingCount = Math.max(0, (p.pendingCount || p.installmentsTotal) - 1);
         return {
@@ -1187,12 +1326,13 @@ export default function App() {
 
     // 2. Update debtor in state (score recalculation, cashback balance, balances)
     const nextDebtors = debtors.map((d) => {
-      if (d.id === inst.debtorId) {
+      const isTargetDebtor = (d.id && d.id === inst.debtorId) || (d.name && inst.debtorName && d.name.trim().toLowerCase() === inst.debtorName.trim().toLowerCase());
+      if (isTargetDebtor) {
         const newTotalOwed = Math.max(0, (d.totalOwed || 0) - (inst.amount || inst.originalAmount || 0));
         const newTotalPaid = (d.totalPaid || 0) + paidAmount;
         const newOverdueCount = isOverdue ? Math.max(0, (d.overdueCount || 0) - 1) : (d.overdueCount || 0);
 
-        const debtorInsts = updatedInstallments.filter((i) => i.debtorId === d.id);
+        const debtorInsts = updatedInstallments.filter((i) => i.debtorId === d.id || (i.debtorName && d.name && i.debtorName.trim().toLowerCase() === d.name.trim().toLowerCase()));
         const scoreResult = calculateDebtorScore(d, debtorInsts);
         const alertResult = evaluateSpendingAlert(d, nextPurchases, debtorInsts);
 
@@ -1225,12 +1365,15 @@ export default function App() {
     }
 
     if (activeUserId) {
+      if (updatedInst) {
+        saveSingleInstallmentToFirestore(activeUserId, updatedInst).catch(console.warn);
+      }
       saveInstallmentsToFirestore(activeUserId, updatedInstallments).catch(console.warn);
       savePurchasesToFirestore(activeUserId, nextPurchases).catch(console.warn);
       saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
     }
 
-    let toastMsg = `Pagamento da parcela #${inst.installmentNumber} safeToFixed(R$ ${safeToFixed(paidAmount).replace('.', ',')}) confirmado via ${method}! Chave ${persistentAuthCode} gerada e registrada com sucesso.`;
+    let toastMsg = `🎉 Tudo certo! Pagamento registrado com sucesso. Parcela #${inst.installmentNumber} (R$ ${safeToFixed(paidAmount).replace('.', ',')}) liquidada via ${method}! Autenticação: ${persistentAuthCode}`;
 
     addAuditLog('PAGAMENTO_CONFIRMADO', `Pagamento de R$ ${safeToFixed(paidAmount, 2)} confirmado (${method}). Autenticação ${persistentAuthCode}.`, inst.debtorName, 'FIRESTORE_SAVED');
     showToast(toastMsg);
@@ -1566,12 +1709,14 @@ export default function App() {
   const handleSaveEditedDebtor = (updated: Debtor) => {
     const nextDebtors = debtors.map((d) => (d.id === updated.id ? updated : d));
     const nextInsts = installments.map((i) =>
-      i.debtorId === updated.id
+      i.debtorId === updated.id || (i.debtorName && i.debtorName.trim().toLowerCase() === updated.name.trim().toLowerCase())
         ? { ...i, debtorName: updated.name, debtorAvatar: updated.avatar }
         : i
     );
     const nextPurchases = purchases.map((p) =>
-      p.debtorId === updated.id ? { ...p, debtorName: updated.name } : p
+      p.debtorId === updated.id || (p.debtorName && p.debtorName.trim().toLowerCase() === updated.name.trim().toLowerCase())
+        ? { ...p, debtorName: updated.name, debtorAvatar: updated.avatar, avatar: updated.avatar }
+        : p
     );
 
     setDebtors(nextDebtors);
@@ -1584,6 +1729,8 @@ export default function App() {
       localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
       localStorage.setItem('haspaho_installments', JSON.stringify(nextInsts));
       localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInsts));
+      localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
+      localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));
     } catch (e) {
       console.warn('LocalStorage error:', e);
     }
@@ -1642,15 +1789,39 @@ export default function App() {
       saveDebtorsToFirestore(activeUserId, nextDebtors).catch(console.warn);
     }
 
-    if (updatedData.name) {
+    if (updatedData.name || updatedData.avatar) {
+      const updatedDebtorObj = nextDebtors.find((d) => d.id === debtorId);
+      const debtorName = updatedData.name || updatedDebtorObj?.name;
       const nextInsts = installments.map((i) =>
-        i.debtorId === debtorId ? { ...i, debtorName: updatedData.name! } : i
+        i.debtorId === debtorId || (i.debtorName && debtorName && i.debtorName.trim().toLowerCase() === debtorName.trim().toLowerCase())
+          ? {
+              ...i,
+              ...(debtorName ? { debtorName } : {}),
+              ...(updatedData.avatar ? { debtorAvatar: updatedData.avatar } : {}),
+            }
+          : i
       );
       const nextPurchases = purchases.map((p) =>
-        p.debtorId === debtorId ? { ...p, debtorName: updatedData.name! } : p
+        p.debtorId === debtorId || (p.debtorName && debtorName && p.debtorName.trim().toLowerCase() === debtorName.trim().toLowerCase())
+          ? {
+              ...p,
+              ...(debtorName ? { debtorName } : {}),
+              ...(updatedData.avatar ? { debtorAvatar: updatedData.avatar, avatar: updatedData.avatar } : {}),
+            }
+          : p
       );
       setInstallments(nextInsts);
       setPurchases(nextPurchases);
+      try {
+        localStorage.setItem('haspaho_installments', JSON.stringify(nextInsts));
+        localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
+        if (activeUserId) {
+          localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInsts));
+          localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));
+        }
+      } catch (e) {
+        console.warn('LocalStorage write error:', e);
+      }
       if (activeUserId) {
         saveInstallmentsToFirestore(activeUserId, nextInsts).catch(console.warn);
         savePurchasesToFirestore(activeUserId, nextPurchases).catch(console.warn);
@@ -2204,6 +2375,10 @@ export default function App() {
         isStackScreen={isStackScreen}
         currentUser={currentUser}
         debtors={debtors}
+        installments={installments}
+        onToast={showToast}
+        onSettleInstallment={handleSettleInstallment}
+        onNudgeWhatsApp={handleNudgeWhatsApp}
         onOpenNewDebtor={() => setIsNewDebtorModalOpen(true)}
         onEditDebtor={handleOpenEditDebtor}
         onOpenContract={handleOpenContract}
@@ -2233,7 +2408,7 @@ export default function App() {
 
       {/* Main Screen Container - Fluid Full Width Design (No empty side margins) */}
       <main
-        className={`flex-1 w-full relative z-10 ${
+        className={`flex-1 w-full relative ${
           currentTab === 'erp-legacy' || currentTab === 'admin-forum'
             ? 'px-1 sm:px-3 lg:px-4 pt-20 md:pt-20 pb-6'
             : isStackScreen

@@ -87,11 +87,11 @@ export const DebtorUnitaryItemsModal: React.FC<DebtorUnitaryItemsModalProps> = (
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/60 backdrop-blur-md overflow-hidden animate-in fade-in duration-200"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-slate-950/60 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200"
       onClick={onClose}
     >
       <div
-        className="relative w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-2xl text-slate-900 overflow-hidden flex flex-col max-h-[80vh] sm:max-h-[82vh] my-auto"
+        className="relative w-full max-w-3xl bg-white border border-slate-200 rounded-2xl shadow-2xl text-slate-900 overflow-hidden flex flex-col max-h-[88dvh] m-auto"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header Compacto do Modal com Dados do Devedor */}

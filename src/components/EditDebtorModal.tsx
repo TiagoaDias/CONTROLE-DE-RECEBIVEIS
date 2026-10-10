@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Debtor } from '../types';
 import { APP_IMAGES } from '../data/mockData';
+import { ImageCropperModal } from './ImageCropperModal';
 
 interface EditDebtorModalProps {
   isOpen: boolean;
@@ -62,6 +63,8 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
   const [notes, setNotes] = useState('');
   const [isNewPhotoSelected, setIsNewPhotoSelected] = useState(false);
   const [photoError, setPhotoError] = useState('');
+  const [rawUploadImage, setRawUploadImage] = useState<string | null>(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -117,45 +120,9 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
     reader.onload = (event) => {
       const result = event.target?.result as string;
       if (!result) return;
-
-      const img = new Image();
-      img.onload = () => {
-        try {
-          const canvas = document.createElement('canvas');
-          const size = 360; // 360x360 px
-          canvas.width = size;
-          canvas.height = size;
-          const ctx = canvas.getContext('2d');
-          if (!ctx) {
-            setAvatar(result);
-            setIsNewPhotoSelected(true);
-            return;
-          }
-          ctx.imageSmoothingEnabled = true;
-          ctx.imageSmoothingQuality = 'high';
-
-          // Center crop square
-          const scale = Math.max(size / img.width, size / img.height);
-          const w = img.width * scale;
-          const h = img.height * scale;
-          const x = (size - w) / 2;
-          const y = (size - h) / 2;
-
-          ctx.drawImage(img, x, y, w, h);
-          const optimized = canvas.toDataURL('image/jpeg', 0.88);
-          setAvatar(optimized);
-          setIsNewPhotoSelected(true);
-          setPhotoError('');
-        } catch (err) {
-          console.warn('Canvas optimization error, fallback to raw data:', err);
-          setAvatar(result);
-          setIsNewPhotoSelected(true);
-        }
-      };
-      img.onerror = () => {
-        setPhotoError('Não foi possível carregar a imagem. Tente outro arquivo.');
-      };
-      img.src = result;
+      setRawUploadImage(result);
+      setCropModalOpen(true);
+      setPhotoError('');
     };
     reader.onerror = () => {
       setPhotoError('Erro ao ler arquivo do dispositivo.');
@@ -195,8 +162,8 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col items-center justify-start overflow-y-auto pt-16 sm:pt-20 pb-24 sm:pb-28 px-3 sm:px-6 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[calc(100dvh-160px)] sm:max-h-[calc(100dvh-180px)] overflow-hidden border border-slate-200 my-auto shrink-0">
+    <div className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 overflow-y-auto animate-in fade-in duration-200">
+      <div className="w-full max-w-lg bg-white rounded-3xl shadow-2xl flex flex-col max-h-[92dvh] sm:max-h-[88dvh] overflow-hidden border border-slate-200 my-auto shrink-0">
         
         {/* Topo do Modal com Botão Voltar & Fechar */}
         <div className="flex items-center justify-between p-4 border-b border-slate-200 bg-slate-900 text-white shrink-0">
@@ -310,6 +277,22 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
                     <span className="material-symbols-outlined text-[17px]">photo_camera</span>
                     <span>{hasCustomPhoto ? '📷 Trocar foto' : '📷 Adicionar foto'}</span>
                   </button>
+
+                  {/* Botão Ajustar / Recortar Foto Atual */}
+                  {avatar && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawUploadImage(avatar);
+                        setCropModalOpen(true);
+                      }}
+                      className="px-3 py-2 rounded-xl bg-purple-50 hover:bg-purple-100 text-purple-700 font-bold text-xs border border-purple-200 flex items-center justify-center gap-1 transition-colors cursor-pointer"
+                      title="Abrir editor de zoom e enquadramento"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">crop</span>
+                      <span>✂️ Ajustar foto</span>
+                    </button>
+                  )}
 
                   {/* Botão Remover Foto */}
                   {hasCustomPhoto && (
@@ -678,6 +661,25 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
             </button>
           </div>
         </form>
+
+        {/* Modal de Recorte Manual Interativo para Foto do Devedor */}
+        <ImageCropperModal
+          isOpen={cropModalOpen}
+          imageSrc={rawUploadImage}
+          shape="square"
+          title="Recorte Manual da Foto do Devedor"
+          onConfirm={(cropped) => {
+            setAvatar(cropped);
+            setIsNewPhotoSelected(true);
+            setCropModalOpen(false);
+            setRawUploadImage(null);
+            setPhotoError('');
+          }}
+          onCancel={() => {
+            setCropModalOpen(false);
+            setRawUploadImage(null);
+          }}
+        />
       </div>
     </div>
   );

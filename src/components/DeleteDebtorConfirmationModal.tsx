@@ -33,8 +33,8 @@ export const DeleteDebtorConfirmationModal: React.FC<DeleteDebtorConfirmationMod
   };
 
   return (
-    <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn">
-      <div className="bg-[#0b162c] border-2 border-red-500/50 rounded-3xl p-6 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.25)] text-white space-y-5 relative overflow-hidden">
+    <div className="fixed inset-0 z-[250] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn overflow-y-auto">
+      <div className="bg-[#0b162c] border-2 border-red-500/50 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full max-h-[85dvh] sm:max-h-[88vh] overflow-y-auto my-auto shadow-[0_0_50px_rgba(239,68,68,0.25)] text-white space-y-4 sm:space-y-5 relative scrollbar-thin">
         {/* Top Header Badge */}
         <div className="flex items-center justify-between border-b border-white/10 pb-4">
           <div className="flex items-center gap-2.5">

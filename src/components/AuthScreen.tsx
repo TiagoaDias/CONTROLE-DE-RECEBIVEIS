@@ -137,6 +137,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação Google foi cancelada.');
+      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
+        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione o domínio no Firebase Console (Authentication > Settings > Authorized domains).`);
       } else {
         setErrorMessage(err.message || 'Erro no login com Google.');
       }
@@ -155,6 +157,8 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação do Facebook foi cancelada.');
+      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
+        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione o domínio no Firebase Console (Authentication > Settings > Authorized domains).`);
       } else {
         setErrorMessage(err.message || 'Erro no login com Facebook.');
       }

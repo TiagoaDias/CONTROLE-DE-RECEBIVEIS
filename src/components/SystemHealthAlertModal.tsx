@@ -85,8 +85,8 @@ export const SystemHealthAlertModal: React.FC<SystemHealthAlertModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[220] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
-      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh] my-auto animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[220] flex items-center justify-center p-2 sm:p-4 bg-slate-950/80 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
+      <div className="bg-white w-full max-w-2xl rounded-2xl sm:rounded-3xl shadow-2xl border border-slate-200 overflow-hidden flex flex-col max-h-[88dvh] sm:max-h-[90vh] my-auto animate-in zoom-in-95 duration-200">
         
         {/* Top Header */}
         <div className="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 p-4 sm:p-5 text-white flex items-center justify-between shrink-0 border-b border-indigo-500/20">

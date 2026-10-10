@@ -316,7 +316,7 @@ export const DebtorSelectorCascade: React.FC<DebtorSelectorCascadeProps> = ({
                           <div className="pt-1.5 border-t border-white/10 flex items-center justify-between text-[10.5px] font-mono mt-1">
                             <span className="text-[9px] text-slate-400 uppercase font-sans">Aberto:</span>
                             <span className={`font-black ${hasOverdue ? 'text-red-300' : 'text-cyan-300'}`}>
-                              R$ {debtor.totalOwed.toFixed(2)}
+                              R$ {(Number(debtor.totalOwed) || 0).toFixed(2)}
                             </span>
                           </div>
                         </div>
@@ -399,7 +399,7 @@ export const DebtorSelectorCascade: React.FC<DebtorSelectorCascadeProps> = ({
                             )}
                           </div>
                           <span className={`font-mono font-black text-xs sm:text-sm block ${hasOverdue ? 'text-red-300' : 'text-cyan-300'}`}>
-                            R$ {debtor.totalOwed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            R$ {(Number(debtor.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                           </span>
                         </div>
 

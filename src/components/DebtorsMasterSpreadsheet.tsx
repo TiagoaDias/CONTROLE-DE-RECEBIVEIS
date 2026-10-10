@@ -4,8 +4,29 @@ import { APP_IMAGES } from '../data/mockData';
 import { getProductCategory, getProductIcon } from '../utils/debtorItemsUtils';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { safeToFixed, safeFormatCurrency, safeToNumber } from '../utils/numberUtils';
+import { playAppSound } from '../utils/soundUtils';
 
 export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): string => {
+  // 1. Se houver avatar personalizado salvo (DataURL de foto recortada ou URL válida), prioriza 100% o avatar do devedor
+  if (currentAvatar && currentAvatar.trim().length > 10) {
+    return currentAvatar.trim();
+  }
+  try {
+    const stored = localStorage.getItem('haspaho_debtors');
+    if (stored) {
+      const debtorsList = JSON.parse(stored);
+      const matched = debtorsList.find((d: any) => 
+        d.name && name && d.name.toLowerCase().trim() === name.toLowerCase().trim()
+      );
+      if (matched && matched.avatar && matched.avatar.trim().length > 10) {
+        return matched.avatar.trim();
+      }
+    }
+  } catch (e) {
+    // silent
+  }
+
+  // 2. Fallback por nome caso não haja foto salva
   const n = (name || '').toLowerCase();
   if (n.includes('jucelia')) return APP_IMAGES.jucelia;
   if (n.includes('marcos')) return APP_IMAGES.marcos;
@@ -15,9 +36,6 @@ export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): str
   if (n.includes('maria')) return APP_IMAGES.maria;
   if (n.includes('fátima') || n.includes('fatima')) return APP_IMAGES.fatima;
   if (n.includes('carlos')) return APP_IMAGES.carlos;
-  if (currentAvatar && !currentAvatar.includes('aida-public') && currentAvatar.length > 15) {
-    return currentAvatar;
-  }
   return APP_IMAGES.marcos;
 };
 
@@ -1355,37 +1373,69 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                 <div className="px-3 sm:px-4 py-2 bg-white flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200/80 min-w-0">
                   <div className="grid grid-cols-2 sm:flex sm:flex-wrap items-center gap-2 sm:gap-4 text-xs min-w-0 w-full sm:w-auto">
                     {/* Total do Extrato */}
-                    <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-slate-50 px-2.5 py-1.5 rounded-xl border border-slate-200/80">
-                      <span className="text-[10px] uppercase font-bold text-slate-500">Total:</span>
-                      <span className="font-bold text-slate-900">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playAppSound('pop');
+                        setStatusFilter('all');
+                      }}
+                      className="indicator-card financial-container flex items-center justify-between sm:justify-start gap-1.5 bg-slate-50 hover:bg-slate-100/90 px-2.5 py-1.5 rounded-xl border border-slate-200/80 hover:border-slate-400 cursor-pointer text-left transition-all group"
+                      title="Clique para filtrar todas as parcelas do extrato"
+                    >
+                      <span className="text-[10px] uppercase font-bold text-slate-500 group-hover:text-slate-700">Total:</span>
+                      <span className="font-bold text-slate-900 font-mono">
                         R$ {safeToFixed(activeTabTotal).replace('.', ',')}
                       </span>
-                    </div>
+                    </button>
 
                     {/* Total Quitado */}
-                    <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-xl border border-emerald-200/80">
-                      <span className="text-[10px] uppercase font-bold text-emerald-700">Quitado:</span>
-                      <span className="font-bold text-emerald-900">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playAppSound('success');
+                        setStatusFilter('paid');
+                      }}
+                      className="indicator-card financial-container flex items-center justify-between sm:justify-start gap-1.5 bg-emerald-50 hover:bg-emerald-100/90 px-2.5 py-1.5 rounded-xl border border-emerald-200/80 hover:border-emerald-400 cursor-pointer text-left transition-all group"
+                      title="Clique para filtrar apenas parcelas quitadas"
+                    >
+                      <span className="text-[10px] uppercase font-bold text-emerald-700 group-hover:text-emerald-900">Quitado:</span>
+                      <span className="font-bold text-emerald-900 font-mono">
                         R$ {safeToFixed(activeTabPaidSum).replace('.', ',')}
                       </span>
-                    </div>
+                    </button>
 
                     {/* Saldo a Receber */}
-                    <div className="flex items-center justify-between sm:justify-start gap-1.5 bg-blue-50 px-2.5 py-1.5 rounded-xl border border-blue-200/80">
-                      <span className="text-[10px] uppercase font-bold text-blue-700">A Receber:</span>
-                      <span className="font-bold text-blue-900">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playAppSound('cheerful');
+                        setStatusFilter('ontime');
+                      }}
+                      className="indicator-card financial-container flex items-center justify-between sm:justify-start gap-1.5 bg-blue-50 hover:bg-blue-100/90 px-2.5 py-1.5 rounded-xl border border-blue-200/80 hover:border-blue-400 cursor-pointer text-left transition-all group"
+                      title="Clique para filtrar parcelas a vencer/em dia"
+                    >
+                      <span className="text-[10px] uppercase font-bold text-blue-700 group-hover:text-blue-900">A Receber:</span>
+                      <span className="font-bold text-blue-900 font-mono">
                         R$ {safeToFixed(activeTabRemaining).replace('.', ',')}
                       </span>
-                    </div>
+                    </button>
 
                     {/* Em Atraso */}
-                    <div className={`flex items-center justify-between sm:justify-start gap-1.5 px-2.5 py-1.5 rounded-xl border ${
-                      activeTabOverdueSum > 0
-                        ? 'bg-red-50 border-red-200 text-red-700'
-                        : 'bg-slate-50 border-slate-200 text-slate-600'
-                    }`}>
-                      <span className="text-[10px] uppercase font-bold">Atraso:</span>
-                      <span className={`font-bold ${activeTabOverdueSum > 0 ? 'text-red-700' : 'text-slate-800'}`}>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        playAppSound('alert');
+                        setStatusFilter('overdue');
+                      }}
+                      className={`indicator-card financial-container flex items-center justify-between sm:justify-start gap-1.5 px-2.5 py-1.5 rounded-xl border cursor-pointer text-left transition-all group ${
+                        activeTabOverdueSum > 0
+                          ? 'bg-red-50 hover:bg-red-100/90 border-red-200 hover:border-red-400 text-red-700'
+                          : 'bg-slate-50 hover:bg-slate-100/90 border-slate-200 hover:border-slate-400 text-slate-600'
+                      }`}
+                      title="Clique para filtrar parcelas em atraso"
+                    >
+                      <span className="text-[10px] uppercase font-bold group-hover:text-red-900">Atraso:</span>
+                      <span className={`font-bold font-mono ${activeTabOverdueSum > 0 ? 'text-red-700' : 'text-slate-800'}`}>
                         R$ {safeToFixed(activeTabOverdueSum).replace('.', ',')}
                         {activeTabOverdue.length > 0 && (
                           <span className="text-[10px] font-black text-red-600 ml-1">
@@ -1393,7 +1443,7 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                           </span>
                         )}
                       </span>
-                    </div>
+                    </button>
                   </div>
 
                   {/* Alerta Financeiro (Compacto na Mesma Linha no Desktop, Full Width Responsivo no Mobile) */}

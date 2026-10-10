@@ -449,10 +449,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       `"${d.name}"`,
       `"${d.documentNumber || ''}"`,
       `"${d.phone}"`,
-      d.totalOwed.toFixed(2),
-      d.totalPaid.toFixed(2),
-      d.overdueCount,
-      d.score,
+      (Number(d.totalOwed) || 0).toFixed(2),
+      (Number(d.totalPaid) || 0).toFixed(2),
+      d.overdueCount || 0,
+      d.score || 0,
     ]);
 
     const csvContent = 'data:text/csv;charset=utf-8,' + [headers.join(';'), ...rows.map((r) => r.join(';'))].join('\n');
@@ -801,7 +801,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   >
                     {debtors.map((d) => (
                       <option key={d.id} value={d.id}>
-                        [ID: {d.id}] {d.name} — Owed: R$ {d.totalOwed.toFixed(2)} ({d.overdueCount > 0 ? `${d.overdueCount} ATRASADAS` : 'Em dia'})
+                        [ID: {d.id}] {d.name} — Owed: R$ {(Number(d.totalOwed) || 0).toFixed(2)} {(Number(d.overdueCount) || 0) > 0 ? `${d.overdueCount} ATRASADAS` : 'Em dia'}
                       </option>
                     ))}
                   </select>
@@ -809,13 +809,13 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
                 <div className="flex items-center gap-3 text-[11px]">
                   <span className="font-mono">
-                    Total Devedor Ativo: <strong className="text-red-500">R$ {activeDebtor?.totalOwed.toFixed(2)}</strong>
+                    Total Devedor Ativo: <strong className="text-red-500">R$ {(Number(activeDebtor?.totalOwed) || 0).toFixed(2)}</strong>
                   </span>
                   <span className="font-mono">
-                    Total Já Pago: <strong className="text-emerald-500">R$ {activeDebtor?.totalPaid.toFixed(2)}</strong>
+                    Total Já Pago: <strong className="text-emerald-500">R$ {(Number(activeDebtor?.totalPaid) || 0).toFixed(2)}</strong>
                   </span>
                   <span className="font-mono">
-                    Score: <strong>{activeDebtor?.score}/1000</strong>
+                    Score: <strong>{activeDebtor?.score || 0}/1000</strong>
                   </span>
                 </div>
               </div>
@@ -1341,10 +1341,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           <td className="p-2 border-r border-slate-800">{d.documentNumber || '—'}</td>
                           <td className="p-2 border-r border-slate-800">{d.phone}</td>
                           <td className="p-2 border-r border-slate-800 text-right font-bold text-red-400">
-                            R$ {d.totalOwed.toFixed(2)}
+                            R$ {(Number(d.totalOwed) || 0).toFixed(2)}
                           </td>
                           <td className="p-2 border-r border-slate-800 text-right text-emerald-400">
-                            R$ {d.totalPaid.toFixed(2)}
+                            R$ {(Number(d.totalPaid) || 0).toFixed(2)}
                           </td>
                           <td className="p-2 border-r border-slate-800 text-center">
                             <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold">
@@ -1531,7 +1531,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   >
                     {debtors.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.name} (Saldo Devedor Atual: R$ {d.totalOwed.toFixed(2)})
+                        {d.name} (Saldo Devedor Atual: R$ {(Number(d.totalOwed) || 0).toFixed(2)})
                       </option>
                     ))}
                   </select>

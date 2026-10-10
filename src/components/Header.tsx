@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { ScreenTab, UserAccount, Debtor } from '../types';
+import { ScreenTab, UserAccount, Debtor, Installment } from '../types';
 import { APP_IMAGES } from '../data/mockData';
 import { HaspahoLogo } from './HaspahoLogo';
+import { PushNotificationManager } from './PushNotificationManager';
 import { testConnection } from '../lib/firebase';
 
 interface HeaderProps {
@@ -18,6 +19,7 @@ interface HeaderProps {
   isStackScreen?: boolean;
   currentUser?: UserAccount | null;
   debtors?: Debtor[];
+  installments?: Installment[];
   onOpenNewDebtor?: () => void;
   onEditDebtor?: (debtor: Debtor) => void;
   onOpenContract?: (debtorId: string) => void;
@@ -30,6 +32,14 @@ interface HeaderProps {
   isDarkMode?: boolean;
   onToggleTheme?: () => void;
   onToast?: (msg: string) => void;
+  onSettleInstallment?: (inst: Installment) => void;
+  onNudgeWhatsApp?: (
+    debtorName: string,
+    amount: string,
+    product: string,
+    parcel: string,
+    debtorPhone?: string
+  ) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -46,6 +56,7 @@ export const Header: React.FC<HeaderProps> = ({
   isStackScreen,
   currentUser,
   debtors = [],
+  installments = [],
   onOpenNewDebtor,
   onEditDebtor,
   onOpenContract,
@@ -58,6 +69,8 @@ export const Header: React.FC<HeaderProps> = ({
   isDarkMode,
   onToggleTheme,
   onToast,
+  onSettleInstallment,
+  onNudgeWhatsApp,
 }) => {
   const [isTestingFirebase, setIsTestingFirebase] = useState(false);
 
@@ -160,17 +173,17 @@ export const Header: React.FC<HeaderProps> = ({
           <div
             onClick={() => onNavigate('inicio')}
             className="flex items-center gap-3 cursor-pointer shrink-0 group"
-            title="Ir para o Início 3D / Tela Inicial"
+            title="Ir para o Início / Tela Inicial HASPAHO"
           >
             <HaspahoLogo
               size="sm"
               variant="horizontal"
-              customName={currentTab === 'inicio' ? 'DESENVOLVEDOR FULL STACK' : userName}
+              darkTheme={isDarkMode}
             />
           </div>
 
-          {/* Search bar & Theme Toggle */}
-          <div className="flex items-center gap-1.5 lg:gap-2.5 shrink-0">
+          {/* Search bar & Push Notifications */}
+          <div className="flex items-center gap-2 lg:gap-3 shrink-0">
             <div className="relative w-48 sm:w-60 md:w-72 lg:w-80">
               <input
                 type="search"
@@ -190,6 +203,15 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </div>
 
+            <PushNotificationManager
+              installments={installments}
+              debtors={debtors}
+              onToast={onToast}
+              onNavigateToParcelas={() => onNavigate('parcelas')}
+              onSettleInstallment={onSettleInstallment}
+              onNudgeWhatsApp={onNudgeWhatsApp}
+              isDarkMode={isDarkMode}
+            />
           </div>
         </div>
 
@@ -202,19 +224,28 @@ export const Header: React.FC<HeaderProps> = ({
               className="flex items-center gap-2 cursor-pointer min-w-0 flex-1"
             >
               <div className="shrink-0">
-                <HaspahoLogo size="sm" variant="icon" />
+                <HaspahoLogo size="xs" variant="icon" darkTheme={isDarkMode} />
               </div>
               <div className="flex flex-col min-w-0">
-                <span className="font-black text-slate-900 text-xs leading-tight tracking-tight truncate">
-                  HASPAHO {currentTab === 'inicio' ? '• FULL STACK' : `• ${userName.split(' ')[0]}`}
+                <span className={`font-black text-xs leading-tight tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                  HASPAHO
                 </span>
-                <span className="text-[10px] text-slate-500 font-medium leading-none truncate">
-                  {getSubLabel()}
+                <span className={`text-[10px] font-bold leading-none truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                  DESENVOLVEDOR FULL STACK
                 </span>
               </div>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
+              <PushNotificationManager
+                installments={installments}
+                debtors={debtors}
+                onToast={onToast}
+                onNavigateToParcelas={() => onNavigate('parcelas')}
+                onSettleInstallment={onSettleInstallment}
+                onNudgeWhatsApp={onNudgeWhatsApp}
+                isDarkMode={isDarkMode}
+              />
               <button
                 onClick={() => onNavigate('perfil')}
                 aria-label="Perfil do usuário"

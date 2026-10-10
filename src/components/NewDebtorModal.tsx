@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { APP_IMAGES } from '../data/mockData';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
+import { ImageCropperModal } from './ImageCropperModal';
 
 function isValidCpf(str: string): boolean {
   const clean = str.replace(/\D/g, '');
@@ -99,6 +100,9 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
   const [relation, setRelation] = useState('Amigo(a)');
   const [isCustomRelation, setIsCustomRelation] = useState(false);
   const [customRelationText, setCustomRelationText] = useState('');
+  const [avatar, setAvatar] = useState(APP_IMAGES.carlos);
+  const [rawUploadImage, setRawUploadImage] = useState<string | null>(null);
+  const [cropModalOpen, setCropModalOpen] = useState(false);
 
   // Nova Compra Integrada no Novo Comprador
   const [enablePurchase, setEnablePurchase] = useState(true);
@@ -174,7 +178,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
       relation: finalRelation,
       pixKey: debtorPixKey || phone || email || 'pix@banco.com.br',
       email: email || `${finalUsername}@gmail.com`,
-      avatar: APP_IMAGES.carlos,
+      avatar: avatar || APP_IMAGES.carlos,
       documentNumber: validDocumentNumber,
       cpfCnpj: validDocumentNumber,
       debtorPixKey,
@@ -352,6 +356,64 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
               <div className="flex items-center gap-1.5 pb-1 border-b border-white/10 text-[11px] font-bold text-cyan-300 uppercase tracking-wider">
                 <span className="material-symbols-outlined text-[15px]">badge</span>
                 <span>1. Informações Pessoais do Comprador</span>
+              </div>
+
+              {/* Foto do Comprador com Recorte Manual */}
+              <div className="flex items-center justify-between gap-3 bg-white/5 p-2.5 rounded-2xl border border-white/10">
+                <div className="flex items-center gap-3">
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-cyan-400/50 bg-slate-900 shrink-0 shadow-md">
+                    <img
+                      src={avatar || APP_IMAGES.carlos}
+                      alt="Avatar Comprador"
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-xs font-bold text-slate-100">Foto do Comprador</span>
+                    <span className="text-[10px] text-cyan-300">Defina e ajuste o enquadramento do avatar</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 shrink-0">
+                  {avatar && avatar !== APP_IMAGES.carlos && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setRawUploadImage(avatar);
+                        setCropModalOpen(true);
+                      }}
+                      className="px-2.5 py-1.5 rounded-xl bg-purple-500/20 hover:bg-purple-500/30 text-purple-200 text-xs font-bold border border-purple-400/40 cursor-pointer transition-colors flex items-center gap-1"
+                      title="Reabrir ajustador de zoom e recorte"
+                    >
+                      <span className="material-symbols-outlined text-sm">crop</span>
+                      <span>Ajustar</span>
+                    </button>
+                  )}
+
+                  <label className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-xs font-bold border border-cyan-400/40 cursor-pointer transition-colors flex items-center gap-1.5 shrink-0">
+                    <span className="material-symbols-outlined text-sm">photo_camera</span>
+                    <span>{avatar && avatar !== APP_IMAGES.carlos ? '📷 Trocar' : '📷 Adicionar'}</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (evt) => {
+                            if (evt.target?.result) {
+                              setRawUploadImage(evt.target.result as string);
+                              setCropModalOpen(true);
+                            }
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                        e.target.value = '';
+                      }}
+                    />
+                  </label>
+                </div>
               </div>
 
               {/* Nome Completo */}
@@ -874,6 +936,23 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
             </div>
           </div>
         </form>
+
+        {/* Modal de Recorte Manual Interativo para Foto do Novo Comprador */}
+        <ImageCropperModal
+          isOpen={cropModalOpen}
+          imageSrc={rawUploadImage}
+          shape="square"
+          title="Recorte Manual da Foto do Comprador"
+          onConfirm={(cropped) => {
+            setAvatar(cropped);
+            setCropModalOpen(false);
+            setRawUploadImage(null);
+          }}
+          onCancel={() => {
+            setCropModalOpen(false);
+            setRawUploadImage(null);
+          }}
+        />
       </div>
     </div>
   );

@@ -142,6 +142,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação Google foi cancelada.');
+      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
+        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
       } else {
         setErrorMessage(err.message || 'Erro na autenticação Google.');
       }
@@ -160,6 +162,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     } catch (err: any) {
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação do Facebook foi cancelada.');
+      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
+        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
       } else {
         setErrorMessage(err.message || 'Não foi possível entrar com Facebook. Verifique a configuração no console do Firebase.');
       }
@@ -358,17 +362,17 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
           <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
 
           <div>
-            <div className="flex items-center gap-2 mb-6">
-              <HaspahoLogo size="lg" variant="horizontal" darkTheme={true} />
+            <div className="flex items-center gap-3 mb-6">
+              <HaspahoLogo size="md" variant="horizontal" darkTheme={true} />
             </div>
 
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold tracking-wide uppercase mb-3 border border-blue-400/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Ambiente Seguro • ERP PRO
+              Ambiente Seguro • HASPAHO ERP PRO
             </div>
 
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-              RECEBÍVEIS PRO
+              HASPAHO • RECEBÍVEIS PRO
             </h2>
             <p className="text-xs text-slate-300 mt-2 leading-relaxed">
               Plataforma com isolamento individual de dados, autenticação real e integração direta com o banco de dados Firebase.

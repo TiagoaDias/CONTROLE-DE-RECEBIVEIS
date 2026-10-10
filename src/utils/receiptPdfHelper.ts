@@ -232,28 +232,29 @@ export async function downloadIndividualReceiptPdf(data: IndividualReceiptData):
   // 8. Bloco 4: PAGAMENTOS FUTUROS & QR CODE PIX
   doc.setFillColor(250, 250, 250);
   doc.setDrawColor(226, 232, 240);
-  doc.roundedRect(15, y, 180, 26, 2, 2, 'FD');
+  doc.roundedRect(15, y, 180, 36, 2, 2, 'FD');
 
   try {
     const pixQrDataUrl = await generatePixQrCodeDataUrl(creditorPix, numericAmount, creditorName);
     if (pixQrDataUrl) {
-      doc.addImage(pixQrDataUrl, 'PNG', 19, y + 3, 20, 20, undefined, 'FAST');
+      doc.addImage(pixQrDataUrl, 'PNG', 18, y + 2, 32, 32, undefined, 'FAST');
     }
   } catch (err) {
     console.warn('QR Code generation error in individual receipt:', err);
   }
 
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(7.8);
+  doc.setFontSize(8);
   doc.setTextColor(15, 23, 42);
-  doc.text('DADOS OFICIAIS PARA LIQUIDAÇÃO DE PARCELAS:', 44, y + 7);
+  doc.text('DADOS OFICIAIS PARA LIQUIDAÇÃO DE PARCELAS VIA PIX:', 54, y + 8);
 
-  doc.setFontSize(7.2);
+  doc.setFontSize(7.5);
   doc.setFont('helvetica', 'normal');
   doc.setTextColor(71, 85, 105);
-  doc.text(`Chave PIX Oficial: ${creditorPix}`, 44, y + 12);
-  doc.text(`Titular: ${creditorName} • ${creditorCompany}`, 44, y + 16.5);
-  doc.text(`Identificação: Quitação de Recebíveis HASPAHO`, 44, y + 21);
+  doc.text(`Chave PIX Oficial (Telefone Celular): ${creditorPix}`, 54, y + 14);
+  doc.text(`Titular: ${creditorName} • ${creditorCompany}`, 54, y + 19);
+  doc.text(`Município: Mineiros do Tietê - SP`, 54, y + 24);
+  doc.text(`Instrução: Escaneie o QR Code acima com o app do seu banco ou use a chave Pix.`, 54, y + 29);
 
   // 9. Rodapé Jurídico Oficial
   doc.setFont('helvetica', 'normal');

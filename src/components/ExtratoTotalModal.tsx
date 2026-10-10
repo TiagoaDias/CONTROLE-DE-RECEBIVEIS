@@ -503,34 +503,35 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
       // Section 5: Bloco Oficial de Pagamento PIX (QR Code e Chave Telefone)
       doc.setFillColor(240, 253, 244); // light emerald-50
       doc.setDrawColor(167, 243, 208); // emerald-200
-      doc.roundedRect(marginX, y, contentWidth, 22, 2, 2, 'FD');
+      doc.roundedRect(marginX, y, contentWidth, 34, 2, 2, 'FD');
 
       const officialPixKey = '(14) 99733-9863';
       try {
         const pixQrDataUrl = await generatePixQrCodeDataUrl(officialPixKey, totalPendingAmount, 'Tiago Dias');
         if (pixQrDataUrl) {
-          doc.addImage(pixQrDataUrl, 'PNG', marginX + 3, y + 2, 18, 18, undefined, 'FAST');
+          doc.addImage(pixQrDataUrl, 'PNG', marginX + 2, y + 2, 30, 30, undefined, 'FAST');
         }
       } catch (err) {
         console.warn('QR Code PIX generation error:', err);
       }
 
       doc.setFont('helvetica', 'bold');
-      doc.setFontSize(7.8);
+      doc.setFontSize(8.5);
       doc.setTextColor(6, 95, 70); // emerald-800
-      doc.text('PAGUE VIA QR CODE PIX OU CHAVE TELEFONE (14 99733 9863):', marginX + 25, y + 5.5);
+      doc.text('PAGUE VIA QR CODE PIX OU CHAVE TELEFONE (14 99733 9863):', marginX + 35, y + 7);
 
-      doc.setFontSize(7.2);
+      doc.setFontSize(7.8);
       doc.setTextColor(15, 23, 42);
-      doc.text(`Chave PIX Oficial (Telefone): ${officialPixKey}`, marginX + 25, y + 10.5);
+      doc.text(`Chave PIX Oficial (Telefone Celular): ${officialPixKey}`, marginX + 35, y + 13);
 
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(6.8);
+      doc.setFontSize(7.2);
       doc.setTextColor(71, 85, 105);
-      doc.text(`Titular: Tiago Dias • HASPAHO Tecnologia da Informação (Mineiros do Tietê - SP)`, marginX + 25, y + 15);
-      doc.text(`Identificação: Quitação de Parcelas e Cobranças de Recebíveis`, marginX + 25, y + 19);
+      doc.text(`Titular: Tiago Dias • HASPAHO Tecnologia da Informação`, marginX + 35, y + 18.5);
+      doc.text(`Município: Mineiros do Tietê - SP`, marginX + 35, y + 23.5);
+      doc.text(`Instrução: Abra o aplicativo de qualquer banco e leia o QR Code ao lado.`, marginX + 35, y + 28.5);
 
-      y += 26;
+      y += 38;
 
       // Footer disclaimer & signature line
       doc.setDrawColor(203, 213, 225);

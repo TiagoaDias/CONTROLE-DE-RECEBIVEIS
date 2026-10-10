@@ -174,7 +174,7 @@ export const DetalheAtrasoView: React.FC<DetalheAtrasoViewProps> = ({
               <span>VENCEU EM {inst.dueDate} • PARCELA {inst.installmentNumber} DE {inst.totalInstallments}</span>
             </div>
             <div className="text-2xl sm:text-3xl font-black text-red-600 tracking-tight mt-0.5 font-mono">
-              R$ {inst.originalAmount.toFixed(2).replace('.', ',')}
+              R$ {(Number(inst.originalAmount || inst.amount) || 0).toFixed(2).replace('.', ',')}
             </div>
           </div>
 

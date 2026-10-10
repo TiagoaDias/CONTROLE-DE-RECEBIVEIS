@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenTab } from '../types';
+import { playAppSound } from '../utils/soundUtils';
 
 interface BottomNavProps {
   currentTab: ScreenTab;
@@ -52,6 +53,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   }, [isMenuOpen]);
 
   const handleTabClick = (tab: ScreenTab) => {
+    playAppSound('click');
     setIsMenuOpen(false);
     onNavigate(tab);
   };
@@ -94,20 +96,24 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </button>
           </div>
 
-          {/* 1. Novo Comprador (contendo cadastro de compra integrado) */}
+          {/* 1. Novo Devedor / Comprador */}
           <div
             onClick={() => {
+              playAppSound('click');
               setIsMenuOpen(false);
               if (onOpenNewDebtor) onOpenNewDebtor();
             }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group"
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">person_add</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors">
-                Novo Comprador
+              <div className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors flex items-center gap-1.5">
+                <span>Novo Devedor</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/30">
+                  Principal
+                </span>
               </div>
               <div className="text-[11px] text-slate-400 truncate">
                 Cadastrar comprador e nova compra integrados
@@ -118,13 +124,153 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </div>
 
-          {/* 2. Sistema ERP Corporativo (Botão ERP transferido do topo para o botão mais) */}
+          {/* 2. Nova Compra Parcelada */}
           <div
             onClick={() => {
+              playAppSound('click');
+              setIsMenuOpen(false);
+              onOpenNewPurchase();
+            }}
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(37,99,235,0.4)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-blue-200 transition-colors flex items-center gap-1.5">
+                <span>Nova Compra</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-blue-500/30 text-blue-300 border border-blue-400/30">
+                  Frequente
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Lançar produto, valores e gerar parcelas automáticas
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-blue-300 group-hover:translate-x-0.5 transition-all">
+              chevron_right
+            </span>
+          </div>
+
+          {/* 3. Registrar Pagamento (Liquidar Parcelas) */}
+          <div
+            onClick={() => {
+              playAppSound('click');
+              setIsMenuOpen(false);
+              onNavigate('parcelas');
+            }}
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-teal-500/50 hover:bg-teal-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(20,184,166,0.4)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">payments</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-teal-200 transition-colors flex items-center gap-1.5">
+                <span>Registrar Pagamento</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-teal-500/30 text-teal-300 border border-teal-400/30">
+                  Baixa
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Baixar parcelas em aberto e emitir comprovante
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-teal-300 group-hover:translate-x-0.5 transition-all">
+              chevron_right
+            </span>
+          </div>
+
+          {/* 4. Consultar Parcelas & Histórico */}
+          <div
+            onClick={() => {
+              playAppSound('click');
+              setIsMenuOpen(false);
+              onNavigate('parcelas');
+            }}
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(99,102,241,0.4)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">receipt_long</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-indigo-200 transition-colors flex items-center gap-1.5">
+                <span>Consultar Parcelas</span>
+              </div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Visualizar planilha de parcelas pendentes e pagas
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-indigo-300 group-hover:translate-x-0.5 transition-all">
+              chevron_right
+            </span>
+          </div>
+
+          {/* 5. PDF (Central de Documentos: Extrato Total, Recibo Individual e Contrato Digital) */}
+          <div
+            onClick={() => {
+              playAppSound('click');
+              setIsMenuOpen(false);
+              if (onOpenPdfHub) onOpenPdfHub();
+            }}
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(225,29,72,0.4)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors flex items-center gap-1.5">
+                <span>Gerar Comprovantes &amp; PDFs</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 border border-rose-400/40">
+                  Documentos
+                </span>
+              </div>
+              <div className="text-[11px] text-slate-400 truncate">
+                Extrato Total, Recibos Individuais e Contrato
+              </div>
+            </div>
+            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-rose-300 group-hover:translate-x-0.5 transition-all">
+              chevron_right
+            </span>
+          </div>
+
+          {/* 6. Escanear com Gemini IA */}
+          {onOpenGeminiScanner && (
+            <div
+              onClick={() => {
+                playAppSound('click');
+                setIsMenuOpen(false);
+                onOpenGeminiScanner();
+              }}
+              className="w-full p-2.5 rounded-2xl bg-white/5 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            >
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.4)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[20px]">document_scanner</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors flex items-center gap-1.5">
+                  <span>Leitor Inteligente Gemini IA</span>
+                  <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-cyan-500/30 text-cyan-200 border border-cyan-400/40">
+                    IA
+                  </span>
+                </div>
+                <div className="text-[11px] text-slate-400 truncate">
+                  Escanear carnês, contratos ou comprovantes com IA
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all">
+                chevron_right
+              </span>
+            </div>
+          )}
+
+          {/* 7. Sistema ERP Corporativo (Botão ERP transferido do topo para o botão mais) */}
+          <div
+            onClick={() => {
+              playAppSound('click');
               setIsMenuOpen(false);
               onNavigate(currentTab === 'erp-legacy' ? 'dashboard' : 'erp-legacy');
             }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group"
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.4)] group-hover:scale-105 transition-transform font-bold">
               <span className="material-symbols-outlined text-[20px] text-slate-950">desktop_windows</span>
@@ -133,7 +279,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               <div className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
                 <span>{currentTab === 'erp-legacy' ? 'Sair do Modo ERP' : 'Sistema ERP Corporativo'}</span>
                 <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-mono shadow-xs">
-                  ERP
+                  ERP PRO
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 truncate">
@@ -145,59 +291,30 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </div>
 
-          {/* 3. Notificações & Alertas Financeiros (Sininho transferido para dentro de ações rápidas) */}
+          {/* 8. Notificações & Alertas Financeiros (Sininho transferido para dentro de ações rápidas) */}
           <div
             onClick={() => {
+              playAppSound('click');
               setIsMenuOpen(false);
               onNavigate('detalhe-atraso');
             }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group"
+            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.4)] group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">notifications</span>
-              <span className="absolute -top-1 -right-1 flex items-center gap-0.5">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-500 ring-2 ring-slate-900 animate-pulse" title="1 parcela atrasada" />
-              </span>
             </div>
             <div className="flex-1 min-w-0">
               <div className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
-                <span>Notificações &amp; Alertas (Sininho)</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-red-500/30 text-red-200 border border-red-400/40">
-                  1 atraso
+                <span>Radar &amp; Alertas Financeiros</span>
+                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/40">
+                  Radar
                 </span>
               </div>
               <div className="text-[11px] text-slate-400 truncate">
-                1 parcela atrasada e 3 vencimentos próximos
+                Acompanhar vencimentos e cobranças prioritárias
               </div>
             </div>
             <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 4. PDF (Central de Documentos: Extrato Total, Recibo Individual e Contrato Digital) */}
-          <div
-            onClick={() => {
-              setIsMenuOpen(false);
-              if (onOpenPdfHub) onOpenPdfHub();
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/10 flex items-center gap-3 transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(225,29,72,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors flex items-center gap-1.5">
-                <span>PDF (Documentos &amp; Extratos)</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 border border-rose-400/40">
-                  Janela
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Extrato Total, Recibos Individuais e Contrato
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-rose-300 group-hover:translate-x-0.5 transition-all">
               chevron_right
             </span>
           </div>
@@ -466,7 +583,9 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
-                setIsMenuOpen((prev) => !prev);
+                const nextState = !isMenuOpen;
+                setIsMenuOpen(nextState);
+                playAppSound(nextState ? 'pop' : 'whoosh');
               }}
               aria-label={isMenuOpen ? "Fechar Menu de Ações Rápidas" : "Abrir Menu de Ações Rápidas"}
               aria-expanded={isMenuOpen}
