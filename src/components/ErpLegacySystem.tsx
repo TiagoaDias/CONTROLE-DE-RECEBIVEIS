@@ -2,7 +2,13 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Debtor, Purchase, Installment, BankInstitution, UserAccount, ScreenTab } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
 import { getAuditLogs, clearAuditLogs, addAuditLog, AuditLogEntry } from '../utils/auditLogger';
-import { saveDebtorsToFirestore, saveSingleDebtorToFirestore, deleteDebtorFromFirestore } from '../lib/firebase';
+import {
+  saveDebtorsToFirestore,
+  saveSingleDebtorToFirestore,
+  deleteDebtorFromFirestore,
+  saveInstallmentsToFirestore,
+  deleteInstallmentFromFirestore,
+} from '../lib/firebase';
 
 interface ErpLegacySystemProps {
   debtors: Debtor[];
@@ -151,6 +157,25 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   const [instSearch, setInstSearch] = useState('');
   const [instStatusFilter, setInstStatusFilter] = useState<string>('todos');
 
+  // Lixeira Contábil (Recycle Bin / Desfazer) State & Seleção Geral
+  const [deletedInstallments, setDeletedInstallments] = useState<(Installment & { deletedAt?: string })[]>(() => {
+    try {
+      const saved = localStorage.getItem('haspaho_erp_deleted_installments');
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      console.error(e);
+      return [];
+    }
+  });
+
+  const [lastDeletedBatch, setLastDeletedBatch] = useState<Installment[] | null>(null);
+  const [showTrashModal, setShowTrashModal] = useState(false);
+  const [trashSearch, setTrashSearch] = useState('');
+  const [selectedInstIds, setSelectedInstIds] = useState<string[]>([]);
+  const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
+  const [bulkDeleteScope, setBulkDeleteScope] = useState<'selected' | 'all_filtered'>('selected');
+  const masterCheckboxRef = useRef<HTMLInputElement>(null);
+
   const filteredInstallments = useMemo(() => {
     return installments.filter((i) => {
       const match =
@@ -162,6 +187,172 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       return i.status === instStatusFilter;
     });
   }, [installments, instSearch, instStatusFilter]);
+
+  // Master Checkbox & Selection Helpers
+  const isAllFilteredSelected = useMemo(() => {
+    if (!filteredInstallments.length) return false;
+    return filteredInstallments.every((i) => selectedInstIds.includes(i.id));
+  }, [filteredInstallments, selectedInstIds]);
+
+  useEffect(() => {
+    if (masterCheckboxRef.current) {
+      const filteredCount = filteredInstallments.length;
+      const count = filteredInstallments.filter((i) => selectedInstIds.includes(i.id)).length;
+      masterCheckboxRef.current.indeterminate = count > 0 && count < filteredCount;
+    }
+  }, [filteredInstallments, selectedInstIds]);
+
+  const toggleSelectAllFiltered = () => {
+    if (isAllFilteredSelected) {
+      const filteredIdSet = new Set(filteredInstallments.map((i) => i.id));
+      setSelectedInstIds((prev) => prev.filter((id) => !filteredIdSet.has(id)));
+    } else {
+      const newIds = Array.from(new Set([...selectedInstIds, ...filteredInstallments.map((i) => i.id)]));
+      setSelectedInstIds(newIds);
+    }
+  };
+
+  const toggleSelectRow = (instId: string) => {
+    setSelectedInstIds((prev) =>
+      prev.includes(instId) ? prev.filter((id) => id !== instId) : [...prev, instId]
+    );
+  };
+
+  const selectedInstallmentsList = useMemo(() => {
+    const idSet = new Set(selectedInstIds);
+    return installments.filter((i) => idSet.has(i.id));
+  }, [installments, selectedInstIds]);
+
+  const totalSelectedAmount = useMemo(() => {
+    return selectedInstallmentsList.reduce((acc, i) => acc + (i.amount || 0), 0);
+  }, [selectedInstallmentsList]);
+
+  // Mover Títulos para a Lixeira Contábil (Permite Desfazer)
+  const moveToTrash = async (targets: Installment[], reasonLabel?: string) => {
+    if (!targets.length) return;
+    const targetIds = new Set(targets.map((t) => t.id));
+    const nowIso = new Date().toISOString();
+    const enrichedTargets = targets.map((t) => ({ ...t, deletedAt: nowIso }));
+
+    const nextInstallments = installments.filter((i) => !targetIds.has(i.id));
+    const nextDeleted = [...enrichedTargets, ...deletedInstallments.filter((d) => !targetIds.has(d.id))];
+
+    onUpdateInstallments(nextInstallments);
+    setDeletedInstallments(nextDeleted);
+    setLastDeletedBatch(targets);
+    setSelectedInstIds((prev) => prev.filter((id) => !targetIds.has(id)));
+
+    try {
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      localStorage.setItem('haspaho_erp_deleted_installments', JSON.stringify(nextDeleted));
+    } catch (e) {
+      console.error(e);
+    }
+
+    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    try {
+      await saveInstallmentsToFirestore(activeUserId, nextInstallments);
+      for (const t of targets) {
+        deleteInstallmentFromFirestore(activeUserId, t.id).catch(console.warn);
+      }
+    } catch (err) {
+      console.warn('Erro ao sincronizar exclusão com Firestore:', err);
+    }
+
+    addAuditLog(
+      'EXCLUSAO_TITULOS_ERP',
+      `${targets.length} título(s) contábil(is) excluído(s) no ERP (${reasonLabel || 'Movido para Lixeira'}).`,
+      targets.length === 1 ? targets[0].debtorName : `Lote de ${targets.length} títulos`,
+      'FIRESTORE_SAVED'
+    );
+
+    onToast(`🗑️ ${targets.length} título(s) movido(s) para a Lixeira Contábil. Ação reversível!`);
+  };
+
+  // Restaurar Títulos da Lixeira (Desfazer Ação)
+  const handleRestoreInstallments = async (targets: (Installment & { deletedAt?: string })[]) => {
+    if (!targets.length) return;
+    const targetIds = new Set(targets.map((t) => t.id));
+
+    const cleanedTargets = targets.map((t) => {
+      const copy: any = { ...t };
+      delete copy.deletedAt;
+      return copy as Installment;
+    });
+
+    const existingIds = new Set(installments.map((i) => i.id));
+    const toAdd = cleanedTargets.filter((t) => !existingIds.has(t.id));
+    const nextInstallments = [...toAdd, ...installments];
+    const nextDeleted = deletedInstallments.filter((d) => !targetIds.has(d.id));
+
+    onUpdateInstallments(nextInstallments);
+    setDeletedInstallments(nextDeleted);
+    if (lastDeletedBatch && targets.some((t) => lastDeletedBatch.some((b) => b.id === t.id))) {
+      setLastDeletedBatch(null);
+    }
+
+    try {
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      localStorage.setItem('haspaho_erp_deleted_installments', JSON.stringify(nextDeleted));
+    } catch (e) {
+      console.error(e);
+    }
+
+    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    try {
+      await saveInstallmentsToFirestore(activeUserId, nextInstallments);
+    } catch (err) {
+      console.warn('Erro ao sincronizar restauração com Firestore:', err);
+    }
+
+    addAuditLog(
+      'RESTAURACAO_TITULOS_ERP',
+      `${targets.length} título(s) contábil(is) restaurado(s) da Lixeira para a Grade Contábil do ERP.`,
+      targets.length === 1 ? targets[0].debtorName : `Lote de ${targets.length} títulos`,
+      'FIRESTORE_SAVED'
+    );
+
+    onToast(`♻️ ${targets.length} título(s) restaurado(s) com sucesso para a Grade Contábil!`);
+  };
+
+  // Esvaziar Lixeira Definitivamente
+  const handleEmptyTrash = () => {
+    if (!deletedInstallments.length) return;
+    if (window.confirm(`⚠️ EXCLUSÃO PERMANENTE: Deseja esvaziar definitivamente todos os ${deletedInstallments.length} títulos da lixeira? Esta ação não pode ser desfeita.`)) {
+      setDeletedInstallments([]);
+      setLastDeletedBatch(null);
+      try {
+        localStorage.removeItem('haspaho_erp_deleted_installments');
+      } catch (e) {
+        console.error(e);
+      }
+      addAuditLog(
+        'LIMPEZA_LIXEIRA_ERP',
+        `Lixeira de Contas a Receber esvaziada permanentemente.`,
+        'SISTEMA_ERP',
+        'LOCAL_SAVED'
+      );
+      onToast('🧹 Lixeira contábil esvaziada definitivamente.');
+    }
+  };
+
+  // Solicitar Exclusão em Massa (Abre Modal de Confirmação)
+  const handleRequestBulkDelete = (scope: 'selected' | 'all_filtered') => {
+    setBulkDeleteScope(scope);
+    setConfirmBulkDeleteOpen(true);
+  };
+
+  // Confirmar Exclusão em Massa
+  const handleConfirmBulkDelete = () => {
+    const targets = bulkDeleteScope === 'selected' ? selectedInstallmentsList : filteredInstallments;
+    setConfirmBulkDeleteOpen(false);
+    moveToTrash(
+      targets,
+      bulkDeleteScope === 'selected'
+        ? `Exclusão de ${targets.length} títulos selecionados via caixa marcável`
+        : `Exclusão Geral de ${targets.length} títulos da Grade Contábil`
+    );
+  };
 
   // Rapid Purchase Entry State (Emissão de Carnê/Lançamento)
   const [newPurchaseDebtorId, setNewPurchaseDebtorId] = useState(debtors[0]?.id || '');
@@ -409,27 +600,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     }
   };
 
-  // Excluir parcela específica do título contábil
+  // Excluir parcela específica do título contábil (Envia para Lixeira com opção de Desfazer)
   const handleDeleteSpecificInstallment = (inst: Installment) => {
-    if (onDeleteInstallment) {
-      onDeleteInstallment(inst.id);
-      return;
-    }
-    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja excluir a parcela ${inst.installmentNumber}/${inst.totalInstallments} de R$ ${inst.amount.toFixed(2)} (${inst.debtorName})?`)) {
-      const nextInstallments = installments.filter((i) => i.id !== inst.id);
-      onUpdateInstallments(nextInstallments);
-      try {
-        localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
-      } catch (e) {
-        console.error(e);
-      }
-      addAuditLog(
-        'EXCLUSAO_PARCELA_ERP',
-        `Título/Parcela ID ${inst.id} de "${inst.debtorName}" excluído no ERP.`,
-        inst.debtorName,
-        'FIRESTORE_SAVED'
-      );
-      onToast(`🗑️ Título/Parcela de R$ ${inst.amount.toFixed(2)} excluído com sucesso.`);
+    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja excluir a parcela ${inst.installmentNumber}/${inst.totalInstallments} de R$ ${inst.amount.toFixed(2)} (${inst.debtorName})?\n\nO registro será movido para a Lixeira Contábil e você poderá desfazer a qualquer momento.`)) {
+      moveToTrash([inst], `Parcela #${inst.installmentNumber} do produto "${inst.product}" (${inst.debtorName})`);
     }
   };
 
@@ -1537,6 +1711,37 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           {/* TAB 3: CONTAS A RECEBER (GRADE CONTÁBIL DE PARCELAS) */}
           {activeTab === 'titulos' && (
             <div className="space-y-3">
+              {/* Notificação Rápida de Desfazer Exclusão */}
+              {lastDeletedBatch && lastDeletedBatch.length > 0 && (
+                <div className="flex items-center justify-between gap-3 px-3 py-2 bg-amber-950/80 border border-amber-500 rounded text-amber-200 text-xs shadow-md animate-fade-in">
+                  <div className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[18px] text-amber-400">info</span>
+                    <span>
+                      <strong>{lastDeletedBatch.length} título(s)</strong> movido(s) para a Lixeira Contábil do ERP. Caso tenha sido um engano:
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreInstallments(lastDeletedBatch)}
+                      className="px-2.5 py-1 bg-amber-500 hover:bg-amber-400 text-black font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 shadow-xs transition-transform active:scale-95"
+                    >
+                      <span className="material-symbols-outlined text-[14px]">undo</span>
+                      <span>Desfazer Exclusão Agora</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setLastDeletedBatch(null)}
+                      className="text-amber-400 hover:text-white p-0.5 rounded cursor-pointer"
+                      title="Dispensar aviso"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">close</span>
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Filtros e Barra de Ferramentas Contábeis */}
               <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-black/20 rounded border border-slate-800">
                 <div className="flex items-center gap-2 flex-1 max-w-md">
                   <span className="material-symbols-outlined text-[16px] text-slate-400">search</span>
@@ -1549,7 +1754,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2">
                   <span className="text-[11px] font-bold">Situação:</span>
                   {(['todos', 'overdue', 'soon', 'ontime', 'paid'] as const).map((st) => (
                     <button
@@ -1564,14 +1769,100 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       {st === 'overdue' ? 'Atrasadas' : st === 'soon' ? 'Vence Logo' : st === 'ontime' ? 'Em dia' : st === 'paid' ? 'Pagas' : 'Todas'}
                     </button>
                   ))}
+
+                  {/* Botão da Lixeira Contábil */}
+                  <button
+                    type="button"
+                    onClick={() => setShowTrashModal(true)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-xs ml-2 ${
+                      deletedInstallments.length > 0
+                        ? 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border-amber-600'
+                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                    }`}
+                    title="Abrir Lixeira Contábil para restaurar ou desfazer exclusões"
+                  >
+                    <span className="material-symbols-outlined text-[15px] text-amber-400">delete_sweep</span>
+                    <span>Lixeira Contábil</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
+                      deletedInstallments.length > 0 ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
+                    }`}>
+                      {deletedInstallments.length}
+                    </span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Caixa Selecionável & Barra de Ações em Massa (Excluir Geral) */}
+              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-900/90 border border-slate-700 rounded text-xs font-mono">
+                <div className="flex items-center gap-3">
+                  <label className="flex items-center gap-1.5 cursor-pointer font-bold select-none text-slate-200 hover:text-white">
+                    <input
+                      type="checkbox"
+                      ref={masterCheckboxRef}
+                      checked={isAllFilteredSelected}
+                      onChange={toggleSelectAllFiltered}
+                      className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                    />
+                    <span>Selecionar Geral (Todos os {filteredInstallments.length} títulos)</span>
+                  </label>
+
+                  {selectedInstIds.length > 0 && (
+                    <span className="px-2 py-0.5 rounded bg-blue-900/60 border border-blue-700 text-blue-200 text-[11px]">
+                      ✓ <strong>{selectedInstIds.length}</strong> selecionado(s) | Total: <strong>R$ {totalSelectedAmount.toFixed(2)}</strong>
+                    </span>
+                  )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2">
+                  {selectedInstIds.length > 0 && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => handleRequestBulkDelete('selected')}
+                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 shadow-xs transition-all active:scale-95"
+                        title="Excluir títulos marcados e enviar para a lixeira"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
+                        <span>Excluir Selecionados ({selectedInstIds.length})</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setSelectedInstIds([])}
+                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] cursor-pointer transition-colors"
+                      >
+                        Desmarcar
+                      </button>
+                    </>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={() => handleRequestBulkDelete('all_filtered')}
+                    disabled={filteredInstallments.length === 0}
+                    className="px-2.5 py-1 bg-red-900/80 hover:bg-red-800 text-red-200 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 border border-red-700 shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Excluir geral todos os títulos exibidos na grade e enviar para a lixeira"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">delete_forever</span>
+                    <span>Excluir Geral ({filteredInstallments.length})</span>
+                  </button>
                 </div>
               </div>
 
               {/* DataGrid of Installments */}
               <div className="border border-slate-700 rounded overflow-x-auto max-h-[500px] table-scroll-container financial-table-container">
-                <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
+                <table className="w-full text-left border-collapse text-[11px] min-w-[750px]">
                   <thead className="bg-slate-950 text-slate-300 uppercase font-mono text-[10px] border-b border-slate-700 sticky top-0 z-10 select-none">
                     <tr>
+                      <th className="p-2 border-r border-slate-800 text-center w-10 select-none">
+                        <input
+                          type="checkbox"
+                          checked={isAllFilteredSelected}
+                          onChange={toggleSelectAllFiltered}
+                          title="Caixa Selecionável Geral (Marcar/Desmarcar todos)"
+                          className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                        />
+                      </th>
                       <th className="p-2 border-r border-slate-800 w-14">Título</th>
                       <th className="p-2 border-r border-slate-800">Devedor</th>
                       <th className="p-2 border-r border-slate-800">Descrição do Produto</th>
@@ -1584,87 +1875,129 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 font-mono">
-                    {filteredInstallments.map((inst, index) => {
-                      const isOverdue = inst.status === 'overdue';
-                      const isPaid = inst.status === 'paid';
-                      return (
-                        <tr
-                          key={inst.id}
-                          className={`transition-colors ${
-                            isPaid
-                              ? 'opacity-60 bg-slate-950/20'
-                              : isOverdue
-                              ? 'bg-red-950/30 text-red-200'
-                              : index % 2 === 0
-                              ? 'bg-slate-900/60'
-                              : 'bg-slate-950/40'
-                          }`}
-                        >
-                          <td className="p-2 border-r border-slate-800 text-slate-400">{inst.id.slice(-5)}</td>
-                          <td className="p-2 border-r border-slate-800 font-sans font-semibold">{inst.debtorName}</td>
-                          <td className="p-2 border-r border-slate-800 truncate max-w-xs">{inst.product}</td>
-                          <td className="p-2 border-r border-slate-800 text-center">
-                            {inst.installmentNumber}/{inst.totalInstallments}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 font-bold">
-                            {new Date(inst.dueDate).toLocaleDateString('pt-BR')}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-right font-bold">
-                            R$ {inst.amount.toFixed(2)}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-right text-amber-400">
-                            {isOverdue ? 'R$ 5,00' : '—'}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-center">
-                            {isPaid ? (
-                              <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px]">
-                                QUITADO
-                              </span>
-                            ) : isOverdue ? (
-                              <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold text-[9px]">
-                                ATRASADA
-                              </span>
-                            ) : (
-                              <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 text-[9px]">
-                                ABERTO
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-1.5">
-                              {!isPaid ? (
-                                <button
-                                  type="button"
-                                  onClick={() => handleQuickPayInstallment(inst.id)}
-                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
-                                  title="Liquidar com recibo contábil oficial"
-                                >
-                                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                  <span>Dar Baixa</span>
-                                </button>
+                    {filteredInstallments.length === 0 ? (
+                      <tr>
+                        <td colSpan={10} className="p-6 text-center text-slate-500 font-sans">
+                          Nenhum título encontrado com os filtros atuais.
+                        </td>
+                      </tr>
+                    ) : (
+                      filteredInstallments.map((inst, index) => {
+                        const isOverdue = inst.status === 'overdue';
+                        const isPaid = inst.status === 'paid';
+                        const isSelected = selectedInstIds.includes(inst.id);
+                        return (
+                          <tr
+                            key={inst.id}
+                            className={`transition-colors ${
+                              isSelected
+                                ? 'bg-blue-950/50 text-blue-100 ring-1 ring-blue-500/50'
+                                : isPaid
+                                ? 'opacity-60 bg-slate-950/20'
+                                : isOverdue
+                                ? 'bg-red-950/30 text-red-200'
+                                : index % 2 === 0
+                                ? 'bg-slate-900/60'
+                                : 'bg-slate-950/40'
+                            }`}
+                          >
+                            <td className="p-2 border-r border-slate-800 text-center w-10" onClick={(e) => e.stopPropagation()}>
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectRow(inst.id)}
+                                title={`Selecionar título ${inst.id}`}
+                                className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                              />
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-slate-400">{inst.id.slice(-5)}</td>
+                            <td className="p-2 border-r border-slate-800 font-sans font-semibold">{inst.debtorName}</td>
+                            <td className="p-2 border-r border-slate-800 truncate max-w-xs">{inst.product}</td>
+                            <td className="p-2 border-r border-slate-800 text-center">
+                              {inst.installmentNumber}/{inst.totalInstallments}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 font-bold">
+                              {new Date(inst.dueDate).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-right font-bold">
+                              R$ {inst.amount.toFixed(2)}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-right text-amber-400">
+                              {isOverdue ? 'R$ 5,00' : '—'}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-center">
+                              {isPaid ? (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px]">
+                                  QUITADO
+                                </span>
+                              ) : isOverdue ? (
+                                <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold text-[9px]">
+                                  ATRASADA
+                                </span>
                               ) : (
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px] inline-flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px]">verified</span>
-                                  <span>Baixado</span>
+                                <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 text-[9px]">
+                                  ABERTO
                                 </span>
                               )}
+                            </td>
+                            <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex items-center justify-center gap-1.5">
+                                {!isPaid ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleQuickPayInstallment(inst.id)}
+                                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
+                                    title="Liquidar com recibo contábil oficial"
+                                  >
+                                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                    <span>Dar Baixa</span>
+                                  </button>
+                                ) : (
+                                  <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px] inline-flex items-center gap-1">
+                                    <span className="material-symbols-outlined text-[12px]">verified</span>
+                                    <span>Baixado</span>
+                                  </span>
+                                )}
 
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSpecificInstallment(inst)}
-                                className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
-                                title="Excluir esta parcela do ERP"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">delete</span>
-                                <span>Excluir</span>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSpecificInstallment(inst)}
+                                  className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
+                                  title="Excluir este título e mover para a Lixeira Contábil"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">delete</span>
+                                  <span>Excluir</span>
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
                   </tbody>
                 </table>
+              </div>
+
+              {/* Rodapé da Grade com Atalhos e Lixeira */}
+              <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
+                <div className="flex items-center gap-4">
+                  <span>Títulos listados: <strong className="text-white">{filteredInstallments.length}</strong> de {installments.length}</span>
+                  {selectedInstIds.length > 0 && (
+                    <span className="text-blue-300">Selecionados: <strong>{selectedInstIds.length}</strong></span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowTrashModal(true)}
+                    className="hover:text-amber-400 underline transition-colors cursor-pointer flex items-center gap-1"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">restore_from_trash</span>
+                    <span>Ver Lixeira Contábil ({deletedInstallments.length} itens)</span>
+                  </button>
+                  <span>Dica: Caixa selecionável no cabeçalho marca todos para exclusão geral.</span>
+                </div>
               </div>
             </div>
           )}
@@ -2078,6 +2411,234 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           <span>OPERADOR: {currentUser?.name || 'Thiago Dias'}</span>
         </div>
       </div>
+
+      {/* MODAL 1: CONFIRMAÇÃO DE EXCLUSÃO EM MASSA / EXCLUIR GERAL */}
+      {confirmBulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-slate-900 border border-red-500/50 rounded-xl shadow-2xl p-5 text-white animate-fade-in font-sans">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-full bg-red-950/80 border border-red-500/50 flex items-center justify-center shrink-0 text-red-400">
+                <span className="material-symbols-outlined text-[24px]">delete_sweep</span>
+              </div>
+              <div className="flex-1">
+                <h3 className="text-base font-bold text-white flex items-center gap-1.5">
+                  <span>Confirmação de Exclusão Contábil</span>
+                </h3>
+                <p className="text-xs text-slate-300 mt-1">
+                  {bulkDeleteScope === 'selected' ? (
+                    <>
+                      Você selecionou <strong>{selectedInstIds.length} título(s)</strong> no valor total de{' '}
+                      <strong className="text-amber-300">R$ {totalSelectedAmount.toFixed(2)}</strong>.
+                    </>
+                  ) : (
+                    <>
+                      Você solicitou a <strong>Exclusão Geral</strong> de todos os{' '}
+                      <strong>{filteredInstallments.length} títulos</strong> listados na Grade Contábil (Total:{' '}
+                      <strong className="text-amber-300">
+                        R$ {filteredInstallments.reduce((acc, i) => acc + i.amount, 0).toFixed(2)}
+                      </strong>
+                      ).
+                    </>
+                  )}
+                </p>
+              </div>
+            </div>
+
+            <div className="mt-4 p-3 bg-slate-950 border border-slate-800 rounded-lg text-[11px] text-slate-300 space-y-1.5 font-mono">
+              <div className="flex items-center gap-1.5 text-emerald-400 font-bold">
+                <span className="material-symbols-outlined text-[15px]">shield</span>
+                <span>Proteção HASPAHO ERP &amp; Lixeira Ativa</span>
+              </div>
+              <p className="text-slate-400">
+                Os títulos serão retirados de circulação ativa e enviados com segurança para a <strong>Lixeira Contábil</strong>. Se você cometeu um engano, poderá <strong>desfazer imediatamente</strong> ou restaurá-los pela Lixeira a qualquer momento.
+              </p>
+            </div>
+
+            <div className="mt-5 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmBulkDeleteOpen(false)}
+                className="px-3.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-bold transition-colors cursor-pointer"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmBulkDelete}
+                className="px-4 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-white text-xs font-bold shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete</span>
+                <span>Confirmar e Mover para a Lixeira</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL 2: LIXEIRA CONTÁBIL DE CONTAS A RECEBER (DESFAZER AÇÕES) */}
+      {showTrashModal && (
+        <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-xs flex items-center justify-center p-3 sm:p-5">
+          <div className="w-full max-w-4xl bg-slate-900 border border-amber-500/40 rounded-xl shadow-2xl flex flex-col max-h-[90vh] overflow-hidden animate-fade-in font-sans">
+            {/* Cabeçalho do Modal */}
+            <div className="p-4 bg-slate-950 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 select-none">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-lg bg-amber-950/60 border border-amber-500/40 flex items-center justify-center text-amber-400">
+                  <span className="material-symbols-outlined text-[20px]">delete_sweep</span>
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Lixeira de Contas a Receber (Grade Contábil)</span>
+                    <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-[10px] font-mono border border-amber-500/40 font-bold">
+                      {deletedInstallments.length} registro(s)
+                    </span>
+                  </h2>
+                  <p className="text-[11px] text-slate-400">
+                    Recupere títulos excluídos ou desfaça ações contábeis acidentais.
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                {deletedInstallments.length > 0 && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => handleRestoreInstallments(deletedInstallments)}
+                      className="px-3 py-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-xs flex items-center gap-1 shadow-sm transition-all active:scale-95 cursor-pointer"
+                      title="Restaurar todos os títulos excluídos para a Grade Contábil"
+                    >
+                      <span className="material-symbols-outlined text-[16px]">restore</span>
+                      <span>Restaurar Todos (Desfazer Tudo)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleEmptyTrash}
+                      className="px-2.5 py-1.5 rounded-lg bg-red-950/80 hover:bg-red-900 text-red-300 border border-red-700/60 font-bold text-xs flex items-center gap-1 transition-all cursor-pointer"
+                      title="Excluir permanentemente todos os registros da lixeira"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete_forever</span>
+                      <span>Esvaziar Lixeira</span>
+                    </button>
+                  </>
+                )}
+
+                <button
+                  type="button"
+                  onClick={() => setShowTrashModal(false)}
+                  className="w-8 h-8 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 flex items-center justify-center cursor-pointer transition-colors"
+                  title="Fechar lixeira"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Barra de Filtro na Lixeira */}
+            <div className="p-3 bg-slate-950/60 border-b border-slate-800 flex items-center gap-2">
+              <span className="material-symbols-outlined text-[16px] text-slate-400">search</span>
+              <input
+                type="search"
+                value={trashSearch}
+                onChange={(e) => setTrashSearch(e.target.value)}
+                placeholder="Pesquisar por devedor, produto ou título na lixeira..."
+                className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
+              />
+            </div>
+
+            {/* Conteúdo da Lixeira / Tabela de Títulos Excluídos */}
+            <div className="flex-1 overflow-auto p-3">
+              {deletedInstallments.length === 0 ? (
+                <div className="text-center py-16 text-slate-400">
+                  <div className="w-14 h-14 mx-auto rounded-full bg-slate-800/60 flex items-center justify-center text-slate-500 mb-3">
+                    <span className="material-symbols-outlined text-[28px]">delete_outline</span>
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-300">A Lixeira Contábil está vazia</h4>
+                  <p className="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+                    Nenhum título ou parcela foi excluído recentemente. Quando você excluir parcelas no ERP, elas aparecerão aqui para serem restauradas se necessário.
+                  </p>
+                </div>
+              ) : (
+                <div className="border border-slate-700 rounded-lg overflow-x-auto">
+                  <table className="w-full text-left border-collapse text-[11px] font-mono min-w-[700px]">
+                    <thead className="bg-slate-950 text-slate-300 uppercase text-[10px] border-b border-slate-700 select-none sticky top-0">
+                      <tr>
+                        <th className="p-2 border-r border-slate-800 w-14">Título</th>
+                        <th className="p-2 border-r border-slate-800">Devedor</th>
+                        <th className="p-2 border-r border-slate-800">Produto</th>
+                        <th className="p-2 border-r border-slate-800 text-center">Parc.</th>
+                        <th className="p-2 border-r border-slate-800">Vencimento</th>
+                        <th className="p-2 border-r border-slate-800 text-right">Valor</th>
+                        <th className="p-2 border-r border-slate-800">Excluído em</th>
+                        <th className="p-2 text-center w-32 select-none">Ação</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-800">
+                      {deletedInstallments
+                        .filter((item) => {
+                          if (!trashSearch.trim()) return true;
+                          const q = trashSearch.toLowerCase();
+                          return (
+                            item.debtorName.toLowerCase().includes(q) ||
+                            item.product.toLowerCase().includes(q) ||
+                            item.id.toLowerCase().includes(q)
+                          );
+                        })
+                        .map((item) => (
+                          <tr key={item.id} className="hover:bg-slate-800/40 transition-colors">
+                            <td className="p-2 border-r border-slate-800 text-slate-400">{item.id.slice(-5)}</td>
+                            <td className="p-2 border-r border-slate-800 font-sans font-semibold text-white">{item.debtorName}</td>
+                            <td className="p-2 border-r border-slate-800 truncate max-w-xs text-slate-300">{item.product}</td>
+                            <td className="p-2 border-r border-slate-800 text-center text-slate-400">
+                              {item.installmentNumber}/{item.totalInstallments}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-slate-300">
+                              {new Date(item.dueDate).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-right font-bold text-amber-300">
+                              R$ {item.amount.toFixed(2)}
+                            </td>
+                            <td className="p-2 border-r border-slate-800 text-[10px] text-slate-400">
+                              {item.deletedAt ? new Date(item.deletedAt).toLocaleString('pt-BR') : 'Hoje'}
+                            </td>
+                            <td className="p-2 text-center whitespace-nowrap">
+                              <button
+                                type="button"
+                                onClick={() => handleRestoreInstallments([item])}
+                                className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white font-bold rounded text-[10px] cursor-pointer inline-flex items-center gap-1 shadow-xs transition-transform active:scale-95"
+                                title="Desfazer exclusão e restaurar este título"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">undo</span>
+                                <span>Restaurar</span>
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+
+            {/* Rodapé do Modal da Lixeira */}
+            <div className="p-3 bg-slate-950 border-t border-slate-800 flex items-center justify-between text-xs text-slate-400 font-mono">
+              <span>
+                Total na lixeira: <strong>{deletedInstallments.length}</strong> títulos | Total:{' '}
+                <strong className="text-amber-300">
+                  R$ {deletedInstallments.reduce((acc, i) => acc + i.amount, 0).toFixed(2)}
+                </strong>
+              </span>
+              <button
+                type="button"
+                onClick={() => setShowTrashModal(false)}
+                className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white rounded text-xs cursor-pointer font-sans"
+              >
+                Fechar Lixeira
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
