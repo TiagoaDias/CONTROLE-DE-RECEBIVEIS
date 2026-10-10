@@ -7,6 +7,7 @@ import {
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import {
   getFirestore,
@@ -302,7 +303,7 @@ export async function loginWithRealCredentials(
   const cleanPass = rawPassword.trim();
 
   if (!cleanId) {
-    throw new Error('Informe seu e-mail, CPF, telefone ou nome de usuário.');
+    throw new Error('Informe seu e-mail ou nome de usuário.');
   }
   if (!cleanPass) {
     throw new Error('Informe sua senha de acesso.');
@@ -320,7 +321,7 @@ export async function loginWithRealCredentials(
 
   if (isMasterId) {
     if (cleanPass !== 'haspaho2026' && cleanPass !== '8888') {
-      throw new Error('Senha incorreta para a conta de Administrador Mestre / Desenvolvedor.');
+      throw new Error('Senha incorreta para a conta de Administrador Mestre.');
     }
     let masterUid = TIAGO_DIAS_USER.id;
     try {
@@ -366,69 +367,171 @@ export async function loginWithRealCredentials(
     }
   }
 
-  // 2. Check Firestore / Local Registered Accounts
-  const safeDocKey = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
-  let cred: RegisteredCredential | null = null;
+  // 2. Real Firebase Authentication with Email & Password
+  let targetEmail = cleanId;
+  let targetUsername = cleanId;
 
-  try {
-    const credDoc = await getDoc(doc(db, 'registered_credentials', safeDocKey));
-    if (credDoc.exists()) {
-      cred = credDoc.data() as RegisteredCredential;
-    }
-  } catch (err) {
-    console.warn('[Firebase] Firestore credential lookup note:', err);
-  }
-
-  if (!cred) {
+  // If identifier is not an email (e.g. username), lookup email in registry
+  if (!cleanId.includes('@')) {
     const localRegistry = getLocalRegisteredCredentials();
-    cred = localRegistry[cleanId] || null;
-    if (!cred) {
-      const byUser = Object.values(localRegistry).find(
-        (c) => c.username.toLowerCase() === cleanId
-      );
-      if (byUser) cred = byUser;
-    }
-  }
-
-  if (!cred) {
-    throw new Error(
-      'Usuário ou e-mail não encontrado no sistema. Verifique suas credenciais ou crie uma conta na aba de Cadastro.'
+    const foundCred = Object.values(localRegistry).find(
+      (c) => c.username.toLowerCase() === cleanId || c.email.toLowerCase() === cleanId
     );
+    if (foundCred) {
+      targetEmail = foundCred.email;
+      targetUsername = foundCred.username;
+    } else {
+      // Try Firestore lookup for registered username
+      const safeKey = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
+      try {
+        const docSnap = await getDoc(doc(db, 'registered_credentials', safeKey));
+        if (docSnap.exists()) {
+          const data = docSnap.data() as RegisteredCredential;
+          targetEmail = data.email;
+          targetUsername = data.username;
+        }
+      } catch {}
+    }
   }
 
-  const incomingHash = btoa(cleanPass);
-  if (cred.passwordHash !== incomingHash && cred.passwordHash !== cleanPass) {
-    throw new Error('Senha incorreta para este usuário.');
-  }
+  // Attempt real Firebase Auth signIn
+  let authUid = '';
+  let fbUserSuccess = false;
 
-  let authUid = cred.userId;
-  try {
-    const fbCred = await signInWithEmailAndPassword(auth, cred.email, cleanPass);
-    authUid = fbCred.user.uid;
-  } catch (e) {
+  if (targetEmail.includes('@')) {
     try {
-      const fbCred = await createUserWithEmailAndPassword(auth, cred.email, cleanPass);
+      const fbCred = await signInWithEmailAndPassword(auth, targetEmail, cleanPass);
       authUid = fbCred.user.uid;
-    } catch (err) {
-      // fallback
+      fbUserSuccess = true;
+    } catch (fbErr: any) {
+      console.warn('[Firebase Auth] signInWithEmailAndPassword result:', fbErr.code);
+      if (fbErr.code === 'auth/wrong-password') {
+        throw new Error('Senha incorreta. Verifique os dados digitados ou use "Esqueci minha senha".');
+      } else if (fbErr.code === 'auth/invalid-credential') {
+        // May be bad credentials or user created locally before Firebase Auth
+        const localRegistry = getLocalRegisteredCredentials();
+        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
+        if (localCred) {
+          const incomingHash = btoa(cleanPass);
+          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
+            // Password matches local registry, try syncing into Firebase Auth
+            try {
+              const newCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanPass);
+              authUid = newCred.user.uid;
+              fbUserSuccess = true;
+            } catch {
+              authUid = localCred.userId || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+              fbUserSuccess = true;
+            }
+          } else {
+            throw new Error('Senha incorreta para este usuário.');
+          }
+        } else {
+          throw new Error('E-mail ou senha incorretos.');
+        }
+      } else if (fbErr.code === 'auth/user-not-found') {
+        // Check if user exists in local registry
+        const localRegistry = getLocalRegisteredCredentials();
+        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
+        if (localCred) {
+          const incomingHash = btoa(cleanPass);
+          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
+            try {
+              const newCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanPass);
+              authUid = newCred.user.uid;
+              fbUserSuccess = true;
+            } catch {
+              authUid = localCred.userId || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+              fbUserSuccess = true;
+            }
+          } else {
+            throw new Error('Senha incorreta para este usuário.');
+          }
+        } else {
+          throw new Error('Usuário não cadastrado. Verifique o e-mail digitado ou crie uma nova conta.');
+        }
+      } else if (fbErr.code === 'auth/invalid-email') {
+        throw new Error('Formato de e-mail inválido.');
+      } else if (fbErr.code === 'auth/user-disabled') {
+        throw new Error('Esta conta foi desativada.');
+      } else if (fbErr.code === 'auth/too-many-requests') {
+        throw new Error('Muitas tentativas sem sucesso. Aguarde alguns instantes e tente novamente.');
+      } else {
+        // Fallback to local credential verification if offline or network issue
+        const localRegistry = getLocalRegisteredCredentials();
+        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
+        if (localCred) {
+          const incomingHash = btoa(cleanPass);
+          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
+            authUid = localCred.userId;
+            fbUserSuccess = true;
+          } else {
+            throw new Error('Senha incorreta para este usuário.');
+          }
+        } else {
+          throw new Error(fbErr.message || 'Falha na autenticação. Verifique os dados informados.');
+        }
+      }
     }
+  } else {
+    throw new Error('Usuário não encontrado. Informe seu e-mail cadastrado.');
   }
 
+  if (!fbUserSuccess || !authUid) {
+    throw new Error('Falha na autenticação. Verifique suas credenciais.');
+  }
+
+  // Load user profile from Firestore or build from account info
+  let userProfile: UserAccount | null = null;
   try {
-    const remote = await getUserFromFirestore(authUid);
-    if (remote) {
-      return {
-        ...remote,
-        id: authUid,
-        hasSeenWelcome: remote.hasSeenWelcome ?? cred.user?.hasSeenWelcome ?? false,
-        isFirstLogin: remote.isFirstLogin ?? cred.user?.isFirstLogin ?? false,
-      };
-    }
-  } catch {
-    // fallback
+    userProfile = await getUserFromFirestore(authUid);
+  } catch {}
+
+  if (userProfile) {
+    return {
+      ...userProfile,
+      id: authUid,
+      email: targetEmail,
+      hasSeenWelcome: userProfile.hasSeenWelcome ?? true,
+      isFirstLogin: false,
+    };
   }
 
-  return { ...cred.user, id: authUid };
+  // Check local registry for any custom profile data
+  const localRegistry = getLocalRegisteredCredentials();
+  const localCred = localRegistry[targetEmail] || localRegistry[targetUsername];
+  if (localCred && localCred.user) {
+    const finalUser: UserAccount = {
+      ...localCred.user,
+      id: authUid,
+      email: targetEmail,
+      isFirstLogin: false,
+      hasSeenWelcome: true,
+    };
+    saveUserToFirestore(finalUser).catch(() => {});
+    return finalUser;
+  }
+
+  // Create clean user profile
+  const newUser: UserAccount = {
+    id: authUid,
+    name: auth.currentUser?.displayName || targetUsername || targetEmail.split('@')[0],
+    username: targetUsername || targetEmail.split('@')[0],
+    email: targetEmail,
+    phoneWhatsapp: auth.currentUser?.phoneNumber || '',
+    authProvider: 'local',
+    companyName: 'Empresa / Negócio Próprio',
+    city: 'São Paulo',
+    state: 'SP',
+    role: 'Gestor Financeiro',
+    pixKey: targetEmail,
+    createdAt: new Date().toISOString(),
+    isFirstLogin: false,
+    hasSeenWelcome: true,
+  };
+
+  saveUserToFirestore(newUser).catch(() => {});
+  return newUser;
 }
 
 /**
@@ -454,22 +557,7 @@ export async function registerRealUser(
     username === 'tiagodias' ||
     email.includes('tiagodias8888')
   ) {
-    throw new Error('Este e-mail já pertence a uma conta mestra registrada.');
-  }
-
-  const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
-  try {
-    const checkDoc = await getDoc(doc(db, 'registered_credentials', safeDocKey));
-    if (checkDoc.exists()) {
-      throw new Error('Este e-mail já está cadastrado no sistema.');
-    }
-  } catch (e: any) {
-    if (e.message && e.message.includes('já está cadastrado')) throw e;
-  }
-
-  const localRegistry = getLocalRegisteredCredentials();
-  if (localRegistry[email]) {
-    throw new Error('Este e-mail já está cadastrado no sistema.');
+    throw new Error('Este e-mail pertence à conta de Administrador Mestre.');
   }
 
   let authUid = '';
@@ -477,15 +565,25 @@ export async function registerRealUser(
     const fbCred = await createUserWithEmailAndPassword(auth, email, rawPassword.trim());
     authUid = fbCred.user.uid;
   } catch (err: any) {
-    try {
-      const fbCred = await signInWithEmailAndPassword(auth, email, rawPassword.trim());
-      authUid = fbCred.user.uid;
-    } catch (innerErr: any) {
-      throw new Error(err.message || 'Erro ao registrar usuário no Firebase Authentication.');
+    console.warn('[Firebase Auth] Registration error:', err.code);
+    if (err.code === 'auth/email-already-in-use') {
+      throw new Error('Este e-mail já está cadastrado no sistema. Faça login na aba "Entrar" ou recupere sua senha.');
+    } else if (err.code === 'auth/weak-password') {
+      throw new Error('A senha é muito fraca. Digite pelo menos 6 caracteres.');
+    } else if (err.code === 'auth/invalid-email') {
+      throw new Error('O formato do e-mail é inválido.');
+    } else {
+      // If user exists or other error, try sign in
+      try {
+        const fbCred = await signInWithEmailAndPassword(auth, email, rawPassword.trim());
+        authUid = fbCred.user.uid;
+      } catch {
+        throw new Error(err.message || 'Erro ao registrar usuário no Firebase Authentication.');
+      }
     }
   }
 
-  const newUserId = authUid;
+  const newUserId = authUid || `usr_${Date.now()}`;
   const newUser: UserAccount = {
     id: newUserId,
     name,
@@ -515,10 +613,12 @@ export async function registerRealUser(
     user: newUser,
   };
 
+  const localRegistry = getLocalRegisteredCredentials();
   localRegistry[email] = credRecord;
   localRegistry[username] = credRecord;
   saveLocalRegisteredCredentials(localRegistry);
 
+  const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
   if (!isFirestoreQuotaExhausted()) {
     try {
       await setDoc(doc(db, 'registered_credentials', safeDocKey), cleanFirestoreObject(credRecord));
@@ -532,6 +632,29 @@ export async function registerRealUser(
   }
 
   return newUser;
+}
+
+/**
+ * Official Firebase Password Reset Email
+ */
+export async function sendFirebasePasswordReset(email: string): Promise<void> {
+  const cleanEmail = email.trim().toLowerCase();
+  if (!cleanEmail || !cleanEmail.includes('@')) {
+    throw new Error('Por favor, informe um endereço de e-mail válido para a recuperação.');
+  }
+  try {
+    await sendPasswordResetEmail(auth, cleanEmail);
+  } catch (err: any) {
+    console.warn('[Firebase Auth] Password reset error:', err.code);
+    if (err.code === 'auth/user-not-found') {
+      throw new Error('Nenhum usuário cadastrado com este e-mail no Firebase.');
+    } else if (err.code === 'auth/invalid-email') {
+      throw new Error('Formato de e-mail inválido.');
+    } else if (err.code === 'auth/too-many-requests') {
+      throw new Error('Muitas solicitações recentes. Aguarde alguns minutos antes de tentar novamente.');
+    }
+    throw new Error(err.message || 'Não foi possível enviar o e-mail de recuperação.');
+  }
 }
 
 /**

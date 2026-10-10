@@ -271,19 +271,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <span className="font-extrabold tracking-wide">ENTRAR COM FACEBOOK</span>
               </button>
 
-              {/* Prominent WhatsApp Quick Login Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  setErrorMessage('O login com WhatsApp requer a ativação do provedor Telefone/SMS no Console do Firebase.');
-                }}
-                disabled={isLoading}
-                className="w-full py-3 px-4 rounded-xl border-2 border-slate-200 hover:border-emerald-600 bg-white hover:bg-slate-50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
-              >
-                <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">chat</span>
-                <span className="font-extrabold tracking-wide">ENTRAR COM WHATSAPP</span>
-              </button>
-
               <div className="relative flex items-center justify-center my-2">
                 <div className="border-t border-slate-200 w-full" />
                 <span className="bg-white px-3 text-[11px] text-slate-500 uppercase font-bold shrink-0">

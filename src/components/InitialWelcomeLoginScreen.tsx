@@ -7,6 +7,7 @@ import {
   registerRealUser,
   signInWithGoogleOAuth,
   signInWithFacebook,
+  sendFirebasePasswordReset,
 } from '../lib/firebase';
 
 interface InitialWelcomeLoginScreenProps {
@@ -186,160 +187,29 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     setSocialModalOpen(true);
   };
 
-  // Recover Password States - 3-Step Multi-Factor Security Pipeline
-  const [recoverStep, setRecoverStep] = useState<1 | 2 | 3>(1);
-  const [recoverIdentifier, setRecoverIdentifier] = useState('');
-  const [recoverMaskedEmail, setRecoverMaskedEmail] = useState('');
-  const [recoverSecurityToken, setRecoverSecurityToken] = useState('');
-  const [inputSecurityToken, setInputSecurityToken] = useState('');
-  const [recoverNewPassword, setRecoverNewPassword] = useState('');
-  const [recoverConfirmPassword, setRecoverConfirmPassword] = useState('');
+  // Recover Password States via Official Firebase Auth
+  const [recoverEmail, setRecoverEmail] = useState('');
   const [recoverSuccessMsg, setRecoverSuccessMsg] = useState('');
-  const [tokenCountdown, setTokenCountdown] = useState(0);
 
-  // Mask email helper for privacy and security verification display
-  const maskEmail = (emailStr: string) => {
-    const parts = emailStr.split('@');
-    if (parts.length !== 2) return emailStr;
-    const name = parts[0];
-    const domain = parts[1];
-    if (name.length <= 2) return `${name[0]}***@${domain}`;
-    return `${name[0]}***${name[name.length - 1]}@${domain}`;
-  };
-
-  // Step 1: Send Security Token to Verified Email
-  const handleRequestSecurityToken = (e: React.FormEvent) => {
+  const handleFirebasePasswordReset = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
     setRecoverSuccessMsg('');
 
-    const rawEmail = recoverIdentifier.trim().toLowerCase();
-    if (!rawEmail || (!rawEmail.includes('@') && rawEmail.length < 3)) {
-      setErrorMessage('Por favor, informe um e-mail válido cadastrado no sistema.');
-      return;
-    }
-
-    setIsLoading(true);
-
-    setTimeout(() => {
-      // Check if email exists in system (Master accounts or registered debtors/users)
-      const isKnownMaster =
-        rawEmail === 'tiagodias8888@gmail.com' ||
-        rawEmail === 'tiago_a_dias@hotmail.com' ||
-        rawEmail.includes('tiagodias') ||
-        rawEmail.includes('haspaho');
-
-      // Also check if any debtor has this email or name
-      const isKnownDebtor = debtors?.some(
-        (d) => d.email?.toLowerCase() === rawEmail || d.name.toLowerCase().includes(rawEmail)
-      );
-
-      // Check registered users in localStorage
-      let hasLocalUser = false;
-      try {
-        const stored = localStorage.getItem('haspaho_registered_users');
-        if (stored) {
-          const list = JSON.parse(stored);
-          hasLocalUser = list.some((u: any) => u.email?.toLowerCase() === rawEmail || u.username?.toLowerCase() === rawEmail);
-        }
-      } catch (err) {
-        // silent
-      }
-
-      if (!isKnownMaster && !isKnownDebtor && !hasLocalUser && !rawEmail.includes('@')) {
-        setIsLoading(false);
-        setErrorMessage(
-          '❌ Acesso Negado: E-mail não localizado na base autorizada. Por blindagem antifraude, a recuperação é permitida exclusivamente para o titular cadastrado.'
-        );
-        return;
-      }
-
-      // Generate 6-digit cryptographic security code
-      const generatedCode = Math.floor(100000 + Math.random() * 900000).toString();
-      setRecoverSecurityToken(generatedCode);
-      setRecoverMaskedEmail(maskEmail(rawEmail));
-      setRecoverStep(2);
-      setTokenCountdown(60);
-      setIsLoading(false);
-      setRecoverSuccessMsg(
-        `🛡️ Blindagem Ativada: Enviamos um Código de Autenticidade de 6 dígitos e Link Seguro para ${maskEmail(rawEmail)}.`
-      );
-    }, 800);
-  };
-
-  // Step 2: Validate 6-digit token received by owner
-  const handleVerifySecurityToken = (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    const token = inputSecurityToken.trim();
-    if (!token) {
-      setErrorMessage('Por favor, digite o código de 6 dígitos recebido no seu e-mail.');
-      return;
-    }
-
-    // Token must match the generated code or Master Emergency Bypass code for Tiago Dias
-    const isValid =
-      token === recoverSecurityToken ||
-      token === '888888' ||
-      token === '202610';
-
-    if (!isValid) {
-      setErrorMessage('❌ Código de autenticidade incorreto ou expirado. Verifique sua caixa de entrada.');
-      return;
-    }
-
-    setRecoverStep(3);
-    setRecoverSuccessMsg('✅ Autenticidade do titular confirmada com sucesso! Agora você pode cadastrar a nova senha.');
-  };
-
-  // Step 3: Set New Password after Authenticity is fully established
-  const handleFinalizePasswordReset = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-
-    if (!recoverNewPassword || recoverNewPassword.length < 6) {
-      setErrorMessage('A nova senha deve possuir no mínimo 6 caracteres.');
-      return;
-    }
-    if (recoverNewPassword !== recoverConfirmPassword) {
-      setErrorMessage('As novas senhas digitadas não coincidem.');
+    const rawEmail = recoverEmail.trim().toLowerCase();
+    if (!rawEmail || !rawEmail.includes('@')) {
+      setErrorMessage('Por favor, informe um endereço de e-mail válido.');
       return;
     }
 
     setIsLoading(true);
     try {
-      // Update password in localStorage
-      try {
-        const storedUsers = localStorage.getItem('haspaho_registered_users');
-        if (storedUsers) {
-          const list = JSON.parse(storedUsers);
-          const updated = list.map((u: any) => {
-            if (u.email?.toLowerCase() === recoverIdentifier.trim().toLowerCase()) {
-              return { ...u, password: recoverNewPassword, lastKnownPassword: recoverNewPassword };
-            }
-            return u;
-          });
-          localStorage.setItem('haspaho_registered_users', JSON.stringify(updated));
-        }
-      } catch (err) {
-        // silent
-      }
-
-      setLoginIdentifier(recoverIdentifier.trim());
-      setLoginPassword(recoverNewPassword);
-      setRecoverSuccessMsg('🔒 Senha redefinida com segurança! Suas credenciais foram atualizadas.');
-      
-      setTimeout(() => {
-        setRecoverStep(1);
-        setRecoverIdentifier('');
-        setInputSecurityToken('');
-        setRecoverNewPassword('');
-        setRecoverConfirmPassword('');
-        setActiveTab('login');
-      }, 2000);
+      await sendFirebasePasswordReset(rawEmail);
+      setRecoverSuccessMsg(
+        `E-mail de recuperação enviado para ${rawEmail}! Verifique sua caixa de entrada (e a pasta de spam) para redefinir sua senha com segurança pelo Firebase.`
+      );
     } catch (err: any) {
-      setErrorMessage(err.message || 'Erro ao redefinir a senha.');
+      setErrorMessage(err.message || 'Erro ao enviar e-mail de recuperação.');
     } finally {
       setIsLoading(false);
     }
@@ -355,9 +225,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         onSuccess={(u) => onLoginSuccess(u, false)}
       />
 
-      <div className="w-full max-w-5xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden relative z-20 pointer-events-auto">
-        {/* Left Column: Brand & Security Presentation */}
-        <div className="w-full md:w-[48%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex flex-col justify-between text-white relative z-10 overflow-hidden shrink-0">
+      <div className="w-full max-w-5xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden relative z-20 pointer-events-auto">
+        {/* Left Column: Brand & Security Presentation (Desktop / Tablet) */}
+        <div className="hidden md:flex md:w-[45%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex-col justify-between text-white relative z-10 overflow-hidden shrink-0">
           <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
           <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
 
@@ -433,8 +303,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         </div>
 
         {/* Right Column: Authentication Form */}
-        <div className="w-full md:w-[52%] p-6 sm:p-8 flex flex-col justify-between bg-white relative z-20 pointer-events-auto">
+        <div className="w-full md:w-[55%] p-6 sm:p-8 flex flex-col justify-between bg-white relative z-20 pointer-events-auto">
           <div>
+            {/* Mobile Brand Header */}
+            <div className="mb-4 md:hidden flex items-center justify-center">
+              <HaspahoLogo size="md" variant="horizontal" />
+            </div>
+
             {/* Header Titles */}
             <div className="mb-4">
               <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
@@ -535,24 +410,11 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                   <span className="font-extrabold tracking-wide">ENTRAR COM FACEBOOK</span>
                 </button>
 
-                {/* 3. WhatsApp Button */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    setErrorMessage('O login com WhatsApp requer a ativação do provedor Telefone/SMS no Console do Firebase. Utilize E-mail/Senha, Google ou Facebook para acesso imediato.');
-                  }}
-                  disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-xl border-2 border-slate-200 hover:border-emerald-600 hover:bg-slate-50 bg-white text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer relative z-20 pointer-events-auto opacity-100"
-                >
-                  <span className="material-symbols-outlined text-emerald-600 text-xl font-bold">chat</span>
-                  <span className="font-extrabold tracking-wide">ENTRAR COM WHATSAPP</span>
-                </button>
-
                 {/* Divider */}
                 <div className="relative flex items-center justify-center my-3">
                   <div className="border-t border-slate-200 w-full" />
                   <span className="bg-white px-3 text-[11px] text-slate-500 uppercase font-bold shrink-0">
-                    ──────── ou entre com e-mail ────────
+                    ──────── ou com e-mail e senha ────────
                   </span>
                 </div>
 
@@ -796,195 +658,67 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               </form>
             )}
 
-            {/* TAB 3: RECOVER - 3-STEP MULTI-FACTOR SECURITY PIPELINE */}
+            {/* TAB 3: RECOVER VIA OFFICIAL FIREBASE AUTH */}
             {activeTab === 'recover' && (
-              <div className="space-y-4">
-                {/* Stepper Header */}
-                <div className="flex items-center justify-between p-2 rounded-xl bg-slate-50 border border-slate-200">
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${recoverStep >= 1 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                      1
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-700">E-mail Titular</span>
-                  </div>
-                  <span className="material-symbols-outlined text-slate-300 text-[14px]">arrow_forward</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${recoverStep >= 2 ? 'bg-blue-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                      2
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-700">Código 6 Dígitos</span>
-                  </div>
-                  <span className="material-symbols-outlined text-slate-300 text-[14px]">arrow_forward</span>
-                  <div className="flex items-center gap-1.5">
-                    <span className={`w-5 h-5 rounded-full flex items-center justify-center text-[10px] font-black ${recoverStep === 3 ? 'bg-emerald-600 text-white' : 'bg-slate-200 text-slate-600'}`}>
-                      3
-                    </span>
-                    <span className="text-[11px] font-bold text-slate-700">Nova Senha</span>
+              <form onSubmit={handleFirebasePasswordReset} className="space-y-4">
+                <div className="p-3.5 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2.5">
+                  <span className="material-symbols-outlined text-[20px] text-blue-600 shrink-0 mt-0.5">lock_reset</span>
+                  <div className="text-[12px] leading-relaxed">
+                    <strong className="block font-bold mb-0.5">Recuperação de Senha Segura (Firebase)</strong>
+                    <span>Digite o e-mail cadastrado na sua conta. Você receberá um link oficial do Firebase para redefinir sua senha com total segurança.</span>
                   </div>
                 </div>
 
-                {/* ETAPA 1: Identificação & Envio do Token */}
-                {recoverStep === 1 && (
-                  <form onSubmit={handleRequestSecurityToken} className="space-y-3.5">
-                    <div className="p-3 bg-blue-50 border border-blue-200 rounded-xl text-xs text-blue-900 flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-blue-600 shrink-0 mt-0.5">verified_user</span>
-                      <p className="text-[11.5px] leading-relaxed">
-                        <strong>Blindagem de Segurança:</strong> Digite seu e-mail cadastrado. O sistema enviará um Código de Autenticidade para validar que você é o titular legítimo da conta.
-                      </p>
-                    </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">
+                    E-mail Cadastrado
+                  </label>
+                  <div className="relative">
+                    <span className="material-symbols-outlined absolute left-3.5 top-3 text-slate-400 text-lg pointer-events-none">
+                      mail
+                    </span>
+                    <input
+                      type="email"
+                      value={recoverEmail}
+                      onChange={(e) => setRecoverEmail(e.target.value)}
+                      placeholder="seu.email@exemplo.com"
+                      className="w-full pl-10 pr-3.5 py-3 rounded-xl border-2 border-slate-200 focus:border-blue-600 focus:ring-4 focus:ring-blue-100 text-xs sm:text-sm text-slate-900 bg-white placeholder:text-slate-400 outline-hidden transition-all font-medium"
+                      required
+                      autoFocus
+                    />
+                  </div>
+                </div>
 
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        E-mail Cadastrado do Titular
-                      </label>
-                      <input
-                        type="email"
-                        value={recoverIdentifier}
-                        onChange={(e) => setRecoverIdentifier(e.target.value)}
-                        placeholder="exemplo: seu.email@dominio.com"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 text-xs sm:text-sm text-slate-900 outline-hidden"
-                        required
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-xs cursor-pointer disabled:opacity-50"
-                      >
-                        {isLoading ? (
-                          <>
-                            <span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                            <span>Verificando Titularidade...</span>
-                          </>
-                        ) : (
-                          <>
-                            <span className="material-symbols-outlined text-[18px]">send</span>
-                            <span>Enviar Código ao E-mail</span>
-                          </>
-                        )}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setActiveTab('login')}
-                        className="py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
-                      >
-                        Voltar
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* ETAPA 2: Validação do Código de 6 Dígitos */}
-                {recoverStep === 2 && (
-                  <form onSubmit={handleVerifySecurityToken} className="space-y-3.5">
-                    <div className="p-3 bg-amber-50 border border-amber-300 rounded-xl text-xs text-amber-950 flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-amber-600 shrink-0 mt-0.5">mark_email_read</span>
-                      <div className="text-[11.5px] leading-relaxed">
-                        <strong className="block font-bold">Código Enviado para {recoverMaskedEmail}</strong>
-                        <span>Abra sua caixa de entrada e insira o código de 6 dígitos para autenticar sua identidade.</span>
-                      </div>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">
-                        Código de Autenticação (6 dígitos)
-                      </label>
-                      <input
-                        type="text"
-                        maxLength={6}
-                        value={inputSecurityToken}
-                        onChange={(e) => setInputSecurityToken(e.target.value.replace(/\D/g, ''))}
-                        placeholder="Ex: 849201"
-                        className="w-full px-3 py-2.5 rounded-xl border-2 border-blue-400 focus:border-blue-600 text-center font-mono font-black text-lg tracking-widest text-slate-900 outline-hidden bg-blue-50/20"
-                        required
-                        autoFocus
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[11px] text-slate-500">
-                      <span>Não recebeu na caixa principal?</span>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          const newCode = Math.floor(100000 + Math.random() * 900000).toString();
-                          setRecoverSecurityToken(newCode);
-                          setRecoverSuccessMsg(`Novo código reenviado para ${recoverMaskedEmail}!`);
-                        }}
-                        className="text-blue-600 hover:underline font-bold cursor-pointer"
-                      >
-                        Reenviar Código
-                      </button>
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="submit"
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">verified</span>
-                        <span>Confirmar Autenticidade</span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setRecoverStep(1)}
-                        className="py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
-                      >
-                        Trocar E-mail
-                      </button>
-                    </div>
-                  </form>
-                )}
-
-                {/* ETAPA 3: Redefinição Segura da Senha */}
-                {recoverStep === 3 && (
-                  <form onSubmit={handleFinalizePasswordReset} className="space-y-3.5">
-                    <div className="p-3 bg-emerald-50 border border-emerald-300 rounded-xl text-xs text-emerald-950 flex items-start gap-2">
-                      <span className="material-symbols-outlined text-[18px] text-emerald-600 shrink-0 mt-0.5">lock_reset</span>
-                      <p className="text-[11.5px] leading-relaxed">
-                        <strong>Titularidade Comprovada:</strong> Cadastre sua nova senha de acesso abaixo.
-                      </p>
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Nova Senha (mín. 6 dígitos)</label>
-                      <input
-                        type="password"
-                        value={recoverNewPassword}
-                        onChange={(e) => setRecoverNewPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 text-xs sm:text-sm text-slate-900 outline-hidden"
-                        required
-                        autoFocus
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-xs font-bold text-slate-700 mb-1">Confirmar Nova Senha</label>
-                      <input
-                        type="password"
-                        value={recoverConfirmPassword}
-                        onChange={(e) => setRecoverConfirmPassword(e.target.value)}
-                        placeholder="••••••••"
-                        className="w-full px-3 py-2.5 rounded-xl border border-slate-300 focus:border-blue-500 text-xs sm:text-sm text-slate-900 outline-hidden"
-                        required
-                      />
-                    </div>
-
-                    <div className="flex items-center gap-2 pt-1">
-                      <button
-                        type="submit"
-                        disabled={isLoading}
-                        className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm flex items-center justify-center gap-2 shadow-sm cursor-pointer disabled:opacity-50"
-                      >
-                        <span className="material-symbols-outlined text-[18px]">save</span>
-                        <span>Salvar Nova Senha</span>
-                      </button>
-                    </div>
-                  </form>
-                )}
-              </div>
+                <div className="flex flex-col sm:flex-row items-center gap-2.5 pt-1">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full sm:flex-1 py-3 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs sm:text-sm tracking-wide flex items-center justify-center gap-2 shadow-md transition-colors disabled:opacity-60 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <>
+                        <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
+                        <span>ENVIANDO E-MAIL...</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="material-symbols-outlined text-[18px]">send</span>
+                        <span>ENVIAR LINK DE RECUPERAÇÃO</span>
+                      </>
+                    )}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setActiveTab('login');
+                      setErrorMessage('');
+                    }}
+                    className="w-full sm:w-auto py-3 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs sm:text-sm transition-colors cursor-pointer"
+                  >
+                    Voltar ao Login
+                  </button>
+                </div>
+              </form>
             )}
           </div>
         </div>

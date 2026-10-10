@@ -138,8 +138,17 @@ export default function App() {
     });
   };
 
-  // Authentication & Welcome States - start null so login screen is displayed on startup
+  // Authentication & Welcome States - restore valid session from localStorage if present
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
+    try {
+      const saved = localStorage.getItem('haspaho_auth_user');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (parsed && (parsed.id || parsed.email)) {
+          return parsed;
+        }
+      }
+    } catch {}
     return null;
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
@@ -2325,9 +2334,8 @@ export default function App() {
   // Trava de Autenticação Segura: Se não houver usuário autenticado, exibe a tela oficial de login/cadastro
   if (!currentUser) {
     return (
-      <div className="min-h-screen bg-slate-950 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-hidden">
-        <FuturisticCosmicBackground />
-        <div className="w-full max-w-5xl relative z-20 pointer-events-auto">
+      <div className="min-h-screen bg-slate-100 flex flex-col items-center justify-center p-3 sm:p-6 relative overflow-y-auto">
+        <div className="w-full max-w-4xl relative z-10 py-4 sm:py-8">
           <InitialWelcomeLoginScreen
             currentUser={null}
             debtors={[]}
