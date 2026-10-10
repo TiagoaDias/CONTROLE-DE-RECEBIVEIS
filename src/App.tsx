@@ -233,11 +233,13 @@ export default function App() {
 
   const isInitialLoadRef = useRef(true);
   const lastSyncSignatureRef = useRef<string>('');
+  const isExplicitLogoutRef = useRef(false);
 
   // Enforce Firebase Auth session listener without wiping valid local user sessions
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       if (fbUser) {
+        isExplicitLogoutRef.current = false;
         const authUid = fbUser.uid;
         console.log('[Auth:SESSION_ACTIVE] Firebase Auth session detected for UID:', authUid);
         setCurrentUser((prev) => {
@@ -263,11 +265,16 @@ export default function App() {
         });
       } else {
         // No active Firebase Auth session - check if user is logged in locally
+        if (isExplicitLogoutRef.current) {
+          console.log('[Auth:LOGOUT] Explicit logout recorded.');
+          setCurrentUser(null);
+          return;
+        }
         try {
           const saved = localStorage.getItem('haspaho_auth_user');
           if (saved) {
             const parsed = JSON.parse(saved);
-            if (parsed && parsed.id) {
+            if (parsed && (parsed.id || parsed.email)) {
               console.log('[Auth:LOCAL_SESSION] Restoring local user session:', parsed.name || parsed.email);
               setCurrentUser(parsed);
               return;
@@ -2234,6 +2241,7 @@ export default function App() {
 
   // User Authentication Handlers
   const handleLoginSuccess = async (user: UserAccount, isNewAccount = false) => {
+    isExplicitLogoutRef.current = false;
     setCurrentUser(user);
     localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
     setIsAuthOpen(false);
@@ -2258,6 +2266,7 @@ export default function App() {
   };
 
   const handleLogout = async () => {
+    isExplicitLogoutRef.current = true;
     try {
       await logoutSession();
     } catch (e) {
@@ -2546,6 +2555,8 @@ export default function App() {
             onUpdatePurchases={setPurchases}
             onUpdateInstallments={setInstallments}
             onToast={showToast}
+            onRequestDeleteDebtor={handleRequestDeleteDebtor}
+            onDeleteInstallment={handleDeleteInstallment}
           />
         )}
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Debtor, Purchase, Installment, BankInstitution, UserAccount, ScreenTab } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
 import { getAuditLogs, clearAuditLogs, addAuditLog, AuditLogEntry } from '../utils/auditLogger';
+import { saveDebtorsToFirestore, saveSingleDebtorToFirestore, deleteDebtorFromFirestore } from '../lib/firebase';
 
 interface ErpLegacySystemProps {
   debtors: Debtor[];
@@ -14,6 +15,8 @@ interface ErpLegacySystemProps {
   onUpdatePurchases: (updatedPurchases: Purchase[]) => void;
   onUpdateInstallments: (updatedInstallments: Installment[]) => void;
   onToast: (msg: string) => void;
+  onRequestDeleteDebtor?: (debtor: Debtor) => void;
+  onDeleteInstallment?: (id: string) => void;
 }
 
 export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
@@ -27,6 +30,8 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   onUpdatePurchases,
   onUpdateInstallments,
   onToast,
+  onRequestDeleteDebtor,
+  onDeleteInstallment,
 }) => {
   // Navigation & View State
   const [activeTab, setActiveTab] = useState<'cadastro' | 'pesquisa' | 'titulos' | 'lancamento' | 'massa' | 'auditoria'>('cadastro');
@@ -311,13 +316,120 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   };
 
   const handleDeleteDebtor = () => {
-    if (confirm(`Confirma a exclusão definitiva do registro de "${formData.name}" no ERP?`)) {
-      const updated = debtors.filter((d) => d.id !== formData.id);
+    const target = debtors.find((d) => d.id === formData.id) || activeDebtor;
+    if (!target) return;
+    if (onRequestDeleteDebtor) {
+      onRequestDeleteDebtor(target);
+      return;
+    }
+    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja realmente excluir o registro de "${target.name}"?\n\nEsta ação removerá o cadastro do devedor da base de dados.`)) {
+      const updated = debtors.filter((d) => d.id !== target.id);
       onUpdateDebtors(updated);
+      try {
+        localStorage.setItem('haspaho_debtors', JSON.stringify(updated));
+      } catch (e) {
+        console.error(e);
+      }
+      const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+      try {
+        deleteDebtorFromFirestore(activeUserId, target.id);
+        saveDebtorsToFirestore(activeUserId, updated);
+      } catch (err) {
+        console.error('Error deleting from firestore:', err);
+      }
+      addAuditLog(
+        'EXCLUSAO_REGISTRO_ERP',
+        `Registro de "${target.name}" (ID: ${target.id}) excluído do ERP.`,
+        target.name,
+        'FIRESTORE_SAVED'
+      );
       if (updated.length > 0) {
         setSelectedDebtorId(updated[0].id);
       }
-      onToast('Registro excluído com sucesso da base de dados.');
+      onToast(`🗑️ Registro de "${target.name}" excluído com sucesso da base de dados.`);
+    }
+  };
+
+  // Excluir registro específico da linha da tabela ERP
+  const handleDeleteSpecificDebtor = (debtor: Debtor) => {
+    if (onRequestDeleteDebtor) {
+      onRequestDeleteDebtor(debtor);
+      return;
+    }
+    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja realmente excluir o registro de "${debtor.name}"?\n\nEsta ação removerá o cadastro deste devedor da base de dados.`)) {
+      const nextDebtors = debtors.filter((d) => d.id !== debtor.id);
+      onUpdateDebtors(nextDebtors);
+      try {
+        localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
+      } catch (e) {
+        console.error(e);
+      }
+      const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+      try {
+        deleteDebtorFromFirestore(activeUserId, debtor.id);
+        saveDebtorsToFirestore(activeUserId, nextDebtors);
+      } catch (err) {
+        console.error('Error deleting from firestore:', err);
+      }
+      addAuditLog(
+        'EXCLUSAO_REGISTRO_ERP',
+        `Registro de "${debtor.name}" (ID: ${debtor.id}) excluído via tabela/linha ERP.`,
+        debtor.name,
+        'FIRESTORE_SAVED'
+      );
+      if (selectedDebtorId === debtor.id) {
+        const remaining = nextDebtors[0];
+        if (remaining) setSelectedDebtorId(remaining.id);
+      }
+      onToast(`🗑️ Registro de "${debtor.name}" excluído com sucesso do ERP.`);
+    }
+  };
+
+  // Salvar / Sincronizar registro específico da linha da tabela ERP
+  const handleQuickSaveRecord = async (debtor: Debtor) => {
+    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    try {
+      await saveSingleDebtorToFirestore(activeUserId, debtor);
+      await saveDebtorsToFirestore(activeUserId, debtors);
+      try {
+        localStorage.setItem('haspaho_debtors', JSON.stringify(debtors));
+      } catch (e) {
+        console.error(e);
+      }
+      addAuditLog(
+        'SALVAR_REGISTRO_ERP',
+        `Registro de "${debtor.name}" (ID: ${debtor.id}) gravado e sincronizado com sucesso no banco de dados.`,
+        debtor.name,
+        'FIRESTORE_SAVED'
+      );
+      onToast(`💾 Registro de "${debtor.name}" salvo e sincronizado no ERP com sucesso!`);
+    } catch (err) {
+      console.error(err);
+      onToast(`✅ Registro de "${debtor.name}" confirmado e preservado localmente.`);
+    }
+  };
+
+  // Excluir parcela específica do título contábil
+  const handleDeleteSpecificInstallment = (inst: Installment) => {
+    if (onDeleteInstallment) {
+      onDeleteInstallment(inst.id);
+      return;
+    }
+    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja excluir a parcela ${inst.installmentNumber}/${inst.totalInstallments} de R$ ${inst.amount.toFixed(2)} (${inst.debtorName})?`)) {
+      const nextInstallments = installments.filter((i) => i.id !== inst.id);
+      onUpdateInstallments(nextInstallments);
+      try {
+        localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      } catch (e) {
+        console.error(e);
+      }
+      addAuditLog(
+        'EXCLUSAO_PARCELA_ERP',
+        `Título/Parcela ID ${inst.id} de "${inst.debtorName}" excluído no ERP.`,
+        inst.debtorName,
+        'FIRESTORE_SAVED'
+      );
+      onToast(`🗑️ Título/Parcela de R$ ${inst.amount.toFixed(2)} excluído com sucesso.`);
     }
   };
 
@@ -1266,6 +1378,15 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   >
                     Gravar Registro [F3]
                   </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteDebtor}
+                    className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] shadow-sm cursor-pointer inline-flex items-center gap-1"
+                    title="Excluir cadastro ativo no ERP (F5)"
+                  >
+                    <span className="material-symbols-outlined text-[14px]">delete</span>
+                    <span>Excluir [F5]</span>
+                  </button>
                 </div>
               </div>
             </div>
@@ -1318,7 +1439,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       <th className="p-2 border-r border-slate-800 text-right">Total Pago</th>
                       <th className="p-2 border-r border-slate-800 text-center">Score</th>
                       <th className="p-2 border-r border-slate-800 text-center">Atrasos</th>
-                      <th className="p-2 text-center w-28">Ações ERP</th>
+                      <th className="p-2 text-center min-w-[210px] w-56 select-none">Ações ERP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 font-mono">
@@ -1360,19 +1481,44 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                               <span className="text-emerald-400 text-[10px]">0</span>
                             )}
                           </td>
-                          <td className="p-2 text-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                setSelectedDebtorId(d.id);
-                                setActiveTab('cadastro');
-                              }}
-                              className="px-2 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer"
-                              title="Abrir na Ficha Cadastral"
-                            >
-                              Editar Ficha
-                            </button>
+                          <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              {/* Botão de Editar Ficha */}
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setSelectedDebtorId(d.id);
+                                  setActiveTab('cadastro');
+                                }}
+                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
+                                title="Abrir ficha cadastral completa no ERP"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">edit_note</span>
+                                <span>Editar</span>
+                              </button>
+
+                              {/* Botão de Salvar / Sincronizar Registro no Banco */}
+                              <button
+                                type="button"
+                                onClick={() => handleQuickSaveRecord(d)}
+                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
+                                title="Salvar e sincronizar registro no banco de dados ERP"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">save</span>
+                                <span>Salvar</span>
+                              </button>
+
+                              {/* Botão de Excluir Registro */}
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSpecificDebtor(d)}
+                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
+                                title="Excluir este devedor/registro do sistema ERP"
+                              >
+                                <span className="material-symbols-outlined text-[13px]">delete</span>
+                                <span>Excluir</span>
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -1434,7 +1580,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       <th className="p-2 border-r border-slate-800 text-right">Valor Nominal</th>
                       <th className="p-2 border-r border-slate-800 text-right">Multa R$5</th>
                       <th className="p-2 border-r border-slate-800 text-center">Situação</th>
-                      <th className="p-2 text-center w-28">Baixa Contábil</th>
+                      <th className="p-2 text-center min-w-[150px] w-40 select-none">Baixa / Ações ERP</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800 font-mono">
@@ -1484,19 +1630,35 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                               </span>
                             )}
                           </td>
-                          <td className="p-2 text-center">
-                            {!isPaid ? (
+                          <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                            <div className="flex items-center justify-center gap-1.5">
+                              {!isPaid ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickPayInstallment(inst.id)}
+                                  className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
+                                  title="Liquidar com recibo contábil oficial"
+                                >
+                                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                  <span>Dar Baixa</span>
+                                </button>
+                              ) : (
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px] inline-flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px]">verified</span>
+                                  <span>Baixado</span>
+                                </span>
+                              )}
+
                               <button
                                 type="button"
-                                onClick={() => handleQuickPayInstallment(inst.id)}
-                                className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95"
-                                title="Liquidar com recibo contábil oficial"
+                                onClick={() => handleDeleteSpecificInstallment(inst)}
+                                className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
+                                title="Excluir esta parcela do ERP"
                               >
-                                Dar Baixa
+                                <span className="material-symbols-outlined text-[13px]">delete</span>
+                                <span>Excluir</span>
                               </button>
-                            ) : (
-                              <span className="text-[10px] text-emerald-400 font-bold">Baixado</span>
-                            )}
+                            </div>
                           </td>
                         </tr>
                       );

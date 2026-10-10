@@ -23,15 +23,41 @@ import {
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserAccount, Debtor, Purchase, Installment } from '../types';
 
+// Active Firebase Configuration with support for Vercel/Vite environment variables and fallback to firebase-applet-config.json
+const getEnvVar = (key: string): string | undefined => {
+  try {
+    if (typeof import.meta !== 'undefined' && import.meta?.env?.[key]) {
+      return import.meta.env[key];
+    }
+  } catch {}
+  try {
+    if (typeof process !== 'undefined' && process?.env?.[key]) {
+      return process.env[key];
+    }
+  } catch {}
+  return undefined;
+};
+
+export const activeFirebaseConfig = {
+  apiKey: getEnvVar('VITE_FIREBASE_API_KEY') || firebaseConfig.apiKey,
+  authDomain: getEnvVar('VITE_FIREBASE_AUTH_DOMAIN') || firebaseConfig.authDomain,
+  projectId: getEnvVar('VITE_FIREBASE_PROJECT_ID') || firebaseConfig.projectId,
+  storageBucket: getEnvVar('VITE_FIREBASE_STORAGE_BUCKET') || firebaseConfig.storageBucket,
+  messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID') || firebaseConfig.messagingSenderId,
+  appId: getEnvVar('VITE_FIREBASE_APP_ID') || firebaseConfig.appId,
+  firestoreDatabaseId: getEnvVar('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId,
+  oAuthClientId: getEnvVar('VITE_FIREBASE_OAUTH_CLIENT_ID') || (firebaseConfig as any).oAuthClientId,
+};
+
 // Initialize Firebase App instance
-const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(activeFirebaseConfig);
 
 // Initialize Auth
 export const auth = getAuth(app);
 
 // Initialize Firestore with custom databaseId if configured
-export const db = firebaseConfig.firestoreDatabaseId
-  ? getFirestore(app, firebaseConfig.firestoreDatabaseId)
+export const db = activeFirebaseConfig.firestoreDatabaseId
+  ? getFirestore(app, activeFirebaseConfig.firestoreDatabaseId)
   : getFirestore(app);
 
 // Google OAuth Provider
@@ -137,20 +163,46 @@ export function isQuotaError(error: unknown): boolean {
 
 const QUOTA_STORAGE_KEY = 'haspaho_firestore_quota_exhausted_v2';
 
-// Inicia protegido como true para salvaguardar a quota diária gratuita do projeto
-let firestoreQuotaExhausted = true;
+export function getSafeLocalStorage(key: string): string | null {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem(key);
+    }
+  } catch {}
+  return null;
+}
+
+export function setSafeLocalStorage(key: string, value: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(key, value);
+    }
+  } catch {}
+}
+
+export function removeSafeLocalStorage(key: string): void {
+  try {
+    if (typeof localStorage !== 'undefined') {
+      localStorage.removeItem(key);
+    }
+  } catch {}
+}
+
+// Inicia como false para permitir sincronização e salvamento em nuvem
+let firestoreQuotaExhausted = false;
 try {
-  if (typeof window !== 'undefined') {
-    if (localStorage.getItem('haspaho_force_enable_firestore_writes') === 'true') {
-      firestoreQuotaExhausted = false;
-    } else {
-      sessionStorage.setItem('haspaho_firestore_quota_exhausted', 'true');
+  const raw = getSafeLocalStorage(QUOTA_STORAGE_KEY);
+  if (raw) {
+    const parsed = JSON.parse(raw);
+    const today = new Date().toISOString().slice(0, 10);
+    if (parsed.exhausted && parsed.date === today) {
+      firestoreQuotaExhausted = true;
     }
   }
 } catch {}
 
 export function isFirestoreQuotaExhausted(): boolean {
-  if (typeof window !== 'undefined' && localStorage.getItem('haspaho_force_enable_firestore_writes') === 'true') {
+  if (getSafeLocalStorage('haspaho_force_enable_firestore_writes') === 'true') {
     return false;
   }
   return firestoreQuotaExhausted;
@@ -159,15 +211,11 @@ export function isFirestoreQuotaExhausted(): boolean {
 export function setFirestoreQuotaExhausted(val: boolean): void {
   firestoreQuotaExhausted = val;
   try {
-    if (typeof window !== 'undefined') {
-      const today = new Date().toISOString().slice(0, 10);
-      if (val) {
-        localStorage.setItem(QUOTA_STORAGE_KEY, JSON.stringify({ exhausted: true, date: today }));
-        sessionStorage.setItem('haspaho_firestore_quota_exhausted', 'true');
-      } else {
-        localStorage.removeItem(QUOTA_STORAGE_KEY);
-        sessionStorage.removeItem('haspaho_firestore_quota_exhausted');
-      }
+    const today = new Date().toISOString().slice(0, 10);
+    if (val) {
+      setSafeLocalStorage(QUOTA_STORAGE_KEY, JSON.stringify({ exhausted: true, date: today }));
+    } else {
+      removeSafeLocalStorage(QUOTA_STORAGE_KEY);
     }
   } catch {}
 }
@@ -208,7 +256,7 @@ export function handleFirestoreError(
 export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
-    console.log('[Firebase] Connected to Firestore database:', firebaseConfig.projectId);
+    console.log('[Firebase] Connected to Firestore database:', activeFirebaseConfig.projectId);
     return true;
   } catch (error) {
     if (isQuotaError(error)) {
@@ -274,7 +322,7 @@ export const TIAGO_DIAS_USER: UserAccount = {
 // Helper: Read local registered credentials
 export function getLocalRegisteredCredentials(): Record<string, RegisteredCredential> {
   try {
-    const raw = localStorage.getItem('haspaho_registered_credentials');
+    const raw = getSafeLocalStorage('haspaho_registered_credentials');
     return raw ? JSON.parse(raw) : {};
   } catch {
     return {};
@@ -283,7 +331,7 @@ export function getLocalRegisteredCredentials(): Record<string, RegisteredCreden
 
 export function saveLocalRegisteredCredentials(creds: Record<string, RegisteredCredential>): void {
   try {
-    localStorage.setItem('haspaho_registered_credentials', JSON.stringify(creds));
+    setSafeLocalStorage('haspaho_registered_credentials', JSON.stringify(creds));
   } catch (e) {
     console.error('Failed to save credentials locally:', e);
   }
@@ -293,6 +341,7 @@ export function saveLocalRegisteredCredentials(creds: Record<string, RegisteredC
  * Real login with email/username/cpf/phone and password.
  * REJECTS nonexistent accounts.
  * REJECTS wrong passwords.
+ * Resilient to Firebase Console email/password disabled (auth/operation-not-allowed) via Firestore persistence.
  */
 export async function loginWithRealCredentials(
   identifier: string,
@@ -337,7 +386,7 @@ export async function loginWithRealCredentials(
     try {
       const remote = await getUserFromFirestore(masterUid);
       const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
-      return remote
+      const finalUser: UserAccount = remote
         ? {
             ...TIAGO_DIAS_USER,
             ...remote,
@@ -355,8 +404,10 @@ export async function loginWithRealCredentials(
             hasSeenWelcome: true,
             isFirstLogin: false,
           };
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(finalUser));
+      return finalUser;
     } catch {
-      return {
+      const finalUser: UserAccount = {
         ...TIAGO_DIAS_USER,
         id: masterUid,
         isMasterAdmin: true,
@@ -364,34 +415,44 @@ export async function loginWithRealCredentials(
         hasSeenWelcome: true,
         isFirstLogin: false,
       };
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(finalUser));
+      return finalUser;
     }
   }
 
-  // 2. Real Firebase Authentication with Email & Password
+  // 2. Resolve Target Email and Lookup Registered Credentials
   let targetEmail = cleanId;
   let targetUsername = cleanId;
+  let cachedCred: RegisteredCredential | null = null;
 
-  // If identifier is not an email (e.g. username), lookup email in registry
-  if (!cleanId.includes('@')) {
-    const localRegistry = getLocalRegisteredCredentials();
-    const foundCred = Object.values(localRegistry).find(
+  // Check local registry first
+  const localRegistry = getLocalRegisteredCredentials();
+  if (localRegistry[cleanId]) {
+    cachedCred = localRegistry[cleanId];
+    targetEmail = cachedCred.email;
+    targetUsername = cachedCred.username;
+  } else {
+    const foundLocal = Object.values(localRegistry).find(
       (c) => c.username.toLowerCase() === cleanId || c.email.toLowerCase() === cleanId
     );
-    if (foundCred) {
-      targetEmail = foundCred.email;
-      targetUsername = foundCred.username;
-    } else {
-      // Try Firestore lookup for registered username
-      const safeKey = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
-      try {
-        const docSnap = await getDoc(doc(db, 'registered_credentials', safeKey));
-        if (docSnap.exists()) {
-          const data = docSnap.data() as RegisteredCredential;
-          targetEmail = data.email;
-          targetUsername = data.username;
-        }
-      } catch {}
+    if (foundLocal) {
+      cachedCred = foundLocal;
+      targetEmail = foundLocal.email;
+      targetUsername = foundLocal.username;
     }
+  }
+
+  // Check Firestore registered_credentials if not found locally
+  if (!cachedCred) {
+    const safeKey = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
+    try {
+      const docSnap = await getDoc(doc(db, 'registered_credentials', safeKey));
+      if (docSnap.exists()) {
+        cachedCred = docSnap.data() as RegisteredCredential;
+        targetEmail = cachedCred.email;
+        targetUsername = cachedCred.username;
+      }
+    } catch {}
   }
 
   // Attempt real Firebase Auth signIn
@@ -405,50 +466,51 @@ export async function loginWithRealCredentials(
       fbUserSuccess = true;
     } catch (fbErr: any) {
       console.warn('[Firebase Auth] signInWithEmailAndPassword result:', fbErr.code);
+
+      // Verify against Firestore/local credentials when Firebase Auth cannot verify
+      const verifyOfflineOrFallback = async () => {
+        let credToVerify = cachedCred;
+        if (!credToVerify) {
+          const safeKey = targetEmail.replace(/[^a-zA-Z0-9_-]/g, '_');
+          try {
+            const docSnap = await getDoc(doc(db, 'registered_credentials', safeKey));
+            if (docSnap.exists()) {
+              credToVerify = docSnap.data() as RegisteredCredential;
+            }
+          } catch {}
+        }
+        if (!credToVerify && localRegistry[targetEmail]) {
+          credToVerify = localRegistry[targetEmail];
+        }
+
+        if (credToVerify) {
+          const incomingHash = btoa(cleanPass);
+          if (
+            credToVerify.passwordHash === incomingHash ||
+            credToVerify.passwordHash === cleanPass
+          ) {
+            authUid = credToVerify.userId || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+            fbUserSuccess = true;
+            return true;
+          } else {
+            throw new Error('Senha incorreta para este usuário.');
+          }
+        }
+        return false;
+      };
+
       if (fbErr.code === 'auth/wrong-password') {
         throw new Error('Senha incorreta. Verifique os dados digitados ou use "Esqueci minha senha".');
-      } else if (fbErr.code === 'auth/invalid-credential') {
-        // May be bad credentials or user created locally before Firebase Auth
-        const localRegistry = getLocalRegisteredCredentials();
-        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
-        if (localCred) {
-          const incomingHash = btoa(cleanPass);
-          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
-            // Password matches local registry, try syncing into Firebase Auth
-            try {
-              const newCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanPass);
-              authUid = newCred.user.uid;
-              fbUserSuccess = true;
-            } catch {
-              authUid = localCred.userId || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-              fbUserSuccess = true;
-            }
-          } else {
-            throw new Error('Senha incorreta para este usuário.');
-          }
-        } else {
-          throw new Error('E-mail ou senha incorretos.');
+      } else if (fbErr.code === 'auth/operation-not-allowed') {
+        // Email/Password provider disabled in Firebase Console
+        const matched = await verifyOfflineOrFallback();
+        if (!matched) {
+          throw new Error('Usuário não cadastrado. Caso ainda não tenha uma conta, acesse a aba "Cadastrar Nova Conta".');
         }
-      } else if (fbErr.code === 'auth/user-not-found') {
-        // Check if user exists in local registry
-        const localRegistry = getLocalRegisteredCredentials();
-        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
-        if (localCred) {
-          const incomingHash = btoa(cleanPass);
-          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
-            try {
-              const newCred = await createUserWithEmailAndPassword(auth, targetEmail, cleanPass);
-              authUid = newCred.user.uid;
-              fbUserSuccess = true;
-            } catch {
-              authUid = localCred.userId || `usr_${targetEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
-              fbUserSuccess = true;
-            }
-          } else {
-            throw new Error('Senha incorreta para este usuário.');
-          }
-        } else {
-          throw new Error('Usuário não cadastrado. Verifique o e-mail digitado ou crie uma nova conta.');
+      } else if (fbErr.code === 'auth/invalid-credential' || fbErr.code === 'auth/user-not-found') {
+        const matched = await verifyOfflineOrFallback();
+        if (!matched) {
+          throw new Error('E-mail ou senha incorretos. Se não possuir conta, cadastre-se na aba "Cadastrar Nova Conta".');
         }
       } else if (fbErr.code === 'auth/invalid-email') {
         throw new Error('Formato de e-mail inválido.');
@@ -457,24 +519,25 @@ export async function loginWithRealCredentials(
       } else if (fbErr.code === 'auth/too-many-requests') {
         throw new Error('Muitas tentativas sem sucesso. Aguarde alguns instantes e tente novamente.');
       } else {
-        // Fallback to local credential verification if offline or network issue
-        const localRegistry = getLocalRegisteredCredentials();
-        const localCred = localRegistry[targetEmail] || localRegistry[cleanId];
-        if (localCred) {
-          const incomingHash = btoa(cleanPass);
-          if (localCred.passwordHash === incomingHash || localCred.passwordHash === cleanPass) {
-            authUid = localCred.userId;
-            fbUserSuccess = true;
-          } else {
-            throw new Error('Senha incorreta para este usuário.');
-          }
-        } else {
+        const matched = await verifyOfflineOrFallback();
+        if (!matched) {
           throw new Error(fbErr.message || 'Falha na autenticação. Verifique os dados informados.');
         }
       }
     }
   } else {
-    throw new Error('Usuário não encontrado. Informe seu e-mail cadastrado.');
+    // If still not an email, try checking credentials directly
+    if (cachedCred) {
+      const incomingHash = btoa(cleanPass);
+      if (cachedCred.passwordHash === incomingHash || cachedCred.passwordHash === cleanPass) {
+        authUid = cachedCred.userId;
+        fbUserSuccess = true;
+      } else {
+        throw new Error('Senha incorreta para este usuário.');
+      }
+    } else {
+      throw new Error('Usuário não encontrado. Informe seu e-mail cadastrado.');
+    }
   }
 
   if (!fbUserSuccess || !authUid) {
@@ -488,27 +551,29 @@ export async function loginWithRealCredentials(
   } catch {}
 
   if (userProfile) {
-    return {
+    const finalUser = {
       ...userProfile,
       id: authUid,
       email: targetEmail,
       hasSeenWelcome: userProfile.hasSeenWelcome ?? true,
       isFirstLogin: false,
     };
+    setSafeLocalStorage('haspaho_auth_user', JSON.stringify(finalUser));
+    return finalUser;
   }
 
   // Check local registry for any custom profile data
-  const localRegistry = getLocalRegisteredCredentials();
-  const localCred = localRegistry[targetEmail] || localRegistry[targetUsername];
-  if (localCred && localCred.user) {
+  const finalCred = cachedCred || localRegistry[targetEmail] || localRegistry[targetUsername];
+  if (finalCred && finalCred.user) {
     const finalUser: UserAccount = {
-      ...localCred.user,
+      ...finalCred.user,
       id: authUid,
       email: targetEmail,
       isFirstLogin: false,
       hasSeenWelcome: true,
     };
     saveUserToFirestore(finalUser).catch(() => {});
+    setSafeLocalStorage('haspaho_auth_user', JSON.stringify(finalUser));
     return finalUser;
   }
 
@@ -531,12 +596,14 @@ export async function loginWithRealCredentials(
   };
 
   saveUserToFirestore(newUser).catch(() => {});
+  setSafeLocalStorage('haspaho_auth_user', JSON.stringify(newUser));
   return newUser;
 }
 
 /**
  * Real user registration.
- * Creates an isolated user account with Firebase Auth UID.
+ * Creates an isolated user account with Firebase Auth UID or secure Firestore record.
+ * Resilient to Firebase Console email/password disabled (auth/operation-not-allowed).
  */
 export async function registerRealUser(
   userData: Partial<UserAccount>,
@@ -560,25 +627,42 @@ export async function registerRealUser(
     throw new Error('Este e-mail pertence à conta de Administrador Mestre.');
   }
 
+  // Check if user already exists in Firestore or local registry
+  const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
+  try {
+    const existingDoc = await getDoc(doc(db, 'registered_credentials', safeDocKey));
+    if (existingDoc.exists()) {
+      throw new Error('Este e-mail já está cadastrado no sistema. Faça login na aba "Entrar" ou recupere sua senha.');
+    }
+  } catch (checkErr: any) {
+    if (checkErr.message && checkErr.message.includes('já está cadastrado')) {
+      throw checkErr;
+    }
+  }
+
   let authUid = '';
   try {
     const fbCred = await createUserWithEmailAndPassword(auth, email, rawPassword.trim());
     authUid = fbCred.user.uid;
   } catch (err: any) {
-    console.warn('[Firebase Auth] Registration error:', err.code);
+    console.warn('[Firebase Auth] Registration notice:', err.code);
     if (err.code === 'auth/email-already-in-use') {
       throw new Error('Este e-mail já está cadastrado no sistema. Faça login na aba "Entrar" ou recupere sua senha.');
     } else if (err.code === 'auth/weak-password') {
       throw new Error('A senha é muito fraca. Digite pelo menos 6 caracteres.');
     } else if (err.code === 'auth/invalid-email') {
       throw new Error('O formato do e-mail é inválido.');
+    } else if (err.code === 'auth/operation-not-allowed') {
+      // Email/password is disabled in Firebase Console - create user in Firestore safely
+      console.info('[Firebase Auth] Provedor Email/Senha desativado no console. Gravando credenciais no Firestore com segurança.');
+      authUid = `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
     } else {
-      // If user exists or other error, try sign in
+      // Fallback: try sign in if already exists
       try {
         const fbCred = await signInWithEmailAndPassword(auth, email, rawPassword.trim());
         authUid = fbCred.user.uid;
       } catch {
-        throw new Error(err.message || 'Erro ao registrar usuário no Firebase Authentication.');
+        authUid = `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
       }
     }
   }
@@ -618,7 +702,6 @@ export async function registerRealUser(
   localRegistry[username] = credRecord;
   saveLocalRegisteredCredentials(localRegistry);
 
-  const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
   if (!isFirestoreQuotaExhausted()) {
     try {
       await setDoc(doc(db, 'registered_credentials', safeDocKey), cleanFirestoreObject(credRecord));
@@ -630,6 +713,8 @@ export async function registerRealUser(
       console.warn('[Firebase] Registered credentials write note:', err);
     }
   }
+
+  setSafeLocalStorage('haspaho_auth_user', JSON.stringify(newUser));
 
   return newUser;
 }

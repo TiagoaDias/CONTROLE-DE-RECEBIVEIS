@@ -8,6 +8,7 @@ import {
   signInWithGoogleOAuth,
   signInWithFacebook,
   sendFirebasePasswordReset,
+  activeFirebaseConfig,
 } from '../lib/firebase';
 
 interface InitialWelcomeLoginScreenProps {
@@ -51,6 +52,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   // Feedback states
   const [errorMessage, setErrorMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [unauthorizedDomain, setUnauthorizedDomain] = useState<string | null>(null);
+  const [copiedDomain, setCopiedDomain] = useState(false);
 
   // Format phone helper
   const formatPhone = (val: string) => {
@@ -136,6 +139,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   // Trigger Google Login
   const handleGoogleAuthDirect = async () => {
     setErrorMessage('');
+    setUnauthorizedDomain(null);
     setIsLoading(true);
     try {
       const user = await signInWithGoogleOAuth();
@@ -144,7 +148,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação Google foi cancelada.');
       } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
-        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
+        const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
+        setUnauthorizedDomain(domain);
+        setErrorMessage(`Domínio não autorizado (${domain}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
       } else {
         setErrorMessage(err.message || 'Erro na autenticação Google.');
       }
@@ -156,6 +162,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   // Trigger Facebook Login
   const handleFacebookAuthDirect = async () => {
     setErrorMessage('');
+    setUnauthorizedDomain(null);
     setIsLoading(true);
     try {
       const user = await signInWithFacebook();
@@ -164,7 +171,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       if (err.code === 'auth/popup-closed-by-user') {
         setErrorMessage('A janela de autenticação do Facebook foi cancelada.');
       } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
-        setErrorMessage(`Domínio não autorizado (${window.location.hostname}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
+        const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
+        setUnauthorizedDomain(domain);
+        setErrorMessage(`Domínio não autorizado (${domain}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
       } else {
         setErrorMessage(err.message || 'Não foi possível entrar com Facebook. Verifique a configuração no console do Firebase.');
       }
@@ -362,8 +371,77 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               </button>
             </div>
 
-            {/* Error Message */}
-            {errorMessage && (
+            {/* Domain Authorization Helper Card */}
+            {(unauthorizedDomain || errorMessage.includes('Domínio não autorizado')) && (
+              <div className="mb-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs shadow-sm animate-in fade-in duration-200">
+                <div className="flex items-start gap-2.5 mb-2.5">
+                  <span className="material-symbols-outlined text-amber-600 text-xl shrink-0 mt-0.5">domain_verification</span>
+                  <div>
+                    <h4 className="font-extrabold text-amber-900 text-sm">Domínio Não Autorizado no Firebase</h4>
+                    <p className="text-amber-800 text-[11px] mt-0.5 leading-relaxed">
+                      O login via Google/Facebook requer que o domínio <strong className="font-bold underline text-amber-950">{unauthorizedDomain || window.location.hostname}</strong> esteja registrado no Firebase Authentication.
+                    </p>
+                  </div>
+                </div>
+
+                <div className="bg-white/80 border border-amber-200 rounded-xl p-3 mb-3 space-y-1.5">
+                  <p className="font-bold text-[11px] text-amber-900">Passo a passo rápido (leva 30 segundos):</p>
+                  <ol className="list-decimal list-inside space-y-1 text-[11px] text-amber-900 pl-1 font-medium">
+                    <li>Acesse o <strong>Firebase Console</strong> do projeto <code>{activeFirebaseConfig.projectId}</code></li>
+                    <li>Vá em <strong>Authentication</strong> → aba <strong>Configurações</strong> → <strong>Domínios autorizados</strong></li>
+                    <li>Clique em <strong>Adicionar domínio</strong> e cole <code>{unauthorizedDomain || window.location.hostname}</code></li>
+                  </ol>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-2 mb-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const domainToCopy = unauthorizedDomain || window.location.hostname || 'controle-de-recebiveis.vercel.app';
+                      navigator.clipboard.writeText(domainToCopy);
+                      setCopiedDomain(true);
+                      setTimeout(() => setCopiedDomain(false), 3000);
+                    }}
+                    className="px-3 py-2 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-lg text-[11px] flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+                  >
+                    <span className="material-symbols-outlined text-sm">
+                      {copiedDomain ? 'check' : 'content_copy'}
+                    </span>
+                    {copiedDomain ? 'Domínio Copiado!' : `Copiar "${unauthorizedDomain || window.location.hostname}"`}
+                  </button>
+
+                  <a
+                    href={`https://console.firebase.google.com/project/${activeFirebaseConfig.projectId}/authentication/settings`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] flex items-center gap-1.5 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">open_in_new</span>
+                    Abrir Domínios no Firebase
+                  </a>
+
+                  <a
+                    href={`https://console.firebase.google.com/project/${activeFirebaseConfig.projectId}/authentication/providers`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="px-3 py-2 bg-white hover:bg-amber-100 text-amber-900 border border-amber-300 font-bold rounded-lg text-[11px] flex items-center gap-1.5 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">toggle_on</span>
+                    Ativar E-mail/Senha no Console
+                  </a>
+                </div>
+
+                <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-900 text-[11px] flex items-start gap-2">
+                  <span className="material-symbols-outlined text-emerald-600 text-base shrink-0 mt-0.5">lock_open</span>
+                  <div className="leading-snug">
+                    <strong className="font-bold">Acesso imediato com E-mail e Senha:</strong> Você pode <strong>entrar ou criar uma nova conta</strong> no formulário abaixo imediatamente, com armazenamento seguro no Firestore!
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error Message (for other errors) */}
+            {errorMessage && !unauthorizedDomain && !errorMessage.includes('Domínio não autorizado') && (
               <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in duration-200">
                 <span className="material-symbols-outlined text-[18px] shrink-0 text-red-600">error</span>
                 <span className="leading-snug">{errorMessage}</span>
@@ -499,13 +577,24 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                     </button>
                   </div>
 
-                  {/* Master Developer Quick Fill Button */}
+                  {/* Master Developer Quick Fill & Login Button */}
                   <button
                     type="button"
-                    onClick={() => {
+                    onClick={async () => {
                       setLoginIdentifier('tiagodias8888@gmail.com');
                       setLoginPassword('haspaho2026');
+                      setIsLoading(true);
+                      setErrorMessage('');
+                      try {
+                        const user = await loginWithRealCredentials('tiagodias8888@gmail.com', 'haspaho2026');
+                        onLoginSuccess(user, false);
+                      } catch (err: any) {
+                        setErrorMessage(err.message || 'Falha ao autenticar administrador.');
+                      } finally {
+                        setIsLoading(false);
+                      }
                     }}
+                    disabled={isLoading}
                     className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-[11px] font-bold flex items-center justify-between transition-colors cursor-pointer relative z-20"
                   >
                     <div className="flex items-center gap-1.5">
