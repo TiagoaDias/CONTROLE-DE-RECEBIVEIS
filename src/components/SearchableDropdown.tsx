@@ -105,34 +105,34 @@ export function SearchableDropdown<T = any>({
   const getBorderColor = () => {
     if (disabled) return 'border-slate-200 bg-slate-100/80 text-slate-400 cursor-not-allowed';
     if (isOpen) {
-      if (accentColor === 'cyan') return 'bg-cyan-50/70 border-cyan-400 text-slate-900 ring-2 ring-cyan-200';
-      if (accentColor === 'indigo') return 'bg-indigo-50/70 border-indigo-400 text-slate-900 ring-2 ring-indigo-200';
-      return 'bg-blue-50/70 border-blue-400 text-slate-900 ring-2 ring-blue-200';
+      if (accentColor === 'cyan') return 'bg-gradient-to-r from-cyan-50 via-blue-50 to-indigo-50 border-cyan-400 text-slate-950 ring-4 ring-cyan-200 shadow-md';
+      if (accentColor === 'indigo') return 'bg-gradient-to-r from-indigo-50 via-purple-50 to-pink-50 border-indigo-400 text-slate-950 ring-4 ring-indigo-200 shadow-md';
+      return 'bg-gradient-to-r from-blue-50 via-sky-50 to-cyan-50 border-blue-400 text-slate-950 ring-4 ring-blue-200 shadow-md';
     }
-    return 'bg-white hover:bg-slate-50 border-slate-200 text-slate-800 shadow-2xs';
+    return 'bg-white/90 hover:bg-gradient-to-r hover:from-cyan-50/40 hover:to-blue-50/40 border-cyan-200/80 text-slate-800 shadow-xs hover:shadow-md hover:border-cyan-400 transition-all';
   };
 
   const getBadgeStyle = (type?: DropdownItem['badgeType']) => {
     switch (type) {
       case 'success':
-        return 'bg-emerald-50 text-emerald-700 border-emerald-200';
+        return 'bg-emerald-100 text-emerald-800 border-emerald-300 font-bold';
       case 'danger':
-        return 'bg-red-50 text-red-700 border-red-200';
+        return 'bg-red-100 text-red-800 border-red-300 font-bold animate-pulse';
       case 'warning':
-        return 'bg-amber-50 text-amber-700 border-amber-200';
+        return 'bg-amber-100 text-amber-800 border-amber-300 font-bold';
       default:
-        return 'bg-slate-100 text-slate-700 border-slate-200';
+        return 'bg-slate-100 text-slate-700 border-slate-200 font-medium';
     }
   };
 
   const getDropdownPositionClass = () => {
     if (dropdownAlign === 'right') {
-      return 'right-0 left-auto w-full min-w-[270px] sm:min-w-[320px] max-w-[calc(100vw-24px)] sm:max-w-[420px]';
+      return 'right-0 left-auto w-full min-w-[280px] sm:min-w-[340px] max-w-[calc(100vw-24px)] sm:max-w-[440px]';
     }
     if (dropdownAlign === 'full') {
       return 'left-0 right-0 w-full max-w-[calc(100vw-24px)]';
     }
-    return 'left-0 right-auto w-full min-w-[270px] sm:min-w-[320px] max-w-[calc(100vw-24px)] sm:max-w-[420px]';
+    return 'left-0 right-auto w-full min-w-[280px] sm:min-w-[340px] max-w-[calc(100vw-24px)] sm:max-w-[440px]';
   };
 
   return (
@@ -144,30 +144,30 @@ export function SearchableDropdown<T = any>({
         onClick={() => {
           if (!disabled) onToggle();
         }}
-        className={`w-full min-h-[46px] px-2.5 sm:px-3 rounded-xl border flex items-center justify-between gap-2 text-left transition-all cursor-pointer ${getBorderColor()}`}
+        className={`w-full min-h-[48px] px-3 rounded-2xl border-2 flex items-center justify-between gap-2.5 text-left transition-all duration-200 cursor-pointer hover:scale-[1.01] active:scale-[0.99] ${getBorderColor()}`}
         title={disabled ? disabledMessage : title || placeholder}
       >
-        <div className="flex items-center gap-2 min-w-0 flex-1">
-          {/* Avatar ou Ícone */}
+        <div className="flex items-center gap-2.5 min-w-0 flex-1">
+          {/* Avatar ou Ícone com Efeito Brilhante */}
           {selectedItem?.avatar ? (
             <img
               src={selectedItem.avatar}
               alt=""
               referrerPolicy="no-referrer"
-              className="w-7 h-7 rounded-lg object-cover shadow-2xs border border-slate-200 shrink-0"
+              className="w-8 h-8 rounded-xl object-cover shadow-xs border-2 border-cyan-400 shrink-0"
             />
           ) : selectedItem?.icon ? (
-            <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
+            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
               accentColor === 'cyan'
-                ? 'bg-cyan-100/70 text-cyan-800 border-cyan-200'
-                : 'bg-slate-100 text-slate-700 border-slate-200'
+                ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-white border-cyan-300'
+                : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white border-slate-600'
             }`}>
-              <span className="material-symbols-outlined text-[17px]">{selectedItem.icon}</span>
+              <span className="material-symbols-outlined text-[18px]">{selectedItem.icon}</span>
             </div>
           ) : (
-            <div className="w-7 h-7 rounded-lg bg-slate-100 text-slate-400 flex items-center justify-center shrink-0 border border-slate-200">
-              <span className="material-symbols-outlined text-[16px]">
-                {disabled ? 'lock' : 'menu_open'}
+            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 flex items-center justify-center shrink-0 border-2 border-cyan-300 shadow-2xs">
+              <span className="material-symbols-outlined text-[18px]">
+                {disabled ? 'lock' : 'bolt'}
               </span>
             </div>
           )}
@@ -175,41 +175,41 @@ export function SearchableDropdown<T = any>({
           {/* Textos: Título / Nome Selecionado */}
           {displayMode === 'inline' ? (
             <div className="min-w-0 flex-1 leading-tight truncate">
-              <div className="flex items-center gap-1 truncate text-xs sm:text-[13px]">
+              <div className="flex items-center gap-1.5 truncate text-sm sm:text-[14.5px]">
                 {disabled ? (
-                  <span className="text-slate-400 font-medium truncate">{disabledMessage}</span>
+                  <span className="text-slate-500 font-bold truncate">{disabledMessage}</span>
                 ) : selectedItem ? (
                   <>
                     {title && (
-                      <span className="text-slate-500 font-bold shrink-0">
+                      <span className="text-slate-900 font-black shrink-0 tracking-wide">
                         {title}:
                       </span>
                     )}
-                    <span className="font-extrabold text-slate-900 truncate">
+                    <span className="font-black text-slate-950 truncate bg-cyan-100/80 px-2 py-0.5 rounded-lg border border-cyan-300 text-slate-950 shadow-2xs">
                       {selectedItem.label}
                     </span>
                   </>
                 ) : (
-                  <span className="font-bold text-slate-700 truncate">
+                  <span className="font-extrabold text-slate-900 truncate">
                     {title ? title : placeholder}
                   </span>
                 )}
               </div>
               {selectedItem?.sublabel && (
-                <span className="text-[10px] text-slate-400 block truncate font-medium">
-                  {selectedItem.sublabel}
+                <span className="text-xs text-slate-700 block truncate font-semibold mt-0.5">
+                  ✨ {selectedItem.sublabel}
                 </span>
               )}
             </div>
           ) : (
             <div className="min-w-0 flex-1 leading-tight">
               {title && (
-                <span className="text-[10px] text-slate-500 font-bold tracking-wide uppercase block truncate">
-                  {title}
+                <span className="text-xs text-slate-900 font-black tracking-wide uppercase block truncate">
+                  ✨ {title}
                 </span>
               )}
-              <span className={`text-xs sm:text-[13px] font-black truncate block ${
-                disabled ? 'text-slate-400' : 'text-slate-900'
+              <span className={`text-sm sm:text-[14.5px] font-black truncate block ${
+                disabled ? 'text-slate-500' : 'text-slate-950'
               }`}>
                 {disabled
                   ? disabledMessage
@@ -221,20 +221,20 @@ export function SearchableDropdown<T = any>({
           )}
         </div>
 
-        {/* Lado Direito: Seta em formato de V (Chevron) */}
-        <div className="flex items-center gap-1.5 shrink-0 pl-1">
+        {/* Lado Direito: Seta em formato de V com Animação */}
+        <div className="flex items-center gap-2 shrink-0 pl-1">
           {selectedItem?.badge && (
-            <span className={`text-[10px] px-2 py-0.5 rounded-full border font-mono font-bold hidden sm:inline ${getBadgeStyle(selectedItem.badgeType)}`}>
+            <span className={`text-xs px-3 py-1 rounded-xl border font-mono font-black hidden sm:inline shadow-2xs ${getBadgeStyle(selectedItem.badgeType)}`}>
               {selectedItem.badge}
             </span>
           )}
-          <span
-            className={`material-symbols-outlined text-[19px] text-slate-500 transition-transform duration-200 ${
-              isOpen ? 'rotate-180 text-cyan-600' : ''
-            }`}
-          >
-            expand_more
-          </span>
+          <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform duration-200 ${
+            isOpen ? 'bg-cyan-600 text-white rotate-180 shadow-md' : 'bg-cyan-100 text-cyan-900 border border-cyan-300'
+          }`}>
+            <span className="material-symbols-outlined text-[18px] font-black">
+              expand_more
+            </span>
+          </div>
         </div>
       </button>
 
@@ -242,52 +242,58 @@ export function SearchableDropdown<T = any>({
       {/* MENU SUSPENSO / LISTA DROPDOWN FLUTUANTE                      */}
       {/* ============================================================ */}
       {isOpen && !disabled && (
-        <div className={`absolute top-[calc(100%+6px)] bg-white rounded-2xl border border-cyan-300/90 shadow-2xl p-2.5 flex flex-col gap-2 z-[999] animate-in fade-in zoom-in-95 duration-150 ${getDropdownPositionClass()}`}>
+        <div className={`absolute top-[calc(100%+8px)] bg-white/98 backdrop-blur-md rounded-2xl border-2 border-cyan-400 shadow-[0_10px_35px_rgba(6,182,212,0.3)] p-3.5 flex flex-col gap-3 z-[999] animate-in fade-in zoom-in-95 duration-200 ${getDropdownPositionClass()}`}>
           
           {/* Cabeçalho da Lista com Título e Botão Fechar */}
-          <div className="flex items-center justify-between pb-1.5 border-b border-slate-100 px-1 text-xs">
-            <span className="font-bold text-slate-800 text-[11.5px] flex items-center gap-1">
-              <span className="material-symbols-outlined text-[15px] text-cyan-600">view_list</span>
-              <span>{title ? `Selecionar ${title}` : 'Selecione uma opção'} ({items.length})</span>
+          <div className="flex items-center justify-between pb-2.5 border-b border-cyan-100 px-1">
+            <span className="font-black text-slate-900 text-sm flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[18px] text-cyan-600 animate-spin" style={{ animationDuration: '4s' }}>
+                auto_awesome
+              </span>
+              <span>{title ? `Escolher ${title}` : 'Selecione uma opção'} ({items.length})</span>
             </span>
             <button
               type="button"
               onClick={onClose}
-              className="w-5 h-5 rounded-md hover:bg-slate-100 text-slate-400 hover:text-slate-700 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 flex items-center justify-center transition-colors cursor-pointer shadow-2xs"
               title="Fechar menu"
             >
-              <span className="material-symbols-outlined text-[15px]">close</span>
+              <span className="material-symbols-outlined text-[16px] font-black">close</span>
             </button>
           </div>
 
           {/* Campo de Pesquisa em Tempo Real */}
           {showSearch && items.length > 2 && (
             <div className="relative w-full">
+              <span className="absolute left-3.5 top-1/2 -translate-y-1/2 text-cyan-700 material-symbols-outlined text-[18px]">
+                search
+              </span>
               <input
                 ref={searchInputRef}
                 type="text"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 placeholder={searchPlaceholder}
-                className="w-full h-8 px-3 pr-7 bg-slate-50 border border-slate-200 rounded-xl text-xs font-medium text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-cyan-400 focus:ring-1 focus:ring-cyan-300 transition-all"
+                className="w-full h-10 pl-10 pr-9 bg-slate-50 border-2 border-cyan-200 rounded-xl text-sm font-bold text-slate-900 placeholder-slate-400 outline-none focus:bg-white focus:border-cyan-500 focus:ring-2 focus:ring-cyan-200 transition-all shadow-inset"
               />
               {searchTerm && (
                 <button
                   type="button"
                   onClick={() => setSearchTerm('')}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-0.5 rounded cursor-pointer"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 p-0.5 rounded cursor-pointer"
                 >
-                  <span className="material-symbols-outlined text-[13px]">close</span>
+                  <span className="material-symbols-outlined text-[16px]">close</span>
                 </button>
               )}
             </div>
           )}
 
           {/* Itens da Lista com Rolagem Confortável */}
-          <div className="flex flex-col gap-1 max-h-60 overflow-y-auto pr-0.5 custom-scrollbar">
+          <div className="flex flex-col gap-2 max-h-72 overflow-y-auto pr-1 custom-scrollbar">
             {filteredItems.length === 0 ? (
-              <div className="p-4 text-center text-xs text-slate-400">
-                {emptyMessage}
+              <div className="p-6 text-center text-sm text-slate-600 font-medium flex flex-col items-center gap-2">
+                <span className="material-symbols-outlined text-[32px] text-cyan-500">search_off</span>
+                <span>{emptyMessage}</span>
               </div>
             ) : (
               filteredItems.map((item) => {
@@ -298,22 +304,22 @@ export function SearchableDropdown<T = any>({
                     type="button"
                     onClick={() => {
                       onSelect(item);
-                      onClose(); // Fecha automaticamente ao selecionar
+                      onClose();
                     }}
-                    className={`w-full p-2 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-2 text-left select-none ${
+                    className={`w-full p-3 rounded-xl border-2 transition-all cursor-pointer flex items-center justify-between gap-3 text-left select-none hover:scale-[1.01] active:scale-[0.99] ${
                       isSelected
-                        ? 'bg-gradient-to-r from-cyan-50 via-blue-50/60 to-white border-cyan-400 text-slate-900 shadow-2xs ring-1 ring-cyan-300'
-                        : 'bg-white hover:bg-slate-50 border-slate-200/80 text-slate-700'
+                        ? 'bg-gradient-to-r from-cyan-100 via-blue-50 to-white border-cyan-500 text-slate-950 shadow-sm ring-2 ring-cyan-300 font-black'
+                        : 'bg-white hover:bg-cyan-50/50 border-slate-200 text-slate-900 hover:border-cyan-300 shadow-2xs'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
+                    <div className="flex items-center gap-3 min-w-0">
                       {/* Checkmark Radio */}
-                      <span className={`w-4 h-4 rounded-full flex items-center justify-center shrink-0 border ${
+                      <span className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 border-2 transition-all ${
                         isSelected
-                          ? 'bg-cyan-500 border-cyan-400 text-slate-950'
-                          : 'border-slate-300 text-transparent'
+                          ? 'bg-gradient-to-br from-cyan-500 to-blue-600 border-cyan-400 text-white shadow-xs scale-110'
+                          : 'border-slate-300 bg-slate-50 text-transparent'
                       }`}>
-                        <span className="material-symbols-outlined text-[11px] font-black">
+                        <span className="material-symbols-outlined text-[14px] font-black">
                           {isSelected ? 'check' : ''}
                         </span>
                       </span>
@@ -324,25 +330,25 @@ export function SearchableDropdown<T = any>({
                           src={item.avatar}
                           alt=""
                           referrerPolicy="no-referrer"
-                          className="w-7 h-7 rounded-lg object-cover shadow-2xs border border-slate-200 shrink-0"
+                          className="w-9 h-9 rounded-xl object-cover shadow-xs border-2 border-cyan-300 shrink-0"
                         />
                       ) : item.icon ? (
-                        <div className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 border ${
+                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
                           isSelected
-                            ? 'bg-cyan-100 text-cyan-800 border-cyan-300'
-                            : 'bg-slate-100 border-slate-200 text-slate-600'
+                            ? 'bg-cyan-600 text-white border-cyan-500'
+                            : 'bg-cyan-50 text-cyan-800 border-cyan-200'
                         }`}>
-                          <span className="material-symbols-outlined text-[15px]">{item.icon}</span>
+                          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
                         </div>
                       ) : null}
 
                       {/* Nome e Subtítulo */}
                       <div className="min-w-0 leading-tight">
-                        <span className="text-xs font-bold text-slate-900 block truncate">
+                        <span className="text-sm sm:text-[14.5px] font-black text-slate-950 block truncate">
                           {item.label}
                         </span>
                         {item.sublabel && (
-                          <span className="text-[10px] text-slate-500 block truncate font-medium">
+                          <span className="text-xs text-slate-700 block truncate font-semibold mt-0.5">
                             {item.sublabel}
                           </span>
                         )}
@@ -351,7 +357,7 @@ export function SearchableDropdown<T = any>({
 
                     {/* Badge do Item */}
                     {item.badge && (
-                      <span className={`text-[10.5px] font-mono font-bold shrink-0 px-2 py-0.5 rounded-full border ${getBadgeStyle(item.badgeType)}`}>
+                      <span className={`text-xs font-mono font-black shrink-0 px-3 py-1 rounded-xl border shadow-2xs ${getBadgeStyle(item.badgeType)}`}>
                         {item.badge}
                       </span>
                     )}

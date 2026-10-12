@@ -563,10 +563,11 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
             </label>
             <input
               type="text"
+              inputMode="numeric"
               value={documentNumber}
               onChange={(e) => setDocumentNumber(e.target.value)}
               placeholder="000.000.000-00"
-              className="w-full h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+              className="w-full h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-mono"
             />
           </div>
 
@@ -577,11 +578,12 @@ export const EditDebtorModal: React.FC<EditDebtorModalProps> = ({
               <span>Telefone / WhatsApp</span>
             </label>
             <input
-              type="text"
+              type="tel"
+              inputMode="numeric"
               value={phone}
               onChange={(e) => setPhone(e.target.value)}
               placeholder="(11) 98765-4321"
-              className="w-full h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all"
+              className="w-full h-11 px-3.5 bg-slate-50 border border-slate-300 rounded-xl text-sm font-medium text-slate-900 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all font-mono"
             />
           </div>
 

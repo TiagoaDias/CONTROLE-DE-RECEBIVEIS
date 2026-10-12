@@ -37,15 +37,24 @@ export const WhatsAppModal: React.FC<WhatsAppModalProps> = ({
 
   const handleSend = () => {
     const rawPhone = phone.replace(/\D/g, '');
-    const cleanPhone = rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`;
+    const cleanPhone = rawPhone.length > 0 ? (rawPhone.startsWith('55') ? rawPhone : `55${rawPhone}`) : '';
     const text = encodeURIComponent(defaultMessage);
-    window.open(`https://wa.me/${cleanPhone}?text=${text}`, '_blank');
+    const targetUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${text}` : `https://wa.me/?text=${text}`;
+    try {
+      const win = window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      if (!win) {
+        window.location.href = targetUrl;
+      }
+    } catch {
+      window.location.href = targetUrl;
+    }
+    onToast(`💬 Lembrete WhatsApp enviado para ${debtorName}!`);
     onClose();
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
-      <div className="w-full max-w-lg bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/70 backdrop-blur-xs p-3 sm:p-4 animate-in fade-in">
+      <div className="w-full max-w-lg bg-white rounded-2xl p-5 flex flex-col gap-4 shadow-2xl animate-in zoom-in-95 duration-200 border border-slate-200">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-full bg-emerald-100 text-emerald-700 flex items-center justify-center">

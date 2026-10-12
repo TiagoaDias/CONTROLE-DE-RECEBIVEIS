@@ -55,6 +55,7 @@ interface ParcelasViewProps {
   onUpdateInstallment?: (inst: Installment) => void;
   userPixKey?: string;
   onDeleteInstallment?: (id: string) => void;
+  onRequestDeleteDebtor?: (debtor: Debtor) => void;
 }
 
 // Helper para abreviar data no mobile (ex: 10/08/2026 -> 10/08)
@@ -162,6 +163,7 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
   onUpdateInstallment,
   userPixKey,
   onDeleteInstallment,
+  onRequestDeleteDebtor,
 }) => {
   // Modal de Detalhes dos Itens Unitários
   const [isUnitaryModalOpen, setIsUnitaryModalOpen] = useState(false);
@@ -222,6 +224,15 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
 
   // Modal / Drawer de Detalhes da Parcela no Mobile
   const [selectedInstallmentForDetail, setSelectedInstallmentForDetail] = useState<Installment | null>(null);
+
+  // Modal de Opção de Edição ao clicar na foto do devedor na planilha
+  const [debtorForEditOption, setDebtorForEditOption] = useState<{
+    debtor: Debtor;
+    installment: Installment;
+  } | null>(null);
+
+  // Estado para balão flutuante de confirmação de liquidação
+  const [settleConfirmInstallmentId, setSettleConfirmInstallmentId] = useState<string | null>(null);
 
   // Feedback do botão de cópia rápida
   const [copiedInstallmentId, setCopiedInstallmentId] = useState<string | null>(null);
@@ -1022,7 +1033,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     </span>
                   ) : activeDebtorStats.isPaidOff ? (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10.5px]">
-                      <span>Quitado</span>
+                      <span>Liquidado</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10.5px]">
@@ -1054,6 +1065,24 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     <span className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
                       {activeDebtor.relation || 'Cliente'} • Cadastrado(a)
                     </span>
+                    {(activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
+                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-black text-[10px]">
+                          <span>🏷️ Cliente Fictício (Exemplo)</span>
+                        </span>
+                        {onRequestDeleteDebtor && (
+                          <button
+                            type="button"
+                            onClick={() => onRequestDeleteDebtor(activeDebtor)}
+                            className="px-2 py-0.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+                            title="Excluir usuário de exemplo"
+                          >
+                            <span className="material-symbols-outlined text-[12px]">delete</span>
+                            <span>Excluir Exemplo</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -1112,6 +1141,13 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                         Interativo
                       </span>
                     </div>
+
+                    {/* Babadinho com o Nome da Pessoa */}
+                    <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 rounded-lg text-[9.5px] font-extrabold text-amber-950 max-w-full shadow-2xs">
+                      <span className="material-symbols-outlined text-[12px] text-amber-700 shrink-0">person</span>
+                      <span className="truncate">{activeDebtor.name}</span>
+                    </div>
+
                     <span className="relative z-10 text-base font-black font-mono text-amber-700 block mt-0.5 group-hover:text-amber-800 transition-colors">
                       R$ {activeDebtorStats.totalDevido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
@@ -1119,7 +1155,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       {activeDebtorStats.pendingCount} parcela(s) pendente(s)
                     </span>
                     <div className="relative z-10 mt-1 pt-1 border-t border-amber-200/60 flex items-center justify-between text-[9px] font-bold text-amber-700 group-hover:text-amber-900">
-                      <span>Ver faturas</span>
+                      <span>Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
                       <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
                     </div>
                   </button>
@@ -1144,6 +1180,13 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                         Interativo
                       </span>
                     </div>
+
+                    {/* Babadinho com o Nome da Pessoa */}
+                    <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-lg text-[9.5px] font-extrabold text-emerald-950 max-w-full shadow-2xs">
+                      <span className="material-symbols-outlined text-[12px] text-emerald-700 shrink-0">person</span>
+                      <span className="truncate">{activeDebtor.name}</span>
+                    </div>
+
                     <span className="relative z-10 text-base font-black font-mono text-emerald-700 block mt-0.5 group-hover:text-emerald-800 transition-colors">
                       R$ {activeDebtorStats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                     </span>
@@ -1151,7 +1194,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       {activeDebtorStats.paidCount} parcela(s) liquidada(s)
                     </span>
                     <div className="relative z-10 mt-1 pt-1 border-t border-emerald-200/60 flex items-center justify-between text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900">
-                      <span>Ver faturas</span>
+                      <span>Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
                       <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
                     </div>
                   </button>
@@ -1169,11 +1212,12 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 >
                   <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent skew-x-12" />
                   <div className="relative z-10 flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-slate-600 group-hover:text-slate-900 flex items-center gap-1">
+                    <span className="text-slate-600 group-hover:text-slate-900 flex items-center gap-1 truncate">
                       <span>Progresso Geral</span>
-                      <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-cyan-100 text-cyan-800">Interativo</span>
+                      <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-cyan-100 text-cyan-800 shrink-0">Interativo</span>
+                      <span className="text-[10px] text-cyan-800 font-bold truncate">• {activeDebtor.name}</span>
                     </span>
-                    <span className="font-mono text-cyan-700 group-hover:text-cyan-800 font-black">{activeDebtorStats.percentPaid}% pago</span>
+                    <span className="font-mono text-cyan-700 group-hover:text-cyan-800 font-black shrink-0">{activeDebtorStats.percentPaid}% pago</span>
                   </div>
                   <div className="relative z-10 w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
                     <div
@@ -1310,8 +1354,8 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
             </div>
           </div>
 
-          <div className="w-full overflow-x-auto scrollbar-thin">
-            <table className="w-full text-center text-xs border-collapse">
+          <div className="w-full overflow-x-auto scrollbar-thin px-1 sm:px-2 pb-4">
+            <table className="w-full text-center text-xs border-collapse min-w-[340px] max-w-full">
               <thead>
                 <tr className="bg-slate-50/95 text-slate-700 font-extrabold uppercase text-[9px] sm:text-[10px] tracking-wider border-b border-slate-200/80 select-none shadow-2xs">
                   {/* Col 1: PARCELAS / VENC. */}
@@ -1324,17 +1368,18 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     DEVEDOR
                   </th>
                   {/* Col 3: ITEM */}
-                  <th className="py-2.5 px-2 text-center w-[26%] sm:w-40 whitespace-nowrap text-cyan-800">
-                    <span className="sm:hidden">ITENS/SERV.</span>
-                    <span className="hidden sm:inline">ITENS E SERVIÇOS</span>
+                  <th className="py-2.5 px-2 text-center w-[28%] sm:w-40 whitespace-nowrap text-cyan-800">
+                    <span className="sm:hidden">ITENS/STATUS</span>
+                    <span className="hidden sm:inline">ITENS, STATUS &amp; VALOR</span>
                   </th>
                   {/* Col 4: CARTÃO (Desktop) */}
                   <th className="hidden md:table-cell py-2.5 px-2 text-center md:w-36 whitespace-nowrap text-slate-700">
                     CARTÃO / FORMA
                   </th>
-                  {/* Col 5: VALOR */}
-                  <th className="py-2.5 px-2 text-center w-[32%] sm:w-36 whitespace-nowrap text-amber-800 font-black">
-                    <span>VALOR</span>
+                  {/* Col 5: QUITAR */}
+                  <th className="py-2.5 px-2 text-center w-[30%] sm:w-36 whitespace-nowrap text-emerald-800 font-black">
+                    <span className="sm:hidden">QUITAR</span>
+                    <span className="hidden sm:inline">QUITAR / AÇÃO</span>
                   </th>
                   {/* Col 6: SITUAÇÃO (Desktop) */}
                   <th className="hidden sm:table-cell py-2.5 px-2 text-center sm:w-28 whitespace-nowrap text-slate-700">
@@ -1424,13 +1469,17 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                             </div>
 
                             <div className="flex flex-col items-center justify-center leading-tight gap-1">
-                              {/* Número da parcela */}
-                              <span className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200/90 font-mono text-[9px] sm:text-[10px] font-bold leading-none shadow-2xs">
+                              {/* Número da parcela - Badge vibrante e moderno */}
+                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-mono text-[10px] sm:text-[11px] font-black leading-none shadow-sm border border-blue-400">
                                 {item.installmentNumber}/{item.totalInstallments}
                               </span>
-                              {/* Data do vencimento */}
-                              <div className="inline-flex items-center justify-center gap-0.5 px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-700 border border-slate-200/90 font-mono text-[8.5px] sm:text-[9.5px] font-semibold leading-none shadow-2xs">
-                                <span className="material-symbols-outlined text-[9px] sm:text-[10px] text-slate-500 shrink-0">
+                              {/* Data do vencimento - Badge vibrante e moderno */}
+                              <div className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg font-mono text-[9.5px] sm:text-[10.5px] font-black leading-none shadow-sm border ${
+                                isOverdue
+                                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-400'
+                                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-300'
+                              }`}>
+                                <span className="material-symbols-outlined text-[11px] sm:text-[12px] shrink-0 text-white">
                                   calendar_today
                                 </span>
                                 <span className="sm:hidden">{formatDueDateShort(item.dueDate)}</span>
@@ -1440,15 +1489,56 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </div>
                         </td>
 
-                        {/* Coluna 2: DEVEDOR */}
+                        {/* Coluna 2: DEVEDOR (Com opção de edição ao clicar na foto) */}
                         <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
                           <div className="flex flex-col items-center justify-center leading-tight gap-1 min-w-0">
-                            <SafeDebtorAvatar
-                              name={item.debtorName}
-                              size="md"
-                              status={isOverdue ? 'late' : 'ok'}
-                              className="shrink-0 shadow-xs"
-                            />
+                            {/* Avatar interativo clicável que abre opção de edição */}
+                            <div
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playAppSound('pop');
+                                const debtorObj = debtors.find(
+                                  (d) =>
+                                    d.id === item.debtorId ||
+                                    (d.name && d.name.trim().toLowerCase() === (item.debtorName || '').trim().toLowerCase())
+                                );
+                                if (debtorObj) {
+                                  setDebtorForEditOption({ debtor: debtorObj, installment: item });
+                                } else if (onEditDebtor) {
+                                  onEditDebtor({
+                                    id: item.debtorId,
+                                    name: item.debtorName,
+                                    avatar: item.debtorAvatar || '',
+                                    phone: '(14) 99733-9863',
+                                    relation: 'Cliente',
+                                    totalOwed: item.amount,
+                                    totalPaid: 0,
+                                    overdueCount: 0,
+                                    activePurchases: 1,
+                                    score: 800,
+                                    scoreTier: 'excelente',
+                                    onTimePaymentsCount: 1,
+                                    justInTimePaymentsCount: 0,
+                                    latePaymentsCount: 0,
+                                    spendingAlert: false,
+                                  });
+                                }
+                              }}
+                              className="relative group cursor-pointer inline-block"
+                              title={`Toque na foto para abrir opções de edição de ${item.debtorName}`}
+                            >
+                              <SafeDebtorAvatar
+                                name={item.debtorName}
+                                size="md"
+                                status={isOverdue ? 'late' : 'ok'}
+                                className="shrink-0 shadow-xs group-hover:scale-105 group-hover:ring-2 group-hover:ring-blue-400 transition-all"
+                              />
+                              {/* Selo interativo de edição no canto da foto */}
+                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[9px] shadow-sm border border-white dark:border-slate-800 group-hover:scale-110 transition-transform">
+                                <span className="material-symbols-outlined text-[10px]">edit</span>
+                              </span>
+                            </div>
+
                             <div
                               className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-900 border border-slate-200/90 font-bold text-[9px] sm:text-[10px] shadow-2xs leading-none truncate max-w-[75px] sm:max-w-[100px]"
                               title={item.debtorName}
@@ -1458,7 +1548,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </div>
                         </td>
 
-                        {/* Coluna 3: ITEM */}
+                        {/* Coluna 3: ITEM & STATUS COM VALOR A QUITAR DEBAIXO DO STATUS */}
                         <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
                           <div className="flex flex-col items-center justify-center leading-tight gap-1">
                             <button
@@ -1479,23 +1569,41 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                               </span>
                             </button>
 
-                            {/* Situação compacta visível no mobile */}
-                            <div className="sm:hidden">
+                            {/* Situação e Valor a quitar DEBAIXO DO STATUS */}
+                            <div className="flex flex-col items-center justify-center gap-0.5">
+                              {/* Status Badge */}
                               {isPaid ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[8px] font-bold">
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[8px] sm:text-[8.5px] font-bold">
                                   <span className="material-symbols-outlined text-[9px]">check_circle</span>
                                   <span>PAGO</span>
                                 </span>
                               ) : isOverdue ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 text-[8px] font-bold">
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 text-[8px] sm:text-[8.5px] font-black animate-pulse">
                                   <span className="material-symbols-outlined text-[9px]">warning</span>
                                   <span>ATRASO</span>
                                 </span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-amber-50 text-amber-700 text-[8px] font-bold">
+                              ) : isSoon ? (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[8px] sm:text-[8.5px] font-bold">
+                                  <span className="material-symbols-outlined text-[9px]">schedule</span>
                                   <span>A VENCER</span>
                                 </span>
+                              ) : (
+                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[8px] sm:text-[8.5px] font-medium">
+                                  <span>EM DIA</span>
+                                </span>
                               )}
+
+                              {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                              <span
+                                className={`font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
+                                  isPaid
+                                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                    : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
+                                }`}
+                                title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
+                              >
+                                R$ {safeFormatCurrency(finalAmount)}
+                              </span>
                             </div>
                           </div>
                         </td>
@@ -1510,55 +1618,89 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </span>
                         </td>
 
-                        {/* Coluna 5: VALOR */}
+                        {/* Coluna 5: BOTÃO DE QUITAR NA TELA */}
                         <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
                           <div className="flex items-center justify-center">
-                            {/* Valor formatado */}
-                            <div className="inline-flex items-center justify-center">
-                              {isPaid ? (
-                                <span className="font-mono text-[10px] sm:text-xs font-bold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded-md border border-emerald-200 shadow-2xs">
-                                  R$ {safeFormatCurrency(finalAmount)}
-                                </span>
-                              ) : isOverdue ? (
-                                <div className="flex flex-col items-center leading-none">
-                                  <span className="font-mono text-[10px] sm:text-xs font-bold text-red-600 bg-red-50 px-1.5 py-0.5 rounded-md border border-red-200 shadow-2xs flex items-center gap-0.5">
-                                    <span className="material-symbols-outlined text-[11px] text-red-500 animate-pulse font-bold">warning</span>
-                                    R$ {safeFormatCurrency(finalAmount)}
-                                  </span>
-                                  <span className="text-[7.5px] font-bold text-red-600 mt-0.5">+R$5 taxa</span>
-                                </div>
-                              ) : (
-                                <span className="font-mono text-[10px] sm:text-xs font-bold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded-md border border-blue-200 shadow-2xs">
-                                  R$ {safeFormatCurrency(finalAmount)}
-                                </span>
-                              )}
-                            </div>
+                            {!isPaid ? (
+                               <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playAppSound('coin');
+                                  onSettleInstallment(item);
+                                }}
+                                className="px-1.5 py-0.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white rounded text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 cursor-pointer border border-emerald-500/60 transition-all uppercase tracking-wider"
+                                title="Quitar / Dar baixa nesta parcela"
+                              >
+                                <span className="material-symbols-outlined text-[10px]">check</span>
+                                <span>Quitar</span>
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  playAppSound('click');
+                                  if (onShowProof) {
+                                    onShowProof(
+                                      item.debtorName,
+                                      `R$ ${safeFormatCurrency(finalAmount)}`,
+                                      item.dueDate,
+                                      'Banco Central / Asaas IP',
+                                      authCode,
+                                      item.product
+                                    );
+                                  } else {
+                                    setSelectedInstallmentForDetail(item);
+                                  }
+                                }}
+                                className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 rounded text-[9px] font-bold border border-emerald-300 shadow-2xs flex items-center justify-center gap-0.5 cursor-pointer transition-all"
+                                title="Visualizar recibo oficial"
+                              >
+                                <span className="material-symbols-outlined text-[11px] text-emerald-600">receipt_long</span>
+                                <span>Recibo</span>
+                              </button>
+                            )}
                           </div>
                         </td>
 
-                        {/* Coluna 6: SITUAÇÃO (Desktop) */}
+                        {/* Coluna 6: SITUAÇÃO (Desktop com valor a quitar debaixo do status) */}
                         <td className="hidden sm:table-cell py-2.5 px-2 text-center align-middle whitespace-nowrap">
-                          {isPaid ? (
-                            <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                              <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                              <span>PAGO</span>
+                          <div className="flex flex-col items-center justify-center gap-0.5">
+                            {isPaid ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+                                <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                <span>PAGO</span>
+                              </span>
+                            ) : isOverdue ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-300 text-[10px] font-black animate-pulse">
+                                <span className="material-symbols-outlined text-[12px]">warning</span>
+                                <span>ATRASADA</span>
+                              </span>
+                            ) : isSoon ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold">
+                                <span className="material-symbols-outlined text-[12px]">schedule</span>
+                                <span>A VENCER</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-medium">
+                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
+                                <span>EM DIA</span>
+                              </span>
+                            )}
+
+                            {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                            <span
+                              className={`font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
+                                isPaid
+                                  ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                  : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
+                              }`}
+                              title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
+                            >
+                              R$ {safeFormatCurrency(finalAmount)}
                             </span>
-                          ) : isOverdue ? (
-                            <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-300 text-[10px] font-black animate-pulse">
-                              <span className="material-symbols-outlined text-[12px]">warning</span>
-                              <span>ATRASADA</span>
-                            </span>
-                          ) : isSoon ? (
-                            <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold">
-                              <span className="material-symbols-outlined text-[12px]">schedule</span>
-                              <span>A VENCER</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-medium">
-                              <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                              <span>EM DIA</span>
-                            </span>
-                          )}
+                          </div>
                         </td>
 
                         {/* Coluna 7: AÇÕES EXTRAS NO DESKTOP */}
@@ -1784,7 +1926,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
             </div>
           </div>
         ) : (
-          <div className="flex flex-col gap-3 w-full">
+          <div className="flex flex-col gap-3 w-full px-1.5 sm:px-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
             {filteredInstallments.map((item, idx) => {
               const prevItem = idx > 0 ? filteredInstallments[idx - 1] : null;
@@ -1833,143 +1975,170 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     </div>
                   )}
 
-                  {/* Card Compacto, Estruturado e Sobreposto Suavemente */}
-                  <div className={`bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border shadow-xs hover:shadow-md -mt-2 sm:-mt-2.5 first:mt-0 relative hover:z-10 hover:-translate-y-0.5 transition-all flex flex-col justify-between gap-2 ${
+                  {/* Card Ultra-Compacto e Otimizado */}
+                  <div className={`bg-white/95 backdrop-blur-md rounded-xl p-1.5 sm:p-2 border shadow-xs hover:shadow-md -mt-1.5 sm:-mt-2 first:mt-0 relative hover:z-10 hover:-translate-y-0.5 transition-all flex flex-col justify-between gap-1 ${
                     isOverdue ? 'border-red-300/80 bg-red-50/25' : isPaid ? 'border-emerald-300/80 bg-emerald-50/20' : 'border-slate-200/90'
                   }`}>
                     
-                    {/* Bloco 1: Devedor (Foto + Nome) + Status da Parcela */}
-                    <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
-                      {/* Foto e Nome do Devedor */}
-                      <div className="flex items-center gap-2 min-w-0 flex-1">
-                        <SafeDebtorAvatar
-                          name={item.debtorName}
-                          avatar={item.debtorAvatar || debtorObj?.avatar}
-                          size="sm"
-                          status={isOverdue ? 'late' : 'ok'}
-                          className="shrink-0 ring-1 ring-slate-200"
-                        />
+                    {/* Linha 1: Devedor (Avatar + Nome) + Status & Parcela */}
+                    <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-100">
+                      <div className="flex items-center gap-1.5 min-w-0 flex-1">
+                        <div
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            const fullDebtor: Debtor = debtorObj || debtors.find(d => d.id === item.debtorId || d.name.toLowerCase() === (item.debtorName || '').toLowerCase()) || {
+                              id: item.debtorId || 'unknown',
+                              name: item.debtorName || 'Devedor',
+                              avatar: item.debtorAvatar || '',
+                              phone: '',
+                              documentNumber: '',
+                              pixKey: '',
+                              relation: '',
+                              score: 800,
+                              scoreTier: 'bom',
+                              totalOwed: 0,
+                              totalPaid: 0,
+                              overdueCount: 0,
+                              notes: '',
+                              onTimePaymentsCount: 0,
+                              justInTimePaymentsCount: 0,
+                              latePaymentsCount: 0,
+                              spendingAlert: false,
+                            };
+                            setDebtorForEditOption({
+                              debtor: fullDebtor,
+                              installment: item
+                            });
+                          }}
+                          className="cursor-pointer shrink-0 group relative"
+                          title="Clique na foto para editar o devedor"
+                        >
+                          <SafeDebtorAvatar
+                            name={item.debtorName}
+                            avatar={item.debtorAvatar || debtorObj?.avatar}
+                            size="xs"
+                            status={isOverdue ? 'late' : 'ok'}
+                            className="shrink-0 ring-1.5 ring-blue-500/30 group-hover:ring-blue-600 transition-all shadow-xs"
+                          />
+                          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-600 text-white rounded-full flex items-center justify-center text-[7px] font-bold shadow-xs">
+                            ✎
+                          </span>
+                        </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-xs font-bold text-slate-900 truncate leading-tight" title={item.debtorName}>
+                          <span className="text-[11px] font-bold text-slate-900 truncate leading-tight" title={item.debtorName}>
                             {item.debtorName}
                           </span>
-                          <span className="text-[10px] text-slate-500 font-medium truncate">
+                          <span className="text-[9px] text-slate-500 font-medium truncate">
                             {debtorObj?.relation || 'Beneficiário'}
                           </span>
                         </div>
                       </div>
 
-                      {/* Status da Parcela */}
-                      <div className="flex flex-col items-end shrink-0 gap-0.5">
-                        <span className="px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200 font-mono text-[10.5px] font-bold leading-none">
+                      {/* Status & Parcela Badge */}
+                      <div className="flex items-center gap-1 shrink-0">
+                        <span className="px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono text-[9.5px] font-black leading-none shadow-xs" title="Número da Parcela">
                           #{item.installmentNumber}/{item.totalInstallments}
                         </span>
                         {isPaid ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[9px] leading-none">
-                            <span className="material-symbols-outlined text-[10px]">check_circle</span>
-                            <span>PAGO</span>
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[8.5px] leading-none border border-emerald-200">
+                            PAGO
                           </span>
                         ) : isOverdue ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[9px] leading-none">
-                            <span className="material-symbols-outlined text-[10px]">warning</span>
-                            <span>ATRASADA</span>
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[8.5px] leading-none border border-red-200">
+                            ATRASO
                           </span>
                         ) : isSoon ? (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[9px] leading-none">
-                            <span className="material-symbols-outlined text-[10px]">schedule</span>
-                            <span>A VENCER</span>
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[8.5px] leading-none border border-amber-200">
+                            VENCE LOGO
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[9px] leading-none">
+                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[8.5px] leading-none border border-slate-200">
                             EM DIA
                           </span>
                         )}
                       </div>
                     </div>
 
-                    {/* Bloco 2: Produto / Auxílio + Data de Vencimento + Cartão */}
-                    <div className="flex flex-col gap-1.5 bg-slate-50/80 p-2 rounded-xl border border-slate-100">
-                      <div className="flex items-center justify-between gap-1.5">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
-                          }}
-                          className="flex items-center gap-1.5 min-w-0 text-left hover:text-blue-600 transition-colors cursor-pointer group"
-                          title={`Clique para visualizar o print da compra de ${item.product}`}
-                        >
-                          <span className="material-symbols-outlined text-[15px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
-                            {itemIconName}
-                          </span>
-                          <span className="text-xs font-bold text-slate-800 group-hover:text-blue-600 truncate underline decoration-dotted decoration-blue-400" title={item.product}>
-                            {item.product}
-                          </span>
-                          <span className="material-symbols-outlined text-[12px] text-blue-500">
-                            photo_camera
-                          </span>
-                        </button>
-                        <div className="flex items-center gap-1 text-[11px] font-mono font-bold text-slate-700 shrink-0">
-                          <span className="material-symbols-outlined text-[12px] text-slate-400">event</span>
-                          <span>{item.dueDate}</span>
-                        </div>
-                      </div>
-
-                      <div className="flex items-center justify-between text-[10px] pt-1 border-t border-slate-200/60">
-                        <span className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded font-semibold border ${cardBadge.colorClass}`}>
-                          <span className="material-symbols-outlined text-[11px]">{cardBadge.icon}</span>
-                          <span className="truncate max-w-[120px]">{item.cardName || 'Boleto / Pix'}</span>
+                    {/* Linha 2: Produto/Print & Data de Vencimento */}
+                    <div className="flex items-center justify-between gap-1.5 bg-slate-50/80 px-2 py-1 rounded-lg border border-slate-100 text-[10px]">
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
+                        }}
+                        className="flex items-center gap-1 min-w-0 text-left hover:text-blue-600 transition-colors cursor-pointer group"
+                        title={`Visualizar print da compra de ${item.product}`}
+                      >
+                        <span className="material-symbols-outlined text-[13px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
+                          {itemIconName}
                         </span>
-                        {isOverdue && (
-                          <span className="text-red-600 font-bold">
-                            {item.delayDays || 9} dias de atraso
-                          </span>
-                        )}
+                        <span className="font-bold text-slate-800 group-hover:text-blue-600 truncate underline decoration-dotted decoration-blue-400" title={item.product}>
+                          {item.product}
+                        </span>
+                      </button>
+                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-mono font-bold shrink-0 border border-amber-200">
+                        <span>Venc: {item.dueDate}</span>
                       </div>
                     </div>
 
-                    {/* Bloco 3: Valor da Parcela & Ações Compactas */}
-                    <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                      {/* Valor Monetário */}
+                    {/* Linha 3: Valor & Botões de Ação */}
+                    <div className="flex items-center justify-between gap-2 pt-0.5">
                       <div className="flex flex-col">
-                        <span className="text-[9px] uppercase font-bold text-slate-400 tracking-wider">
-                          Valor da Parcela
-                        </span>
-                        <span className={`font-mono text-sm sm:text-base font-black leading-tight ${
+                        <span className={`font-mono text-xs sm:text-sm font-black leading-tight ${
                           isPaid ? 'text-emerald-700' : isOverdue ? 'text-red-600' : 'text-slate-900'
                         }`}>
                           R$ {finalAmount.toFixed(2).replace('.', ',')}
                         </span>
                       </div>
 
-                      {/* Botões de Ação Compactos */}
                       <div className="flex items-center gap-1">
-                        {/* Se pago: Botão de Ver Detalhes / Ações (Olhinho) */}
                         {isPaid ? (
-                          <button
-                            type="button"
-                            onClick={() => setSelectedInstallmentForDetail(item)}
-                            className="h-8 w-8 rounded-lg bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center active:scale-95 shadow-2xs transition-all cursor-pointer"
-                            title="Ver detalhes da situação e ações da parcela"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">visibility</span>
-                          </button>
-                        ) : (
-                          <>
-                            {/* Botão Quitar */}
+                          <div className="flex items-center gap-1">
                             <button
                               type="button"
-                              onClick={() => onSettleInstallment(item)}
-                              className={`h-8 px-2.5 rounded-lg text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs active:scale-95 transition-all cursor-pointer ${
+                              onClick={() => {
+                                if (onShowProof) {
+                                  onShowProof(
+                                    item.debtorName,
+                                    `R$ ${safeFormatCurrency(finalAmount)}`,
+                                    item.dueDate,
+                                    'Banco Central / Asaas IP',
+                                    authCode,
+                                    item.product
+                                  );
+                                } else {
+                                  setSelectedInstallmentForDetail(item);
+                                }
+                              }}
+                              className="h-5 px-1.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center justify-center gap-0.5 active:scale-95 shadow-2xs transition-all cursor-pointer text-[8px] font-bold"
+                              title="Visualizar recibo oficial"
+                            >
+                              <span className="material-symbols-outlined text-[10px] text-emerald-600">receipt_long</span>
+                              <span>Recibo</span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setSelectedInstallmentForDetail(item)}
+                              className="h-5 w-5 rounded bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 flex items-center justify-center active:scale-95 shadow-2xs transition-all cursor-pointer"
+                              title="Ver detalhes"
+                            >
+                              <span className="material-symbols-outlined text-[10px]">visibility</span>
+                            </button>
+                          </div>
+                        ) : (
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => setSettleConfirmInstallmentId(item.id)}
+                              className={`h-5 px-1.5 rounded text-white font-bold text-[8px] flex items-center gap-0.5 shadow-2xs active:scale-95 transition-all cursor-pointer ${
                                 isOverdue ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
                               }`}
-                              title="Quitar parcela"
+                              title="Liquidar parcela"
                             >
-                              <span className="material-symbols-outlined text-[13px]">check</span>
-                              <span>Quitar</span>
+                              <span className="material-symbols-outlined text-[9px]">check</span>
+                              <span>Liquidar</span>
                             </button>
-
-                            {/* Botão WhatsApp */}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1981,16 +2150,61 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                   `${item.installmentNumber}/${item.totalInstallments}`
                                 );
                               }}
-                              className="px-2.5 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center justify-center gap-1 transition-colors cursor-pointer shadow-2xs"
+                              className="px-1 h-5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 flex items-center justify-center gap-0.5 transition-colors cursor-pointer shadow-2xs"
                               title="Enviar no WhatsApp"
                             >
-                              <WhatsAppIcon className="w-4 h-4 text-emerald-600" size={15} />
-                              <span className="text-[10.5px] font-bold">WhatsApp</span>
+                              <WhatsAppIcon className="w-2.5 h-2.5 text-emerald-600" size={9} />
+                              <span className="text-[8px] font-bold">Zap</span>
                             </button>
                           </>
                         )}
                       </div>
                     </div>
+
+                    {/* Balão Flutuante de Confirmação de Liquidação */}
+                    {settleConfirmInstallmentId === item.id && (
+                      <div
+                        className="absolute inset-x-2 bottom-2 z-[200] bg-slate-900 text-white p-3 rounded-2xl shadow-2xl border-2 border-emerald-400 flex flex-col gap-2 animate-in zoom-in-95 duration-150 font-sans"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <div className="flex items-center justify-between text-xs font-bold text-emerald-300">
+                          <span className="flex items-center gap-1.5">
+                            <span className="material-symbols-outlined text-[16px]">help</span>
+                            <span>Tem certeza que deseja liquidar?</span>
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => setSettleConfirmInstallmentId(null)}
+                            className="w-5 h-5 rounded-full bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white flex items-center justify-center text-[10px] transition-colors cursor-pointer"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                        <p className="text-[11px] text-slate-300 leading-tight">
+                          Deseja confirmar a liquidação da parcela <strong>#{item.installmentNumber}</strong> ({item.product}) no valor de <strong className="text-emerald-400">R$ {finalAmount.toFixed(2).replace('.', ',')}</strong>?
+                        </p>
+                        <div className="flex items-center gap-2 pt-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setSettleConfirmInstallmentId(null);
+                              onSettleInstallment(item);
+                            }}
+                            className="flex-1 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-xl font-black text-xs flex items-center justify-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+                          >
+                            <span className="material-symbols-outlined text-[14px]">check</span>
+                            <span>Sim, Liquidar</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setSettleConfirmInstallmentId(null)}
+                            className="flex-1 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-200 rounded-xl font-bold text-xs flex items-center justify-center gap-1 cursor-pointer active:scale-95 transition-all"
+                          >
+                            <span>Não</span>
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </React.Fragment>
               );
@@ -2452,8 +2666,125 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
       )}
 
       {/* ============================================================ */}
-      {/* 7. MODAL DE RECÁLCULO DE JUROS POR ATRASO DIÁRIO              */}
+      {/* MODAL DE OPÇÃO DE EDIÇÃO AO CLICAR NA FOTO DO DEVEDOR        */}
       {/* ============================================================ */}
+      {debtorForEditOption && (
+        <div
+          role="dialog"
+          aria-label="Opções de Edição do Devedor"
+          className="fixed inset-0 z-[9990] flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setDebtorForEditOption(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border-2 border-blue-400/50 overflow-hidden flex flex-col p-4 gap-3 text-slate-900 dark:text-slate-100 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <SafeDebtorAvatar
+                  name={debtorForEditOption.debtor.name}
+                  avatar={debtorForEditOption.debtor.avatar}
+                  size="md"
+                  className="ring-2 ring-blue-500 shadow-xs"
+                />
+                <div className="min-w-0">
+                  <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">
+                    {debtorForEditOption.debtor.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                    {debtorForEditOption.debtor.phone || 'Sem telefone cadastrado'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDebtorForEditOption(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer text-xs font-bold"
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+              Selecione uma opção de gerenciamento para este devedor:
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {/* Opção 1: Editar Cadastro Completo (Lápis) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const deb = debtorForEditOption.debtor;
+                  setDebtorForEditOption(null);
+                  playAppSound('click');
+                  if (onEditDebtor) onEditDebtor(deb);
+                }}
+                className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">edit</span>
+                  <span>Editar Cadastro Completo</span>
+                </span>
+                <span className="text-[10px] bg-blue-500/40 px-1.5 py-0.5 rounded">F2 / Lápis</span>
+              </button>
+
+              {/* Opção 2: Cobrança / Mensagem WhatsApp */}
+              <button
+                type="button"
+                onClick={() => {
+                  const deb = debtorForEditOption.debtor;
+                  const inst = debtorForEditOption.installment;
+                  setDebtorForEditOption(null);
+                  playAppSound('pop');
+                  onNudgeWhatsApp(
+                    deb.name,
+                    `R$ ${safeFormatCurrency(inst.amount || inst.originalAmount)}`,
+                    inst.product,
+                    `${inst.installmentNumber}/${inst.totalInstallments}`,
+                    deb.phone
+                  );
+                }}
+                className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <WhatsAppIcon className="w-4 h-4 text-white" size={17} />
+                  <span>Enviar Mensagem no WhatsApp</span>
+                </span>
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              </button>
+
+              {/* Opção 3: Filtrar e ver histórico deste devedor */}
+              <button
+                type="button"
+                onClick={() => {
+                  const debId = debtorForEditOption.debtor.id;
+                  setDebtorForEditOption(null);
+                  playAppSound('click');
+                  handleSelectDebtor(debId);
+                }}
+                className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 active:scale-95 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px] text-blue-600">receipt_long</span>
+                  <span>Ver Todas as Parcelas ({debtorForEditOption.debtor.name.split(' ')[0]})</span>
+                </span>
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setDebtorForEditOption(null)}
+                className="py-1.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {recalcModalItem && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center p-3 sm:p-6 bg-slate-950/70 backdrop-blur-md overflow-y-auto animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl sm:rounded-3xl shadow-[0_0_40px_rgba(6,182,212,0.3)] ring-2 ring-cyan-400/50 border-2 border-cyan-400/60 w-full max-w-lg overflow-hidden my-auto text-slate-850">

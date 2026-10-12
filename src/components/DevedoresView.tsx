@@ -79,6 +79,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
   const [isUnitaryModalOpen, setIsUnitaryModalOpen] = useState(false);
   const [selectedDebtorForUnitary, setSelectedDebtorForUnitary] = useState<Debtor | null>(null);
   const [initialUnitaryItemId, setInitialUnitaryItemId] = useState<string | undefined>(undefined);
+  const [debtorForEditOption, setDebtorForEditOption] = useState<{ debtor: Debtor; installment?: Installment } | null>(null);
 
   const handleOpenUnitaryModal = (debtor: Debtor, initialItemId?: string, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -503,82 +504,141 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                     : 'bg-white border-slate-200'
                                 }`}
                               >
-                                {/* Linha 1: Parcela, Vencimento & Badge Situação */}
+                                {/* Linha 1: Parcela, Vencimento & Badge Situação com Valor a Quitar Debaixo */}
                                 <div className="flex items-center justify-between gap-2">
-                                  <div className="flex items-center gap-2">
-                                    <span className="text-xs font-black font-mono px-2 py-0.5 rounded-lg bg-slate-100 text-slate-800 border border-slate-200">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    {/* Caixinha do número de parcelas com corzinha suave */}
+                                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-lg bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/90 dark:border-indigo-800/80 shadow-2xs">
                                       {inst.installmentNumber}/{inst.totalInstallments}
                                     </span>
-                                    <div className="flex items-center gap-1 text-[11px] font-mono text-slate-600">
-                                      <span className="material-symbols-outlined text-[13px] text-slate-500">calendar_today</span>
+                                    {/* Caixinha da data de vencimento com corzinha suave */}
+                                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-mono shadow-2xs font-semibold ${
+                                      isLate
+                                        ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
+                                        : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
+                                    }`}>
+                                      <span className="material-symbols-outlined text-[12px]">calendar_today</span>
                                       <span>{inst.dueDate}</span>
                                     </div>
                                   </div>
 
-                                  {/* Badge de Situação */}
-                                  {isPaid ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-emerald-300 bg-emerald-100/80 text-emerald-800 font-bold text-[10.5px]">
-                                      <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                                      <span>PAGO</span>
-                                    </span>
-                                  ) : isLate ? (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-red-300 bg-red-100/80 text-red-800 font-bold text-[10.5px] animate-pulse">
-                                      <span className="material-symbols-outlined text-[12px]">warning</span>
-                                      <span>ATRASADA</span>
-                                    </span>
-                                  ) : (
-                                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full border border-amber-300 bg-amber-100/80 text-amber-800 font-bold text-[10.5px]">
-                                      <span>A VENCER</span>
-                                    </span>
-                                  )}
-                                </div>
-
-                                {/* Linha 2: Produto / Item e Valor */}
-                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <div className="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-                                      <span className="material-symbols-outlined text-[16px]">{itemIconName}</span>
-                                    </div>
-                                    <div className="flex flex-col min-w-0">
-                                      <span className="text-xs font-bold text-slate-800 truncate" title={inst.product}>
-                                        {inst.product}
+                                  {/* Situação e Valor a quitar DEBAIXO DO STATUS */}
+                                  <div className="flex flex-col items-end gap-0.5">
+                                    {/* Badge de Situação */}
+                                    {isPaid ? (
+                                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-emerald-300 bg-emerald-100/90 text-emerald-800 font-bold text-[10px]">
+                                        <span className="material-symbols-outlined text-[11px]">check_circle</span>
+                                        <span>PAGO</span>
                                       </span>
-                                      <span className="text-[10px] text-slate-400 truncate">
-                                        {inst.cardName || 'Nubank Croma'}
+                                    ) : isLate ? (
+                                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-red-300 bg-red-100/90 text-red-800 font-bold text-[10px] animate-pulse">
+                                        <span className="material-symbols-outlined text-[11px]">warning</span>
+                                        <span>ATRASADA</span>
                                       </span>
-                                    </div>
-                                  </div>
+                                    ) : (
+                                      <span className="inline-flex items-center gap-0.5 px-2 py-0.5 rounded-full border border-amber-300 bg-amber-100/90 text-amber-800 font-bold text-[10px]">
+                                        <span>A VENCER</span>
+                                      </span>
+                                    )}
 
-                                  <div className="text-right shrink-0">
-                                    <span className="text-xs font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200">
+                                    {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                                    <span
+                                      className={`font-mono text-[10.5px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
+                                        isPaid
+                                          ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                          : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
+                                      }`}
+                                      title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
+                                    >
                                       R$ {instAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
                                     </span>
                                   </div>
                                 </div>
 
+                                {/* Linha 2: Devedor (foto clicável com opção de edição) + Produto / Item */}
+                                <div className="flex items-center justify-between gap-2 pt-1 border-t border-slate-100">
+                                  <div className="flex items-center gap-2 min-w-0">
+                                    {/* Foto do devedor com opção de edição ao clicar */}
+                                    <div
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setDebtorForEditOption({ debtor, installment: inst });
+                                      }}
+                                      className="relative group cursor-pointer inline-block shrink-0"
+                                      title={`Toque na foto para abrir opções de edição de ${debtor.name}`}
+                                    >
+                                      <SafeDebtorAvatar
+                                        name={inst.debtorName || debtor.name}
+                                        avatar={debtor.avatar}
+                                        size="sm"
+                                        status={isLate ? 'late' : 'ok'}
+                                        className="ring-2 ring-blue-400 group-hover:scale-105 transition-transform"
+                                      />
+                                      <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[8px] shadow-sm border border-white">
+                                        <span className="material-symbols-outlined text-[9px]">edit</span>
+                                      </span>
+                                    </div>
+
+                                    <div className="flex flex-col min-w-0">
+                                      <div className="flex items-center gap-1 min-w-0">
+                                        <span className="material-symbols-outlined text-[13px] text-blue-600 shrink-0">{itemIconName}</span>
+                                        <span className="text-xs font-bold text-slate-800 truncate" title={inst.product}>
+                                          {inst.product}
+                                        </span>
+                                      </div>
+                                      <span className="text-[10px] text-slate-400 truncate">
+                                        {inst.cardName || 'Nubank Croma'} • {(inst.debtorName || debtor.name).split(' ')[0]}
+                                      </span>
+                                    </div>
+                                  </div>
+
+                                  {!isPaid && (
+                                    <button
+                                      type="button"
+                                      onClick={() => onSettleInstallment(inst)}
+                                      className="py-1 px-2.5 rounded-lg bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs flex items-center gap-1 shadow-2xs cursor-pointer active:scale-95 transition-all uppercase tracking-wider shrink-0"
+                                      title="Quitar esta parcela"
+                                    >
+                                      <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                                      <span>Quitar</span>
+                                    </button>
+                                  )}
+                                </div>
+
                                 {/* Linha 3: Ações Rápidas */}
-                                <div className="flex items-center justify-end gap-2 pt-1.5 border-t border-slate-100">
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      if (isPaid && onShowProof) {
-                                        onShowProof(
-                                          debtor.name,
-                                          `R$ ${safeToFixed(instAmount, 2)}`,
-                                          inst.paidAt || inst.dueDate || 'Hoje',
-                                          inst.paymentMethod || 'PIX / Banco',
-                                          authCode,
-                                          `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`
-                                        );
-                                      } else {
-                                        onSettleInstallment(inst);
-                                      }
-                                    }}
-                                    className="flex-1 py-1.5 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
-                                    title={isPaid ? "Visualizar Recibo de Pagamento" : "Ver detalhes da situação / Quitar ou Pagar"}
-                                  >
-                                    <span className="material-symbols-outlined text-[16px]">visibility</span>
-                                  </button>
+                                <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-slate-100">
+                                  {isPaid ? (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (onShowProof) {
+                                          onShowProof(
+                                            debtor.name,
+                                            `R$ ${safeToFixed(instAmount, 2)}`,
+                                            inst.paidAt || inst.dueDate || 'Hoje',
+                                            inst.paymentMethod || 'PIX / Banco',
+                                            authCode,
+                                            `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`
+                                          );
+                                        }
+                                      }}
+                                      className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95 shadow-2xs"
+                                      title="Visualizar Recibo de Pagamento"
+                                    >
+                                      <span className="material-symbols-outlined text-[15px] text-emerald-600">receipt_long</span>
+                                      <span>Recibo</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={() => onSettleInstallment(inst)}
+                                      className="flex-1 py-1.5 px-3 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all active:scale-95 shadow-xs uppercase tracking-wider"
+                                      title="Dar baixa / Quitar esta parcela"
+                                    >
+                                      <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                                      <span>Quitar Parcela</span>
+                                    </button>
+                                  )}
 
                                   {!isPaid && debtor.phone && (
                                     <button
@@ -590,9 +650,10 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                         inst.dueDate,
                                         debtor.phone
                                       )}
-                                      className="py-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20 font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer transition-all shadow-2xs"
+                                      className="py-1.5 px-3 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 hover:bg-emerald-500/20 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all shadow-2xs"
+                                      title="Cobrar via WhatsApp"
                                     >
-                                      <WhatsAppIcon className="w-4 h-4 text-emerald-400" size={15} />
+                                      <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" size={14} />
                                       <span>WhatsApp</span>
                                     </button>
                                   )}
@@ -603,10 +664,10 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                       e.stopPropagation();
                                       onDeleteInstallment(inst.id);
                                     }}
-                                    className="py-1.5 px-3 rounded-xl bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 font-bold text-xs flex items-center justify-center cursor-pointer transition-all active:scale-95"
+                                    className="py-1.5 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 font-bold text-xs flex items-center justify-center cursor-pointer transition-all active:scale-95"
                                     title="Excluir Parcela"
                                   >
-                                    <span className="material-symbols-outlined text-[16px]">delete</span>
+                                    <span className="material-symbols-outlined text-[15px]">delete</span>
                                   </button>
                                 </div>
                               </div>
@@ -624,8 +685,8 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                               <th className="py-2.5 px-2 text-center whitespace-nowrap">DEVEDOR</th>
                               <th className="py-2.5 px-2 text-center whitespace-nowrap">ITEM / DESC.</th>
                               <th className="py-2.5 px-2 text-center whitespace-nowrap">CARTÃO / FORMA</th>
-                              <th className="py-2.5 px-2 text-center whitespace-nowrap">VALOR</th>
-                              <th className="py-2.5 px-2 text-center whitespace-nowrap">SITUAÇÃO</th>
+                              <th className="py-2.5 px-2 text-center whitespace-nowrap">SITUAÇÃO &amp; VALOR</th>
+                              <th className="py-2.5 px-2 text-center whitespace-nowrap text-emerald-800 font-black">QUITAR</th>
                               <th className="py-2.5 px-2 text-center whitespace-nowrap">AÇÕES</th>
                             </tr>
                           </thead>
@@ -656,7 +717,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                         : 'bg-white hover:bg-slate-50/50'
                                     }`}
                                   >
-                                    {/* 1. PARCELAS / VENC. com linha vertical e ponto luminoso */}
+                                    {/* 1. PARCELAS / VENC. com corzinha suave nas duas caixinhas */}
                                     <td className="py-3 pl-4 pr-2 text-center align-middle whitespace-nowrap">
                                       <div className="flex items-center gap-2 justify-center">
                                         {/* Ramificação tracejada vertical com ponto ciano brilhante */}
@@ -666,30 +727,43 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                         </div>
 
                                         <div className="flex flex-col items-center justify-center gap-1">
-                                          <span className="text-[10px] font-bold text-slate-600 font-mono">
+                                          {/* Caixinha número de parcelas - corzinha suave */}
+                                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 border border-indigo-200/90 font-mono text-[10px] font-bold shadow-2xs">
                                             {inst.installmentNumber}/{inst.totalInstallments}
                                           </span>
-                                          <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg border border-slate-250 bg-white text-slate-700 text-[10px] font-mono shadow-2xs">
-                                            <span className="material-symbols-outlined text-[12px] text-slate-500">calendar_today</span>
+                                          {/* Caixinha data de vencimento - corzinha suave */}
+                                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[9.5px] font-semibold shadow-2xs ${
+                                            isLate
+                                              ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
+                                              : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
+                                          }`}>
+                                            <span className="material-symbols-outlined text-[11px]">calendar_today</span>
                                             <span>{inst.dueDate}</span>
                                           </div>
                                         </div>
                                       </div>
                                     </td>
 
-                                    {/* 2. DEVEDOR com foto e nome embaixo */}
+                                    {/* 2. DEVEDOR com foto clicável que abre opção de edição */}
                                     <td className="py-3 px-2 text-center align-middle whitespace-nowrap">
                                       <div className="flex flex-col items-center justify-center gap-1">
-                                        <div className="relative inline-flex items-center justify-center">
+                                        <div
+                                          onClick={(e) => {
+                                            e.stopPropagation();
+                                            setDebtorForEditOption({ debtor, installment: inst });
+                                          }}
+                                          className="relative group cursor-pointer inline-block"
+                                          title={`Toque na foto para abrir opções de edição de ${debtor.name}`}
+                                        >
                                           <SafeDebtorAvatar
                                             name={inst.debtorName || debtor.name}
                                             avatar={debtor.avatar}
                                             size="sm"
                                             status={isLate ? 'late' : 'ok'}
-                                            className="ring-2 ring-cyan-300"
+                                            className="ring-2 ring-cyan-400 group-hover:scale-105 group-hover:ring-blue-500 transition-all shadow-2xs"
                                           />
-                                          <span className="absolute -bottom-1 -right-1 w-3.5 h-3.5 rounded-full bg-emerald-500 text-white flex items-center justify-center text-[8px] font-black ring-1 ring-white">
-                                            ✓
+                                          <span className="absolute -top-1 -right-1 w-3.5 h-3.5 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[8px] shadow-sm border border-white">
+                                            <span className="material-symbols-outlined text-[9px]">edit</span>
                                           </span>
                                         </div>
                                         <span className="inline-block px-2 py-0.2 rounded-md bg-slate-100 text-slate-800 text-[10px] font-bold">
@@ -716,44 +790,63 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                       </div>
                                     </td>
 
-                                    {/* 5. VALOR & AÇÃO com valor verde e botão Recibo / Baixar */}
+                                    {/* 5. SITUAÇÃO COM VALOR A QUITAR DEBAIXO DO STATUS */}
                                     <td className="py-3 px-2 text-center align-middle whitespace-nowrap">
-                                      <div className="flex items-center justify-center">
-                                        <div className={`inline-flex items-center px-2 py-0.5 rounded-md font-mono text-[11px] font-bold border ${
-                                          isPaid 
-                                            ? 'bg-emerald-50 border-emerald-250 text-emerald-700' 
-                                            : isLate 
-                                            ? 'bg-red-50 border-red-250 text-red-700' 
-                                            : 'bg-blue-50 border-blue-250 text-blue-700'
-                                        }`}>
+                                      <div className="flex flex-col items-center justify-center gap-0.5">
+                                        {/* Status Badge */}
+                                        {isPaid ? (
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 font-bold text-[10px]">
+                                            <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                            <span>PAGO</span>
+                                          </div>
+                                        ) : isLate ? (
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-red-300 bg-red-50 text-red-700 font-bold text-[10px] animate-pulse">
+                                            <span className="material-symbols-outlined text-[12px]">warning</span>
+                                            <span>ATRASADA</span>
+                                          </div>
+                                        ) : (
+                                          <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 font-bold text-[10px]">
+                                            <span>A VENCER</span>
+                                          </div>
+                                        )}
+
+                                        {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                                        <span
+                                          className={`font-mono text-[10px] font-bold px-2 py-0.5 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
+                                            isPaid
+                                              ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                              : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
+                                          }`}
+                                          title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
+                                        >
                                           R$ {instAmount.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                                        </div>
-                                      </div>
-                                      {/* Removido botões daqui */}
-                                      <div className="hidden">
-                                        <div className="flex items-center justify-center gap-1.5 flex-wrap">
-                                          {/* botões removidos */}
-                                        </div>
+                                        </span>
                                       </div>
                                     </td>
 
-                                    {/* 6. SITUAÇÃO */}
+                                    {/* 6. BOTÃO DE QUITAR NA TELA */}
                                     <td className="py-3 px-2 text-center align-middle whitespace-nowrap">
-                                      {isPaid ? (
-                                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-emerald-300 bg-emerald-50 text-emerald-700 font-bold text-[10px]">
-                                          <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                                          <span>PAGO</span>
-                                        </div>
-                                      ) : isLate ? (
-                                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-red-300 bg-red-50 text-red-700 font-bold text-[10px] animate-pulse">
-                                          <span className="material-symbols-outlined text-[12px]">warning</span>
-                                          <span>ATRASADA</span>
-                                        </div>
-                                      ) : (
-                                        <div className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-lg border border-amber-300 bg-amber-50 text-amber-700 font-bold text-[10px]">
-                                          <span>A VENCER</span>
-                                        </div>
-                                      )}
+                                      <div className="flex items-center justify-center">
+                                        {!isPaid ? (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onSettleInstallment(inst);
+                                            }}
+                                            className="px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white rounded-xl text-xs font-black shadow-xs flex items-center justify-center gap-1 cursor-pointer border border-emerald-500/60 transition-all uppercase tracking-wider"
+                                            title="Quitar / Dar baixa nesta parcela"
+                                          >
+                                            <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                                            <span>Quitar</span>
+                                          </button>
+                                        ) : (
+                                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 font-extrabold text-[10.5px]">
+                                            <span className="material-symbols-outlined text-[13px] text-emerald-600">verified</span>
+                                            <span>Quitado</span>
+                                          </span>
+                                        )}
+                                      </div>
                                     </td>
 
                                     {/* 7. AÇÕES */}
@@ -775,18 +868,36 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                               onSettleInstallment(inst);
                                             }
                                           }}
-                                          className="w-8 h-8 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border border-cyan-500/30 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
+                                          className="w-8 h-8 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-500 border border-cyan-500/30 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
                                           title={isPaid ? "Visualizar Recibo de Pagamento" : "Ver detalhes da situação / Quitar ou Pagar"}
                                         >
                                           <span className="material-symbols-outlined text-[18px]">visibility</span>
                                         </button>
+
+                                        {!isPaid && debtor.phone && (
+                                          <button
+                                            type="button"
+                                            onClick={() => onNudgeWhatsApp(
+                                              debtor.name,
+                                              `R$ ${safeToFixed(instAmount, 2)}`,
+                                              `Parcela ${inst.installmentNumber}/${inst.totalInstallments} (${inst.product})`,
+                                              inst.dueDate,
+                                              debtor.phone
+                                            )}
+                                            className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-600 border border-emerald-300 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
+                                            title="Cobrar via WhatsApp"
+                                          >
+                                            <WhatsAppIcon className="w-4 h-4 text-emerald-600" size={15} />
+                                          </button>
+                                        )}
+
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             onDeleteInstallment(inst.id);
                                           }}
-                                          className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
+                                          className="w-8 h-8 rounded-lg bg-red-500/10 hover:bg-red-500/20 text-red-500 border border-red-500/30 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
                                           title="Excluir parcela permanentemente"
                                         >
                                           <span className="material-symbols-outlined text-[18px]">delete</span>
@@ -1008,6 +1119,124 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
         onOpenNewPurchaseForDebtor={onOpenNewPurchaseForDebtor}
         onOpenExtratoTotal={onOpenExtratoTotal}
       />
+
+      {/* Modal de Opções de Edição ao clicar na foto do Devedor */}
+      {debtorForEditOption && (
+        <div
+          role="dialog"
+          aria-label="Opções de Edição do Devedor"
+          className="fixed inset-0 z-[9990] flex items-center justify-center p-3 bg-black/60 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={() => setDebtorForEditOption(null)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border-2 border-blue-400/50 overflow-hidden flex flex-col p-4 gap-3 text-slate-900 dark:text-slate-100 animate-in zoom-in-95 duration-150"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-slate-200 dark:border-slate-800">
+              <div className="flex items-center gap-2.5">
+                <SafeDebtorAvatar
+                  name={debtorForEditOption.debtor.name}
+                  avatar={debtorForEditOption.debtor.avatar}
+                  size="md"
+                  className="ring-2 ring-blue-500 shadow-xs"
+                />
+                <div className="min-w-0">
+                  <h4 className="font-black text-sm text-slate-900 dark:text-white truncate">
+                    {debtorForEditOption.debtor.name}
+                  </h4>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 font-mono truncate">
+                    {debtorForEditOption.debtor.phone || 'Sem telefone cadastrado'}
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDebtorForEditOption(null)}
+                className="w-7 h-7 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer text-xs font-bold"
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            <p className="text-xs text-slate-600 dark:text-slate-300 font-medium">
+              Selecione uma opção de gerenciamento para este devedor:
+            </p>
+
+            <div className="flex flex-col gap-2">
+              {/* Opção 1: Editar Cadastro Completo (Lápis) */}
+              <button
+                type="button"
+                onClick={() => {
+                  const deb = debtorForEditOption.debtor;
+                  setDebtorForEditOption(null);
+                  if (onEditDebtor) onEditDebtor(deb);
+                }}
+                className="w-full py-2.5 px-3 bg-blue-600 hover:bg-blue-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all cursor-pointer"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px]">edit</span>
+                  <span>Editar Cadastro Completo</span>
+                </span>
+                <span className="text-[10px] bg-blue-500/40 px-1.5 py-0.5 rounded">Lápis</span>
+              </button>
+
+              {/* Opção 2: Cobrança / Mensagem WhatsApp */}
+              {debtorForEditOption.debtor.phone && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const deb = debtorForEditOption.debtor;
+                    const inst = debtorForEditOption.installment;
+                    setDebtorForEditOption(null);
+                    onNudgeWhatsApp(
+                      deb.name,
+                      `R$ ${inst ? (inst.amount || inst.originalAmount || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 }) : safeToFixed(deb.totalOwed, 2)}`,
+                      inst ? inst.product : 'Extrato de compras',
+                      inst ? `${inst.installmentNumber}/${inst.totalInstallments}` : 'Todas parcelas',
+                      deb.phone
+                    );
+                  }}
+                  className="w-full py-2.5 px-3 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <WhatsAppIcon className="w-4 h-4 text-white" size={17} />
+                    <span>Enviar Mensagem no WhatsApp</span>
+                  </span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              )}
+
+              {/* Opção 3: Ver Tabela / Todas as Parcelas */}
+              <button
+                type="button"
+                onClick={() => {
+                  const debId = debtorForEditOption.debtor.id;
+                  setDebtorForEditOption(null);
+                  onNavigate('parcelas', debId);
+                }}
+                className="w-full py-2.5 px-3 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-750 active:scale-95 text-slate-800 dark:text-slate-200 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer border border-slate-200 dark:border-slate-700"
+              >
+                <span className="flex items-center gap-2">
+                  <span className="material-symbols-outlined text-[17px] text-blue-600">receipt_long</span>
+                  <span>Ver Tabela de Parcelas ({debtorForEditOption.debtor.name.split(' ')[0]})</span>
+                </span>
+                <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+              </button>
+            </div>
+
+            <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setDebtorForEditOption(null)}
+                className="py-1.5 px-3.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400 rounded-lg text-xs font-bold cursor-pointer"
+              >
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

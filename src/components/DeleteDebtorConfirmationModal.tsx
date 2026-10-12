@@ -59,31 +59,34 @@ export const DeleteDebtorConfirmationModal: React.FC<DeleteDebtorConfirmationMod
           </button>
         </div>
 
-        {/* Target Debtor Card Preview */}
-        <div className="bg-slate-900/80 rounded-2xl p-3.5 border border-white/10 flex items-center gap-3">
+        {/* Target Debtor Card Preview & Demo Specification */}
+        <div className="bg-slate-900/80 rounded-2xl p-3.5 border border-amber-500/30 flex items-center gap-3 relative">
+          <div className="absolute -top-2.5 right-3 bg-amber-500 text-slate-950 font-black text-[9px] px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
+            Usuário de Demonstração (Exemplo)
+          </div>
           <img
             src={debtor.avatar || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&auto=format&fit=crop&q=80'}
             alt={debtor.name}
-            className="w-11 h-11 rounded-full object-cover ring-2 ring-red-500/40 shrink-0"
+            className="w-11 h-11 rounded-full object-cover ring-2 ring-amber-500/50 shrink-0"
           />
-          <div className="min-w-0 flex-1">
+          <div className="min-w-0 flex-1 pt-1">
             <h4 className="font-extrabold text-white text-sm truncate">{debtor.name}</h4>
-            <p className="text-xs text-slate-400 truncate">
-              Vínculo: <strong className="text-slate-200">{debtor.relation || 'Cliente'}</strong> • Saldo: <strong className="text-amber-400 font-mono">R$ {debtor.totalOwed.toFixed(2)}</strong>
+            <p className="text-xs text-amber-300/90 truncate font-mono">
+              ID: {debtor.id} • Vínculo: {debtor.relation || 'Demonstração'}
             </p>
           </div>
         </div>
 
-        {/* STEP 1: PRIMEIRA PERGUNTA */}
+        {/* STEP 1: PRIMEIRA PERGUNTA ("Deseja excluir? Sim ou não") */}
         {step === 1 && (
           <div className="space-y-4 animate-fadeIn">
             <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-center">
               <span className="material-symbols-outlined text-4xl text-red-400 mb-2 block">warning</span>
-              <p className="text-sm font-bold text-white">
-                Deseja excluir este usuário, pessoa ou devedor do sistema?
+              <p className="text-base font-black text-white">
+                Deseja excluir? Sim ou não
               </p>
               <p className="text-xs text-slate-300 mt-1">
-                Ao excluir, o devedor <strong className="text-red-300">{debtor.name}</strong> será movido para a lixeira temporária.
+                Este é um usuário de demonstração ({debtor.name}). Ao confirmar, ele será removido da carteira.
               </p>
             </div>
 
@@ -93,14 +96,14 @@ export const DeleteDebtorConfirmationModal: React.FC<DeleteDebtorConfirmationMod
                 onClick={handleReset}
                 className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white font-bold text-xs transition-all cursor-pointer border border-slate-700"
               >
-                Não, Cancelar
+                Não
               </button>
               <button
                 type="button"
                 onClick={handleNextStep1}
                 className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-black text-xs transition-all shadow-lg hover:shadow-red-500/30 cursor-pointer flex items-center justify-center gap-1.5"
               >
-                <span>Sim, Excluir</span>
+                <span>Sim</span>
                 <span className="material-symbols-outlined text-[16px]">arrow_forward</span>
               </button>
             </div>

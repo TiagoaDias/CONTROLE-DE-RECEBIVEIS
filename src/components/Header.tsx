@@ -33,12 +33,14 @@ interface HeaderProps {
   onToggleTheme?: () => void;
   onToast?: (msg: string) => void;
   onSettleInstallment?: (inst: Installment) => void;
+  onOpenCredorScore?: () => void;
   onNudgeWhatsApp?: (
     debtorName: string,
     amount: string,
     product: string,
     parcel: string,
-    debtorPhone?: string
+    debtorPhone?: string,
+    dueDate?: string
   ) => void;
 }
 
@@ -70,6 +72,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToggleTheme,
   onToast,
   onSettleInstallment,
+  onOpenCredorScore,
   onNudgeWhatsApp,
 }) => {
   const [isTestingFirebase, setIsTestingFirebase] = useState(false);
@@ -182,27 +185,7 @@ export const Header: React.FC<HeaderProps> = ({
             />
           </div>
 
-          {/* Search bar & Push Notifications */}
-          <div className="flex items-center gap-2 lg:gap-3 shrink-0">
-            <div className="relative w-48 sm:w-60 md:w-72 lg:w-80">
-              <input
-                type="search"
-                value={searchQuery}
-                onChange={(e) => onSearchChange(e.target.value)}
-                placeholder="Buscar devedor..."
-                className="w-full h-9 px-3 pr-6 bg-slate-50 text-slate-800 placeholder:text-slate-400 text-xs rounded-xl outline-none border border-slate-200 focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/10 transition-all"
-              />
-              {searchQuery && (
-                <button
-                  type="button"
-                  onClick={() => onSearchChange('')}
-                  className="absolute right-2 text-slate-400 hover:text-slate-600 top-2.5 cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[15px]">close</span>
-                </button>
-              )}
-            </div>
-
+          <div className="flex items-center gap-3 shrink-0">
             <PushNotificationManager
               installments={installments}
               debtors={debtors}
@@ -212,71 +195,82 @@ export const Header: React.FC<HeaderProps> = ({
               onNudgeWhatsApp={onNudgeWhatsApp}
               isDarkMode={isDarkMode}
             />
+
+            {onOpenCredorScore && (
+              <button
+                onClick={onOpenCredorScore}
+                className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 hover:from-violet-500 hover:to-indigo-500 text-white font-bold text-xs shadow-md shadow-violet-600/30 flex items-center gap-1.5 transition-all cursor-pointer animate-pulse"
+                title="Botão Mágico — Score do Credor & Controle de Limite"
+              >
+                <span className="material-symbols-outlined text-[16px]">auto_awesome</span>
+                <span>Score do Credor</span>
+              </button>
+            )}
+
+            <button
+              onClick={() => onNavigate('perfil')}
+              aria-label="Perfil do usuário"
+              className="w-9 h-9 rounded-full overflow-hidden ring-2 ring-blue-600/20 hover:ring-blue-600 transition-all cursor-pointer shadow-xs"
+            >
+              <img
+                src={userAvatar}
+                alt={userName}
+                className="w-full h-full object-cover"
+              />
+            </button>
           </div>
         </div>
 
         {/* Mobile View Header (< md:) */}
-        <div className="md:hidden flex flex-col justify-between py-2 gap-1.5">
-          {/* Top line with Logo and Branding */}
-          <div className="flex items-center justify-between h-11 gap-2 w-full">
-            <div
-              onClick={() => onNavigate('inicio')}
-              className="flex items-center gap-2 cursor-pointer min-w-0 flex-1"
-            >
-              <div className="shrink-0">
-                <HaspahoLogo size="xs" variant="icon" darkTheme={isDarkMode} />
-              </div>
-              <div className="flex flex-col min-w-0">
-                <span className={`font-black text-xs leading-tight tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                  HASPAHO
-                </span>
-                <span className={`text-[10px] font-bold leading-none truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                  DESENVOLVEDOR FULL STACK
-                </span>
-              </div>
+        <div className="md:hidden flex items-center justify-between h-14 gap-2 w-full">
+          <div
+            onClick={() => onNavigate('inicio')}
+            className="flex items-center gap-2 cursor-pointer min-w-0 flex-1"
+          >
+            <div className="shrink-0">
+              <HaspahoLogo size="xs" variant="icon" darkTheme={isDarkMode} />
             </div>
-
-            <div className="flex items-center gap-1.5 shrink-0">
-              <PushNotificationManager
-                installments={installments}
-                debtors={debtors}
-                onToast={onToast}
-                onNavigateToParcelas={() => onNavigate('parcelas')}
-                onSettleInstallment={onSettleInstallment}
-                onNudgeWhatsApp={onNudgeWhatsApp}
-                isDarkMode={isDarkMode}
-              />
-              <button
-                onClick={() => onNavigate('perfil')}
-                aria-label="Perfil do usuário"
-                className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-blue-600/20 hover:ring-blue-600 transition-all cursor-pointer shadow-xs"
-              >
-                <img
-                  src={userAvatar}
-                  alt={userName}
-                  className="w-full h-full object-cover"
-                />
-              </button>
+            <div className="flex flex-col min-w-0">
+              <span className={`font-black text-xs leading-tight tracking-tight truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                HASPAHO
+              </span>
+              <span className={`text-[10px] font-bold leading-none truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
+                DESENVOLVEDOR FULL STACK
+              </span>
             </div>
           </div>
 
-          {/* Mobile Second Line: Search Bar */}
-          <div className="relative w-full mt-1.5">
-            <input
-              type="search"
-              value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Buscar devedor..."
-              className="w-full h-9 px-3 pr-8 bg-slate-100 text-slate-800 placeholder:text-slate-400 text-xs rounded-xl outline-none focus:bg-white focus:ring-2 focus:ring-blue-500/20 transition-all"
-            />
-            {searchQuery && (
+          <div className="flex items-center gap-1.5 shrink-0">
+            {onOpenCredorScore && (
               <button
-                onClick={() => onSearchChange('')}
-                className="absolute right-2.5 text-slate-400 hover:text-slate-600 top-2 cursor-pointer"
+                onClick={onOpenCredorScore}
+                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-[11px] shadow-sm flex items-center gap-1 cursor-pointer"
+                title="Score do Credor"
               >
-                <span className="material-symbols-outlined text-[16px]">close</span>
+                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                <span>Score</span>
               </button>
             )}
+            <PushNotificationManager
+              installments={installments}
+              debtors={debtors}
+              onToast={onToast}
+              onNavigateToParcelas={() => onNavigate('parcelas')}
+              onSettleInstallment={onSettleInstallment}
+              onNudgeWhatsApp={onNudgeWhatsApp}
+              isDarkMode={isDarkMode}
+            />
+            <button
+              onClick={() => onNavigate('perfil')}
+              aria-label="Perfil do usuário"
+              className="w-8 h-8 rounded-full overflow-hidden ring-2 ring-blue-600/20 hover:ring-blue-600 transition-all cursor-pointer shadow-xs"
+            >
+              <img
+                src={userAvatar}
+                alt={userName}
+                className="w-full h-full object-cover"
+              />
+            </button>
           </div>
         </div>
       </div>

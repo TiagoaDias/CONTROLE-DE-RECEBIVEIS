@@ -77,6 +77,7 @@ import { SystemHealthAlertModal } from './components/SystemHealthAlertModal';
 import { systemHealthSentinel } from './utils/systemHealthSentinel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FuturisticCosmicBackground } from './components/FuturisticCosmicBackground';
+import { CredorScoreModal } from './components/CredorScoreModal';
 import { GeminiParsedContract } from './types';
 
 const DEFAULT_USER: UserAccount = TIAGO_DIAS_USER;
@@ -154,6 +155,7 @@ export default function App() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   // A apresentação inicia sempre como fechada no carregamento para nunca reaparecer em reload
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
+  const [isCredorScoreOpen, setIsCredorScoreOpen] = useState(false);
 
   // Domain data in state - with robust LocalStorage persistence and fallback per user ID
   const [debtors, setDebtors] = useState<Debtor[]>(() => {
@@ -164,6 +166,9 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
+          if (parsed.length > 2 || parsed.some((d: any) => d.id === 'd1' || d.id === 'd-jubileu')) {
+            return INITIAL_DEBTORS;
+          }
           return parsed.map((d: Debtor) => ({
             ...d,
             totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
@@ -176,7 +181,7 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    return [];
+    return INITIAL_DEBTORS;
   });
 
   const [purchases, setPurchases] = useState<Purchase[]>(() => {
@@ -186,13 +191,18 @@ export default function App() {
       const saved = localStorage.getItem(`haspaho_purchases_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_purchases') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 2 || parsed.some((p: any) => p.id === 'p1' || p.id === 'p-jubileu')) {
+            return INITIAL_PURCHASES;
+          }
+          return parsed;
+        }
       }
       return isMaster ? INITIAL_PURCHASES : [];
     } catch (e) {
       console.error(e);
     }
-    return [];
+    return INITIAL_PURCHASES;
   });
 
   const [installments, setInstallments] = useState<Installment[]>(() => {
@@ -202,13 +212,18 @@ export default function App() {
       const saved = localStorage.getItem(`haspaho_installments_${activeUser.id}`) || (isMaster ? localStorage.getItem('haspaho_installments') : null);
       if (saved) {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
+        if (Array.isArray(parsed)) {
+          if (parsed.length > 20 || parsed.some((i: any) => i.purchaseId === 'p1' || i.purchaseId === 'p-jubileu')) {
+            return INITIAL_INSTALLMENTS;
+          }
+          return parsed;
+        }
       }
       return isMaster ? INITIAL_INSTALLMENTS : [];
     } catch (e) {
       console.error(e);
     }
-    return [];
+    return INITIAL_INSTALLMENTS;
   });
 
   const [institutions] = useState<BankInstitution[]>(INITIAL_INSTITUTIONS);
@@ -1200,16 +1215,17 @@ export default function App() {
     amount: string,
     item: string,
     parcel: string,
-    phone?: string
+    phone?: string,
+    dueDate?: string
   ) => {
     const debtor = debtors.find((d) => d.name === name);
     setWhatsAppData({
       isOpen: true,
       debtorName: name,
-      phone: phone || debtor?.phone || '(11) 98765-4321',
+      phone: phone || debtor?.phone || '(14) 99733-9863',
       amount,
       product: `${item} (${parcel})`,
-      dueDate: '10/09/2026',
+      dueDate: dueDate || '10/09/2026',
     });
   };
 
@@ -2395,6 +2411,7 @@ export default function App() {
         installments={installments}
         onToast={showToast}
         onSettleInstallment={handleSettleInstallment}
+        onOpenCredorScore={() => setIsCredorScoreOpen(true)}
         onNudgeWhatsApp={handleNudgeWhatsApp}
         onOpenNewDebtor={() => setIsNewDebtorModalOpen(true)}
         onEditDebtor={handleOpenEditDebtor}
@@ -2426,11 +2443,13 @@ export default function App() {
       {/* Main Screen Container - Fluid Full Width Design (No empty side margins) */}
       <main
         className={`flex-1 w-full relative ${
-          currentTab === 'erp-legacy' || currentTab === 'admin-forum'
-            ? 'px-1 sm:px-3 lg:px-4 pt-20 md:pt-20 pb-6'
+          currentTab === 'erp-legacy'
+            ? 'px-0 sm:px-2 lg:px-3 pt-14 sm:pt-16 pb-6 sm:pb-8'
+            : currentTab === 'admin-forum'
+            ? 'px-1 sm:px-3 lg:px-4 pt-16 md:pt-20 pb-6'
             : isStackScreen
-            ? 'px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-20 md:pt-20 pb-36 sm:pb-28'
-            : 'px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 pt-28 sm:pt-28 md:pt-20 pb-36 sm:pb-28'
+            ? 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-20 md:pt-20 pb-36 sm:pb-28'
+            : 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-24 sm:pt-28 md:pt-20 pb-36 sm:pb-28'
         }`}
       >
         <ErrorBoundary fallbackTitle="Visualização em Recuperação" onReset={() => handleNavigate('dashboard')}>
@@ -2754,6 +2773,17 @@ export default function App() {
           user={currentUser}
         />
       )}
+
+      {/* Botão Mágico — Score do Credor Modal */}
+      <CredorScoreModal
+        isOpen={isCredorScoreOpen}
+        onClose={() => setIsCredorScoreOpen(false)}
+        debtors={debtors}
+        installments={installments}
+        purchases={purchases}
+        isDarkMode={theme === 'dark'}
+        onToast={showToast}
+      />
 
       {/* Pre-Registration Portal Modal for clients clicking WhatsApp link */}
       <PreRegistrationPortalModal

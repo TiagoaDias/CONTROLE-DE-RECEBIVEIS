@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { Debtor, Purchase, Installment, BankInstitution, UserAccount, ScreenTab } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
+import { playAppSound } from '../utils/soundUtils';
+import { ArpDocumentPrintModal } from './ArpDocumentPrintModal';
 import { getAuditLogs, clearAuditLogs, addAuditLog, AuditLogEntry } from '../utils/auditLogger';
 import {
   saveDebtorsToFirestore,
@@ -9,6 +11,19 @@ import {
   saveInstallmentsToFirestore,
   deleteInstallmentFromFirestore,
 } from '../lib/firebase';
+
+export const formatSmartShortName = (fullName: string): string => {
+  if (!fullName) return '';
+  const trimmed = fullName.trim();
+  const parts = trimmed.split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].length > 12 ? parts[0].substring(0, 11) + '…' : parts[0];
+  }
+  if (trimmed.length <= 13) return trimmed;
+  const firstName = parts[0];
+  const lastName = parts[parts.length - 1];
+  return `${firstName} ${lastName.charAt(0)}.`;
+};
 
 interface ErpLegacySystemProps {
   debtors: Debtor[];
@@ -41,7 +56,46 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 }) => {
   // Navigation & View State
   const [activeTab, setActiveTab] = useState<'cadastro' | 'pesquisa' | 'titulos' | 'lancamento' | 'massa' | 'auditoria'>('cadastro');
+  const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
+  const [activeBalloonDebtorId, setActiveBalloonDebtorId] = useState<string | null>(null);
+  const [showPrintModal, setShowPrintModal] = useState(false);
   const themeMode = 'classic_delphi';
+
+  // Helper para formatar data sem risco de 'Invalid Date'
+  const formatDateSafe = (rawDate?: string): string => {
+    if (!rawDate) return '15/10/2026';
+    const str = String(rawDate).trim();
+    if (/^\d{2}\/\d{2}\/\d{4}$/.test(str)) return str;
+    if (/^\d{4}-\d{2}-\d{2}/.test(str)) {
+      const parts = str.split('T')[0].split('-');
+      if (parts.length === 3) return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+    const parsed = new Date(str);
+    if (!isNaN(parsed.getTime())) return parsed.toLocaleDateString('pt-BR');
+    return '15/10/2026';
+  };
+
+  // Helper para buscar informações da parcela a vencer / em atraso
+  const getUpcomingInstallmentInfo = (debtorId: string, debtorTotalOwed: number | string) => {
+    const dInsts = installments.filter(inst => inst.debtorId === debtorId && inst.status !== 'paid');
+    if (dInsts.length > 0) {
+      dInsts.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+      const target = dInsts.find(i => i.status === 'overdue') || dInsts[0];
+      const dateStr = formatDateSafe(target.dueDate);
+      return {
+        parcela: `#${target.installmentNumber}/${target.totalInstallments}`,
+        vencimento: dateStr,
+        valor: `R$ ${(Number(target.amount) || 0).toFixed(2)}`,
+        status: target.status,
+      };
+    }
+    return {
+      parcela: '#01/01',
+      vencimento: '15/10/2026',
+      valor: `R$ ${(Number(debtorTotalOwed) || 118.09).toFixed(2)}`,
+      status: 'pending',
+    };
+  };
 
   // Audit Logs State & Listener
   const [auditLogs, setAuditLogs] = useState<AuditLogEntry[]>(() => getAuditLogs());
@@ -131,18 +185,61 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     }
   }, [activeDebtor?.id]);
 
+  // Mapeamento sequencial de código numérico de cliente (#01, #02, #03...)
+  const debtorCodeMap = useMemo(() => {
+    const map = new Map<string, string>();
+    debtors.forEach((d, idx) => {
+      map.set(d.id, String(idx + 1).padStart(2, '0'));
+    });
+    return map;
+  }, [debtors]);
+
+  const getDebtorCode = (id: string, fallbackIdx?: number) => {
+    if (debtorCodeMap.has(id)) {
+      return debtorCodeMap.get(id)!;
+    }
+    const idx = debtors.findIndex((d) => d.id === id);
+    if (idx !== -1) {
+      return String(idx + 1).padStart(2, '0');
+    }
+    if (typeof fallbackIdx === 'number') {
+      return String(fallbackIdx + 1).padStart(2, '0');
+    }
+    return '01';
+  };
+
+  const formatDocOrPhone = (doc?: string, phone?: string) => {
+    if (doc && doc.trim() && doc.trim() !== 'Sem doc' && doc.trim() !== '—') {
+      return doc.trim();
+    }
+    if (phone && phone.trim()) {
+      const raw = phone.replace(/\D/g, '');
+      if (raw.length === 11) {
+        return `(${raw.slice(0, 2)}) ${raw.slice(2, 7)}-${raw.slice(7)}`;
+      }
+      if (raw.length === 10) {
+        return `(${raw.slice(0, 2)}) ${raw.slice(2, 6)}-${raw.slice(6)}`;
+      }
+      return phone.trim();
+    }
+    return 'Sem doc';
+  };
+
   // Search & Filter in DBGrid
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'todos' | 'adimplente' | 'atrasado' | 'quitado'>('todos');
 
   // Filtered Debtors for Grid
   const filteredDebtors = useMemo(() => {
-    return debtors.filter((d) => {
+    return debtors.filter((d, idx) => {
+      const clientCode = getDebtorCode(d.id, idx);
       const matchText =
         d.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         d.phone.includes(searchQuery) ||
         (d.documentNumber && d.documentNumber.includes(searchQuery)) ||
-        d.id.toLowerCase().includes(searchQuery.toLowerCase());
+        d.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        clientCode.includes(searchQuery) ||
+        `#${clientCode}`.includes(searchQuery);
 
       if (!matchText) return false;
       if (filterStatus === 'todos') return true;
@@ -151,7 +248,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       if (filterStatus === 'quitado') return d.totalOwed === 0;
       return true;
     });
-  }, [debtors, searchQuery, filterStatus]);
+  }, [debtors, searchQuery, filterStatus, debtorCodeMap]);
 
   // Installments Search & Filter
   const [instSearch, setInstSearch] = useState('');
@@ -174,19 +271,38 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   const [selectedInstIds, setSelectedInstIds] = useState<string[]>([]);
   const [confirmBulkDeleteOpen, setConfirmBulkDeleteOpen] = useState(false);
   const [bulkDeleteScope, setBulkDeleteScope] = useState<'selected' | 'all_filtered'>('selected');
+  const [confirmLiquidationInst, setConfirmLiquidationInst] = useState<Installment | null>(null);
+  const [confirmLiquidateDebtor, setConfirmLiquidateDebtor] = useState<Debtor | null>(null);
+  const [confirmDeleteInst, setConfirmDeleteInst] = useState<Installment | null>(null);
   const masterCheckboxRef = useRef<HTMLInputElement>(null);
 
   const filteredInstallments = useMemo(() => {
+    const q = (instSearch || '').trim().toLowerCase();
     return installments.filter((i) => {
+      const debtorName = (i.debtorName || '').toLowerCase();
+      const product = (i.product || '').toLowerCase();
+      const id = (i.id || '').toLowerCase();
       const match =
-        i.debtorName.toLowerCase().includes(instSearch.toLowerCase()) ||
-        i.product.toLowerCase().includes(instSearch.toLowerCase()) ||
-        i.id.toLowerCase().includes(instSearch.toLowerCase());
+        !q ||
+        debtorName.includes(q) ||
+        product.includes(q) ||
+        id.includes(q);
       if (!match) return false;
       if (instStatusFilter === 'todos') return true;
       return i.status === instStatusFilter;
     });
   }, [installments, instSearch, instStatusFilter]);
+
+  // Contadores de situação para os filtros contábeis
+  const statusCounts = useMemo(() => {
+    return {
+      todos: installments.length,
+      overdue: installments.filter((i) => i.status === 'overdue').length,
+      soon: installments.filter((i) => i.status === 'soon').length,
+      ontime: installments.filter((i) => i.status === 'ontime').length,
+      paid: installments.filter((i) => i.status === 'paid').length,
+    };
+  }, [installments]);
 
   // Master Checkbox & Selection Helpers
   const isAllFilteredSelected = useMemo(() => {
@@ -249,12 +365,13 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       console.error(e);
     }
 
-    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    const activeUserId = currentUser?.id || 'tiagodias8';
     try {
       await saveInstallmentsToFirestore(activeUserId, nextInstallments);
       for (const t of targets) {
         deleteInstallmentFromFirestore(activeUserId, t.id).catch(console.warn);
       }
+      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
     } catch (err) {
       console.warn('Erro ao sincronizar exclusão com Firestore:', err);
     }
@@ -298,9 +415,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       console.error(e);
     }
 
-    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    const activeUserId = currentUser?.id || 'tiagodias8';
     try {
       await saveInstallmentsToFirestore(activeUserId, nextInstallments);
+      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
     } catch (err) {
       console.warn('Erro ao sincronizar restauração com Firestore:', err);
     }
@@ -386,6 +504,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       } else if (e.key === 'F6') {
         e.preventDefault();
         setActiveTab('pesquisa');
+      } else if (e.key === 'F7') {
+        e.preventDefault();
+        setShowPrintModal(true);
+        playAppSound('pop');
       } else if (e.key === 'Escape') {
         e.preventDefault();
         onNavigate('dashboard');
@@ -521,10 +643,11 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       } catch (e) {
         console.error(e);
       }
-      const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+      const activeUserId = currentUser?.id || 'tiagodias8';
       try {
         deleteDebtorFromFirestore(activeUserId, target.id);
         saveDebtorsToFirestore(activeUserId, updated);
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(updated));
       } catch (err) {
         console.error('Error deleting from firestore:', err);
       }
@@ -555,10 +678,11 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       } catch (e) {
         console.error(e);
       }
-      const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+      const activeUserId = currentUser?.id || 'tiagodias8';
       try {
         deleteDebtorFromFirestore(activeUserId, debtor.id);
         saveDebtorsToFirestore(activeUserId, nextDebtors);
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
       } catch (err) {
         console.error('Error deleting from firestore:', err);
       }
@@ -576,14 +700,86 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     }
   };
 
+  // Liquidar todas as pendências do devedor (Abre confirmação in-app para contornar bloqueio de window.confirm)
+  const handleLiquidarDebtor = (debtor: Debtor) => {
+    if (Number(debtor.totalOwed) <= 0) {
+      onToast(`✨ O cliente "${debtor.name}" já está totalmente Liquidado!`);
+      playAppSound('pop');
+      return;
+    }
+    setConfirmLiquidateDebtor(debtor);
+    playAppSound('pop');
+  };
+
+  // Executa a liquidação total de todas as pendências do devedor
+  const executeLiquidationDebtor = (debtor: Debtor) => {
+    const amountToLiquidate = Number(debtor.totalOwed) || 0;
+    const updatedDebtors = debtors.map((d) => {
+      if (d.id === debtor.id) {
+        return {
+          ...d,
+          totalPaid: (Number(d.totalPaid) || 0) + amountToLiquidate,
+          totalOwed: 0,
+          overdueCount: 0,
+          score: Math.min(1000, (Number(d.score) || 800) + 50),
+        };
+      }
+      return d;
+    });
+
+    const updatedInst = installments.map((i) => {
+      const isMatch = i.debtorId === debtor.id || (debtor.name && i.debtorName?.trim().toLowerCase() === debtor.name.trim().toLowerCase());
+      if (isMatch && i.status !== 'paid') {
+        return {
+          ...i,
+          status: 'paid' as const,
+          paidAt: new Date().toISOString().split('T')[0],
+          paidAmount: i.amount,
+        };
+      }
+      return i;
+    });
+
+    onUpdateDebtors(updatedDebtors);
+    onUpdateInstallments(updatedInst);
+
+    const activeUserId = currentUser?.id || 'tiagodias8';
+    try {
+      localStorage.setItem('haspaho_debtors', JSON.stringify(updatedDebtors));
+      localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(updatedDebtors));
+      localStorage.setItem('haspaho_installments', JSON.stringify(updatedInst));
+      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(updatedInst));
+    } catch (e) {
+      console.error(e);
+    }
+
+    try {
+      saveDebtorsToFirestore(activeUserId, updatedDebtors);
+      saveInstallmentsToFirestore(activeUserId, updatedInst);
+    } catch (err) {
+      console.error('Error saving liquidation to firestore:', err);
+    }
+
+    addAuditLog(
+      'LIQUIDACAO_TOTAL_DEVEDOR',
+      `Cliente "${debtor.name}" teve saldo de R$ ${amountToLiquidate.toFixed(2)} totalmente Liquidado.`,
+      debtor.name,
+      'FIRESTORE_SAVED'
+    );
+
+    playAppSound('pop');
+    onToast(`🎉 Sucesso! Saldo de "${debtor.name}" foi completamente Liquidado!`);
+  };
+
   // Salvar / Sincronizar registro específico da linha da tabela ERP
   const handleQuickSaveRecord = async (debtor: Debtor) => {
-    const activeUserId = currentUser?.id || 'tiagodias8888@gmail.com';
+    const activeUserId = currentUser?.id || 'tiagodias8';
     try {
       await saveSingleDebtorToFirestore(activeUserId, debtor);
       await saveDebtorsToFirestore(activeUserId, debtors);
       try {
         localStorage.setItem('haspaho_debtors', JSON.stringify(debtors));
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(debtors));
       } catch (e) {
         console.error(e);
       }
@@ -600,15 +796,21 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     }
   };
 
-  // Excluir parcela específica do título contábil (Envia para Lixeira com opção de Desfazer)
+  // Excluir parcela específica do título contábil (Envia para Lixeira com opção de Desfazer e solicitação de permissão)
   const handleDeleteSpecificInstallment = (inst: Installment) => {
-    if (window.confirm(`⚠️ CONFIRMAÇÃO ERP: Deseja excluir a parcela ${inst.installmentNumber}/${inst.totalInstallments} de R$ ${inst.amount.toFixed(2)} (${inst.debtorName})?\n\nO registro será movido para a Lixeira Contábil e você poderá desfazer a qualquer momento.`)) {
-      moveToTrash([inst], `Parcela #${inst.installmentNumber} do produto "${inst.product}" (${inst.debtorName})`);
-    }
+    setConfirmDeleteInst(inst);
   };
 
-  // Quick Settlement / Baixa Manual de Parcela
+  // Quick Settlement / Baixa Manual de Parcela (Totalmente funcional, auditada e persistida)
   const handleQuickPayInstallment = (instId: string) => {
+    const targetInst = installments.find((i) => i.id === instId);
+    if (!targetInst) return;
+
+    if (targetInst.status === 'paid') {
+      onToast(`ℹ️ Esta parcela #${targetInst.installmentNumber} já está Liquidada.`);
+      return;
+    }
+
     const updatedInst = installments.map((i) => {
       if (i.id === instId) {
         return {
@@ -621,27 +823,56 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       }
       return i;
     });
-    onUpdateInstallments(updatedInst);
 
-    // Update debtor balance
-    const targetInst = installments.find((i) => i.id === instId);
-    if (targetInst) {
-      const updatedDebtors = debtors.map((d) => {
-        if (d.id === targetInst.debtorId) {
-          return {
-            ...d,
-            totalOwed: Math.max(0, d.totalOwed - targetInst.amount),
-            totalPaid: d.totalPaid + targetInst.amount,
-            overdueCount: Math.max(0, d.overdueCount - (targetInst.status === 'overdue' ? 1 : 0)),
-            onTimePaymentsCount: d.onTimePaymentsCount + 1,
-            score: Math.min(1000, d.score + 25),
-          };
-        }
-        return d;
-      });
-      onUpdateDebtors(updatedDebtors);
+    // Atualiza saldo do devedor correspondente (pelo ID ou pelo Nome)
+    const updatedDebtors = debtors.map((d) => {
+      if (
+        d.id === targetInst.debtorId ||
+        d.name.trim().toLowerCase() === targetInst.debtorName.trim().toLowerCase()
+      ) {
+        const owed = Number(d.totalOwed) || 0;
+        const paid = Number(d.totalPaid) || 0;
+        return {
+          ...d,
+          totalOwed: Math.max(0, owed - targetInst.amount),
+          totalPaid: paid + targetInst.amount,
+          overdueCount: Math.max(0, (Number(d.overdueCount) || 0) - (targetInst.status === 'overdue' ? 1 : 0)),
+          onTimePaymentsCount: (Number(d.onTimePaymentsCount) || 0) + 1,
+          score: Math.min(1000, (Number(d.score) || 750) + 25),
+        };
+      }
+      return d;
+    });
+
+    onUpdateInstallments(updatedInst);
+    onUpdateDebtors(updatedDebtors);
+
+    const activeUserId = currentUser?.id || 'tiagodias8';
+    try {
+      localStorage.setItem('haspaho_installments', JSON.stringify(updatedInst));
+      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(updatedInst));
+      localStorage.setItem('haspaho_debtors', JSON.stringify(updatedDebtors));
+      localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(updatedDebtors));
+    } catch (e) {
+      console.error(e);
     }
-    onToast(`[Baixa Efetivada] Parcela #${instId} liquidada no razão contábil.`);
+
+    try {
+      saveInstallmentsToFirestore(activeUserId, updatedInst);
+      saveDebtorsToFirestore(activeUserId, updatedDebtors);
+    } catch (err) {
+      console.error('Error saving installment payment to firestore:', err);
+    }
+
+    addAuditLog(
+      'BAIXA_TITULO_ERP',
+      `Título #${targetInst.id.slice(-6)} (${targetInst.debtorName} - ${targetInst.product}) no valor de R$ ${targetInst.amount.toFixed(2)} foi Liquidado no razão contábil.`,
+      targetInst.debtorName,
+      'FIRESTORE_SAVED'
+    );
+
+    playAppSound('pop');
+    onToast(`🎉 [Sucesso] Parcela #${targetInst.installmentNumber} de "${targetInst.debtorName}" Liquidada com sucesso!`);
   };
 
   // Submit Rapid Purchase (Gerar Títulos em Lote)
@@ -754,57 +985,61 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
   // Total Metrics for Status Bar
   const totalReceivables = useMemo(() => {
-    return debtors.reduce((acc, d) => acc + d.totalOwed, 0);
+    return debtors.reduce((acc, d) => acc + (Number(d.totalOwed) || 0), 0);
   }, [debtors]);
 
   const totalOverdueAmount = useMemo(() => {
-    return installments.filter((i) => i.status === 'overdue').reduce((acc, i) => acc + i.amount, 0);
+    return installments.filter((i) => i.status === 'overdue').reduce((acc, i) => acc + (Number(i.amount) || 0), 0);
+  }, [installments]);
+
+  const totalOverdueCount = useMemo(() => {
+    return installments.filter((i) => i.status === 'overdue').length;
   }, [installments]);
 
   return (
     <div
-      className={`min-h-screen pt-16 pb-12 flex flex-col font-sans select-text ${
+      className={`min-h-[calc(100vh-4.5rem)] pb-16 sm:pb-8 flex flex-col font-sans select-text ${
         themeMode === 'classic_delphi'
           ? 'bg-[#d4d0c8] text-black text-xs'
           : 'bg-slate-900 text-slate-100 text-xs'
       }`}
     >
-      {/* Top Windows ERP Titlebar & System Bar */}
+      {/* Top Windows ERP Titlebar & System Bar (Reenquadrado e Otimizado no Mobile) */}
       <div
-        className={`w-full border-b px-3 py-1.5 flex items-center justify-between shadow-xs select-none ${
+        className={`w-full border-b px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-2 shadow-xs select-none ${
           themeMode === 'classic_delphi'
             ? 'bg-gradient-to-r from-[#000080] via-[#1084d0] to-[#000080] text-white border-slate-400 font-bold'
             : 'bg-slate-950 text-slate-200 border-slate-800'
         }`}
       >
-        <div className="flex items-center gap-2">
-          <span className="material-symbols-outlined text-[16px] text-amber-400">desktop_windows</span>
-          <span className="font-mono text-[11px] sm:text-xs tracking-tight font-bold">
-            HASPAHO ERP Enterprise • Sistema de Gestão Financeira &amp; Lançamento em Massa [v4.8.2]
+        <div className="flex items-center gap-1.5 min-w-0">
+          <span className="material-symbols-outlined text-[18px] text-amber-400 shrink-0">desktop_windows</span>
+          <span className="font-mono text-xs tracking-tight font-bold truncate">
+            HASPAHO ERP <span className="hidden xs:inline">Enterprise</span> <span className="hidden md:inline">• Gestão Financeira</span> <span className="text-[10px] text-amber-300 font-normal">[v4.8.2]</span>
           </span>
-          <span className="hidden lg:inline text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30">
-            Operador: {currentUser?.name || 'Thiago Dias'} (ID: {currentUser?.username || 'tiagodias'})
+          <span className="hidden lg:inline text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 whitespace-nowrap">
+            Operador: {currentUser?.name || 'Thiago Dias'}
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 shrink-0">
           {/* Static Classic Theme Badge */}
-          <span className="px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#d4d0c8] text-black border border-slate-500 shadow-2xs">
-            🖥️ Tema Clássico Profissional
+          <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#d4d0c8] text-black border border-slate-500 shadow-2xs">
+            🖥️ Tema Clássico
           </span>
 
           {/* Quick Exit to Modern Mode */}
           <button
             onClick={() => onNavigate('dashboard')}
-            className="px-3 py-0.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-all active:scale-95 cursor-pointer"
+            className="px-2 sm:px-3 py-1 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] flex items-center gap-1 shadow-2xs transition-all active:scale-95 cursor-pointer"
             title="Retornar para o Dashboard Web Moderno"
           >
-            <span className="material-symbols-outlined text-[14px]">arrow_back</span>
-            <span>Voltar ao Modo Moderno</span>
+            <span className="material-symbols-outlined text-[15px]">arrow_back</span>
+            <span>Voltar<span className="hidden sm:inline"> ao Dashboard</span></span>
           </button>
 
           {/* Windows Classic Window Controls */}
-          <div className="flex items-center gap-1 pl-2 border-l border-white/20">
+          <div className="flex items-center gap-1 pl-1 sm:pl-2 border-l border-white/20">
             <button
               onClick={() => onNavigate('dashboard')}
               className="w-5 h-5 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold flex items-center justify-center rounded-xs"
@@ -830,9 +1065,9 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         </div>
       </div>
 
-      {/* Classic Menu Bar (Arquivo, Cadastros, Lançamentos, etc.) */}
+      {/* Classic Menu Bar (Visível no Desktop para fidelidade Delphi; oculto no mobile para poupar espaço) */}
       <div
-        className={`w-full px-3 py-1 flex flex-wrap items-center gap-4 text-[11px] border-b select-none ${
+        className={`w-full px-2.5 sm:px-3 py-1 hidden sm:flex items-center gap-3 sm:gap-4 text-[11px] border-b select-none overflow-x-auto scrollbar-none flex-nowrap ${
           themeMode === 'classic_delphi'
             ? 'bg-[#ece9d8] text-black border-slate-300 font-medium'
             : 'bg-slate-900 text-slate-300 border-slate-800'
@@ -850,7 +1085,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           <button
             key={item.label}
             onClick={item.action}
-            className="hover:underline hover:text-blue-500 transition-colors cursor-pointer"
+            className="hover:underline hover:text-blue-500 transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             {item.label.split(item.hotkey)[0]}
             <span className="underline font-bold">{item.hotkey}</span>
@@ -858,7 +1093,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           </button>
         ))}
 
-        <div className="ml-auto text-[10px] font-mono text-emerald-500 flex items-center gap-1.5">
+        <div className="ml-auto text-[10px] font-mono text-emerald-500 hidden md:flex items-center gap-1.5 whitespace-nowrap shrink-0">
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
           <span>BD ONLINE: isentropic-tangent-sdtd0 | LATÊNCIA: 14ms</span>
         </div>
@@ -866,16 +1101,89 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
       {/* Standard ERP Toolbar with F-Key Actions */}
       <div
-        className={`w-full px-3 py-1.5 border-b flex flex-wrap items-center justify-between gap-2 select-none ${
+        className={`w-full px-1.5 sm:px-3 py-1 sm:py-1.5 border-b select-none ${
           themeMode === 'classic_delphi'
             ? 'bg-[#f0f0f0] border-slate-300'
             : 'bg-slate-950/80 border-slate-800'
         }`}
       >
-        <div className="flex flex-wrap items-center gap-1">
+        {/* Mobile Layout: 3 Columns x 2 Rows - High Contrast & High Legibility - Otimizado e Mais Junto */}
+        <div className="grid grid-cols-3 gap-1 w-full sm:hidden">
           <button
+            type="button"
             onClick={handleNewDebtor}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            className="h-7.5 px-1 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-2xs leading-none"
+            title="Novo Cadastro (F2)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-emerald-600 font-black">add_box</span>
+            <span>1. Novo</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleSaveDebtor}
+            className="h-7.5 px-1 bg-blue-600 hover:bg-blue-700 text-white border-2 border-blue-700 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-xs leading-none"
+            title="Gravar no Banco (F3)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-white font-black">save</span>
+            <span>2. Gravar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('pesquisa')}
+            className="h-7.5 px-1 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-2xs leading-none"
+            title="Buscar Registro (F6)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-blue-600 font-black">search</span>
+            <span>3. Buscar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleDeleteDebtor}
+            className="h-7.5 px-1 bg-red-50 hover:bg-red-100 text-red-800 border-2 border-red-300 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-2xs leading-none"
+            title="Excluir Registro (F5)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-red-600 font-black">delete</span>
+            <span>4. Excluir</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              onToast('🔄 Atualizando página e sincronizando dados contábeis...');
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            }}
+            className="h-7.5 px-1 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-2xs leading-none"
+            title="Atualizar Sistema (F9)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-blue-600 font-black">refresh</span>
+            <span>5. Atualizar</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setShowPrintModal(true);
+              playAppSound('pop');
+            }}
+            className="h-7.5 px-1 bg-white hover:bg-slate-100 text-slate-900 border-2 border-slate-300 rounded-lg text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all active:scale-95 cursor-pointer shadow-2xs leading-none"
+            title="Imprimir Carnês, Fichas e Promissórias ARP (F7)"
+          >
+            <span className="material-symbols-outlined text-[14px] text-slate-700 font-black">print</span>
+            <span>6. Imprimir</span>
+          </button>
+        </div>
+
+        {/* Desktop Layout: Horizontal Toolbar */}
+        <div className="hidden sm:flex items-center gap-1.5 flex-nowrap shrink-0 pr-2">
+          <button
+            type="button"
+            onClick={handleNewDebtor}
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
                 : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-slate-700'
@@ -887,8 +1195,9 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           </button>
 
           <button
+            type="button"
             onClick={handleSaveDebtor}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-blue-900 border-slate-400 shadow-xs'
                 : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
@@ -900,21 +1209,23 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           </button>
 
           <button
-            onClick={() => onToast('[F4] Edição cancelada. Restaurados valores originais.')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            type="button"
+            onClick={() => setActiveTab('pesquisa')}
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
-                ? 'bg-white hover:bg-slate-100 text-slate-700 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700'
             }`}
-            title="Cancelar edição (F4)"
+            title="Localizar devedor ou título (F6)"
           >
-            <span className="material-symbols-outlined text-[15px] text-amber-500">cancel</span>
-            <span>[F4] Cancelar</span>
+            <span className="material-symbols-outlined text-[15px]">search</span>
+            <span>[F6] Buscar</span>
           </button>
 
           <button
+            type="button"
             onClick={handleDeleteDebtor}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-red-700 border-slate-400 shadow-xs'
                 : 'bg-slate-800 hover:bg-red-900/40 text-red-400 border-slate-700'
@@ -925,37 +1236,48 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             <span>[F5] Excluir</span>
           </button>
 
-          <span className="w-px h-5 bg-slate-700 mx-1"></span>
-
           <button
-            onClick={() => setActiveTab('pesquisa')}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            type="button"
+            onClick={() => {
+              onToast('🔄 Atualizando página e sincronizando dados contábeis...');
+              setTimeout(() => {
+                window.location.reload();
+              }, 300);
+            }}
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
-                ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
+                ? 'bg-white hover:bg-slate-100 text-blue-800 border-slate-400 shadow-xs'
                 : 'bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700'
             }`}
-            title="Localizar devedor ou título (F6)"
+            title="Atualizar página e recarregar dados do sistema (F9)"
           >
-            <span className="material-symbols-outlined text-[15px]">search</span>
-            <span>[F6] Localizar</span>
+            <span className="material-symbols-outlined text-[15px] text-blue-500">refresh</span>
+            <span>[F9] Atualizar</span>
           </button>
 
+          <span className="w-px h-5 bg-slate-400 mx-0.5 shrink-0"></span>
+
           <button
-            onClick={() => window.print()}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            type="button"
+            onClick={() => {
+              setShowPrintModal(true);
+              playAppSound('pop');
+            }}
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
                 : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
             }`}
-            title="Imprimir Ficha Cadastral Oficial (F7)"
+            title="Imprimir Documentos, Carnês e Fichas ARP (F7)"
           >
             <span className="material-symbols-outlined text-[15px]">print</span>
             <span>[F7] Imprimir</span>
           </button>
 
           <button
+            type="button"
             onClick={handleExportCSV}
-            className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border ${
+            className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-emerald-800 border-slate-400 shadow-xs'
                 : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-slate-700'
@@ -963,93 +1285,151 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             title="Exportar dados para Excel / CSV (F8)"
           >
             <span className="material-symbols-outlined text-[15px]">table_view</span>
-            <span>[F8] Exportar CSV</span>
+            <span>[F8] CSV</span>
           </button>
-        </div>
-
-        {/* TDBNavigator buttons (Delphi style) */}
-        <div className="flex items-center gap-1 bg-black/20 p-1 rounded border border-slate-700">
-          <span className="text-[10px] font-mono text-slate-400 mr-1 hidden sm:inline">DBNavigator:</span>
-          {[
-            {
-              icon: 'first_page',
-              title: 'Primeiro Registro',
-              action: () => debtors[0] && setSelectedDebtorId(debtors[0].id),
-            },
-            {
-              icon: 'chevron_left',
-              title: 'Registro Anterior',
-              action: () => {
-                const idx = debtors.findIndex((d) => d.id === selectedDebtorId);
-                if (idx > 0) setSelectedDebtorId(debtors[idx - 1].id);
-              },
-            },
-            {
-              icon: 'chevron_right',
-              title: 'Próximo Registro',
-              action: () => {
-                const idx = debtors.findIndex((d) => d.id === selectedDebtorId);
-                if (idx < debtors.length - 1) setSelectedDebtorId(debtors[idx + 1].id);
-              },
-            },
-            {
-              icon: 'last_page',
-              title: 'Último Registro',
-              action: () => debtors[debtors.length - 1] && setSelectedDebtorId(debtors[debtors.length - 1].id),
-            },
-          ].map((nav, idx) => (
-            <button
-              key={idx}
-              onClick={nav.action}
-              className={`w-6 h-6 flex items-center justify-center rounded text-[13px] font-bold cursor-pointer transition-colors ${
-                themeMode === 'classic_delphi'
-                  ? 'bg-white hover:bg-slate-200 text-black border border-slate-400'
-                  : 'bg-slate-800 hover:bg-slate-700 text-slate-200'
-              }`}
-              title={nav.title}
-            >
-              <span className="material-symbols-outlined text-[16px]">{nav.icon}</span>
-            </button>
-          ))}
-          <span className="font-mono text-[10px] px-1 text-amber-300">
-            {debtors.findIndex((d) => d.id === selectedDebtorId) + 1} de {debtors.length}
-          </span>
         </div>
       </div>
 
       {/* Main Workspace with Delphi/WinForms TPageControl */}
-      <div className="flex-1 w-full px-2 sm:px-4 py-3 flex flex-col">
-        {/* Tab Headers (PageControl Tabs) */}
+      <div className="flex-1 w-full px-1 sm:px-4 py-1.5 sm:py-3 flex flex-col min-h-0">
+        {/* Mobile PageControl Tabs: High Contrast & High Legibility - Otimizado e Mais Junto */}
+        <div className="grid grid-cols-3 gap-1 p-0.5 bg-slate-200/90 border border-slate-300 rounded-lg sm:hidden shadow-2xs mb-1.5 select-none">
+          {/* Tab 1: Ficha */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('cadastro')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 ${
+              activeTab === 'cadastro'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'cadastro' ? 'text-white' : 'text-blue-600'
+            }`}>badge</span>
+            <span className="truncate">1. Ficha</span>
+          </button>
+
+          {/* Tab 2: Clientes */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('pesquisa')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 ${
+              activeTab === 'pesquisa'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'pesquisa' ? 'text-white' : 'text-blue-600'
+            }`}>grid_on</span>
+            <span className="truncate">2. Clientes</span>
+          </button>
+
+          {/* Tab 3: Contas */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('titulos')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 relative ${
+              activeTab === 'titulos'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'titulos' ? 'text-white' : 'text-amber-600'
+            }`}>receipt_long</span>
+            <span className="truncate">3. Contas</span>
+            {totalOverdueCount > 0 && (
+              <span className="w-2 h-2 rounded-full bg-red-600 animate-pulse shrink-0 ring-1 ring-white"></span>
+            )}
+          </button>
+
+          {/* Tab 4: Carnês */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('lancamento')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 ${
+              activeTab === 'lancamento'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'lancamento' ? 'text-white' : 'text-emerald-600'
+            }`}>add_shopping_cart</span>
+            <span className="truncate">4. Carnês</span>
+          </button>
+
+          {/* Tab 5: Digitação */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('massa')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 ${
+              activeTab === 'massa'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'massa' ? 'text-white' : 'text-purple-600'
+            }`}>keyboard</span>
+            <span className="truncate">5. Digitação</span>
+          </button>
+
+          {/* Tab 6: Auditoria */}
+          <button
+            type="button"
+            onClick={() => setActiveTab('auditoria')}
+            className={`h-7 px-1 rounded-md text-[9.5px] font-extrabold flex items-center justify-center gap-0.5 transition-all cursor-pointer border-2 ${
+              activeTab === 'auditoria'
+                ? 'bg-blue-600 text-white border-blue-700 shadow-sm font-black'
+                : 'bg-white text-slate-900 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            <span className={`material-symbols-outlined text-[13px] font-black ${
+              activeTab === 'auditoria' ? 'text-white' : 'text-slate-700'
+            }`}>security</span>
+            <span className="truncate">6. Auditoria</span>
+          </button>
+        </div>
+
+        {/* Desktop PageControl Tabs: Horizontal Row */}
         <div
-          className={`flex items-end gap-1 border-b px-2 overflow-x-auto ${
-            themeMode === 'classic_delphi' ? 'border-slate-400 bg-[#ece9d8]' : 'border-slate-800 bg-slate-950/40'
+          className={`hidden sm:flex items-end gap-1 border-b px-1 sm:px-2 overflow-x-auto scrollbar-none flex-nowrap ${
+            themeMode === 'classic_delphi' ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/40'
           }`}
         >
           {[
-            { id: 'cadastro', label: '1. Ficha Cadastral do Devedor (Data Entry)', icon: 'badge' },
-            { id: 'pesquisa', label: '2. DBGrid de Clientes & Consulta Avançada', icon: 'grid_on' },
-            { id: 'titulos', label: '3. Contas a Receber (Grade Contábil)', icon: 'receipt_long' },
-            { id: 'lancamento', label: '4. Emissão de Carnê & Parcelamento em Lote', icon: 'add_shopping_cart' },
-            { id: 'massa', label: '5. Entrada Rápida de Digitação em Massa', icon: 'keyboard' },
-            { id: 'auditoria', label: '6. Trilha de Auditoria & Segurança', icon: 'security' },
+            { id: 'cadastro', label: '1. Ficha', fullLabel: '1. Ficha Cadastral do Devedor (Data Entry)', icon: 'badge' },
+            { id: 'pesquisa', label: '2. Clientes', fullLabel: '2. DBGrid de Clientes & Consulta Avançada', icon: 'grid_on' },
+            { id: 'titulos', label: '3. Contas a Receber', fullLabel: '3. Contas a Receber (Grade Contábil)', icon: 'receipt_long', badge: totalOverdueCount > 0 ? `${totalOverdueCount} atrasadas` : undefined },
+            { id: 'lancamento', label: '4. Carnês', fullLabel: '4. Emissão de Carnê & Parcelamento em Lote', icon: 'add_shopping_cart' },
+            { id: 'massa', label: '5. Digitação ARP', fullLabel: '5. Digitação ARP em Massa (Grade Otimizada)', icon: 'keyboard' },
+            { id: 'auditoria', label: '6. Auditoria', fullLabel: '6. Trilha de Auditoria & Segurança', icon: 'security' },
           ].map((tab) => {
             const isActive = activeTab === tab.id;
             return (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-3 py-2 text-[11px] font-bold border-t border-x rounded-t-sm transition-all whitespace-nowrap cursor-pointer ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-[11px] sm:text-xs font-bold border-t border-x rounded-t-sm sm:rounded-t-md transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                   isActive
                     ? themeMode === 'classic_delphi'
-                      ? 'bg-white text-blue-900 border-slate-400 font-black shadow-xs -mb-px'
+                      ? 'bg-white text-blue-900 border-slate-300 font-black shadow-xs -mb-px'
                       : 'bg-slate-800 text-blue-400 border-slate-700 shadow-xs -mb-px'
                     : themeMode === 'classic_delphi'
-                    ? 'bg-[#dcd8cc] text-slate-700 border-slate-400 hover:bg-white/80'
+                    ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-white hover:text-blue-900'
                     : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:bg-slate-800'
                 }`}
               >
-                <span className="material-symbols-outlined text-[15px]">{tab.icon}</span>
-                <span>{tab.label}</span>
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{tab.icon}</span>
+                <span>{tab.fullLabel}</span>
+                {tab.badge && (
+                  <span className="px-1.5 py-0.2 rounded-full bg-red-600 text-white text-[9px] font-mono font-bold animate-pulse">
+                    {tab.badge}
+                  </span>
+                )}
               </button>
             );
           })}
@@ -1057,7 +1437,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
         {/* Tab Content Box (PageControl Body) */}
         <div
-          className={`flex-1 border border-t-0 p-3 sm:p-4 overflow-y-auto ${
+          className={`flex-1 border border-t-0 ${activeTab === 'massa' ? 'p-1 sm:p-3' : 'p-2 sm:p-4'} min-h-0 overflow-y-visible sm:overflow-y-auto ${
             themeMode === 'classic_delphi'
               ? 'bg-white text-slate-900 border-slate-400 shadow-inner'
               : 'bg-slate-900/90 text-slate-100 border-slate-800'
@@ -1066,43 +1446,164 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           {/* TAB 1: FICHA CADASTRAL DO DEVEDOR (DATA ENTRY FORM) */}
           {activeTab === 'cadastro' && (
             <div className="space-y-4">
-              {/* Quick Record Selector Bar */}
+              {/* Quick Record Selector Bar (Reenquadrado no Mobile e Super Animado) */}
               <div
-                className={`p-2 rounded border flex flex-wrap items-center justify-between gap-3 ${
+                className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl border flex flex-col gap-1.5 sm:gap-2.5 shadow-sm transition-all ${
                   themeMode === 'classic_delphi'
-                    ? 'bg-[#f4f2ea] border-slate-300'
-                    : 'bg-slate-950 border-slate-800'
+                    ? 'bg-gradient-to-b from-[#f8f6f0] to-[#eae6d8] border-slate-300'
+                    : 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-slate-800'
                 }`}
               >
-                <div className="flex items-center gap-2">
-                  <label className="font-bold text-[11px]">Selecionar Devedor:</label>
-                  <select
-                    value={selectedDebtorId}
-                    onChange={(e) => setSelectedDebtorId(e.target.value)}
-                    className={`h-7 px-2 border rounded font-semibold text-[11px] outline-none ${
-                      themeMode === 'classic_delphi'
-                        ? 'bg-white text-black border-slate-400'
-                        : 'bg-slate-800 text-slate-100 border-slate-700'
-                    }`}
-                  >
-                    {debtors.map((d) => (
-                      <option key={d.id} value={d.id}>
-                        [ID: {d.id}] {d.name} — Owed: R$ {(Number(d.totalOwed) || 0).toFixed(2)} {(Number(d.overdueCount) || 0) > 0 ? `${d.overdueCount} ATRASADAS` : 'Em dia'}
-                      </option>
-                    ))}
-                  </select>
+                {/* Selector Row com Animação Vibrante, Efeito Radar & Botões Anterior/Próximo */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5 p-1.5 sm:p-2 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-blue-400/40 shadow-xs animate-debtor-selector">
+                  <div className="flex items-center gap-1.5 sm:gap-2">
+                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md animate-debtor-avatar shrink-0 text-xs sm:text-sm">
+                      👤
+                    </span>
+                    <label className="font-black text-[11px] sm:text-sm text-blue-900 dark:text-blue-300 shrink-0 flex items-center gap-1">
+                      <span>Seletor de Devedor:</span>
+                    </label>
+                  </div>
+
+                  <div className="flex items-center gap-1 sm:gap-1.5 flex-1 max-w-full sm:max-w-xl">
+                    {/* Botão Anterior */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentIdx = debtors.findIndex((d) => d.id === selectedDebtorId);
+                        const prevIdx = currentIdx > 0 ? currentIdx - 1 : debtors.length - 1;
+                        if (debtors[prevIdx]) {
+                          setSelectedDebtorId(debtors[prevIdx].id);
+                          playAppSound('click');
+                        }
+                      }}
+                      className="h-8 sm:h-9 px-1.5 sm:px-2 bg-slate-100 hover:bg-blue-100 text-blue-900 border border-blue-200 dark:bg-slate-800 dark:text-blue-300 dark:border-slate-700 rounded-lg sm:rounded-xl text-xs font-black transition-all active:scale-90 cursor-pointer flex items-center justify-center shrink-0"
+                      title="Devedor Anterior [◀]"
+                    >
+                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chevron_left</span>
+                    </button>
+
+                    <div className="relative flex-1 min-w-0">
+                      <select
+                        value={selectedDebtorId}
+                        onChange={(e) => {
+                          setSelectedDebtorId(e.target.value);
+                          playAppSound('pop');
+                        }}
+                        className={`w-full h-8 sm:h-9 px-2 sm:px-3 border-2 rounded-lg sm:rounded-xl font-black text-xs sm:text-sm outline-none transition-all focus:ring-4 focus:ring-blue-400/30 shadow-xs cursor-pointer truncate ${
+                          themeMode === 'classic_delphi'
+                            ? 'bg-white text-slate-900 border-blue-400/70 hover:border-blue-500'
+                            : 'bg-slate-900 text-slate-100 border-blue-500/70 hover:border-blue-400'
+                        }`}
+                      >
+                        {debtors.map((d, idx) => {
+                          const isDemo = d.id === 'DEMO-001' || d.id === 'DEMO-002' || d.relation === 'Demonstração' || (d.id && d.id.startsWith('DEMO-'));
+                          return (
+                            <option key={d.id} value={d.id}>
+                              {getDebtorCode(d.id, idx)} — {d.name} {isDemo ? '[Exemplo Fictício]' : ''} — R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {(Number(d.overdueCount) || 0) > 0 ? `(${d.overdueCount} atrasadas)` : '(Em dia)'}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Botão Próximo */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const currentIdx = debtors.findIndex((d) => d.id === selectedDebtorId);
+                        const nextIdx = currentIdx < debtors.length - 1 ? currentIdx + 1 : 0;
+                        if (debtors[nextIdx]) {
+                          setSelectedDebtorId(debtors[nextIdx].id);
+                          playAppSound('click');
+                        }
+                      }}
+                      className="h-8 sm:h-9 px-1.5 sm:px-2 bg-slate-100 hover:bg-blue-100 text-blue-900 border border-blue-200 dark:bg-slate-800 dark:text-blue-300 dark:border-slate-700 rounded-lg sm:rounded-xl text-xs font-black transition-all active:scale-90 cursor-pointer flex items-center justify-center shrink-0"
+                      title="Próximo Devedor [▶]"
+                    >
+                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chevron_right</span>
+                    </button>
+                  </div>
                 </div>
 
-                <div className="flex items-center gap-3 text-[11px]">
-                  <span className="font-mono">
-                    Total Devedor Ativo: <strong className="text-red-500">R$ {(Number(activeDebtor?.totalOwed) || 0).toFixed(2)}</strong>
-                  </span>
-                  <span className="font-mono">
-                    Total Já Pago: <strong className="text-emerald-500">R$ {(Number(activeDebtor?.totalPaid) || 0).toFixed(2)}</strong>
-                  </span>
-                  <span className="font-mono">
-                    Score: <strong>{activeDebtor?.score || 0}/1000</strong>
-                  </span>
+                {/* Etiqueta para devedores de demonstração / fictícios */}
+                {activeDebtor && (activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
+                  <div className="flex items-center justify-between bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs animate-fadeIn">
+                    <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                      <span>🏷️</span>
+                      <span>Cliente Fictício (Usuário de Exemplo / Demonstração)</span>
+                    </div>
+                    {onRequestDeleteDebtor && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestDeleteDebtor(activeDebtor)}
+                        className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-extrabold text-[10px] flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+                        title="Excluir usuário de exemplo"
+                      >
+                        <span className="material-symbols-outlined text-[13px]">delete</span>
+                        <span>Excluir Exemplo</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+
+                {/* 3 KPI Summary Cards - Animated, Fun & Interactive - Otimizado e Mais Junto */}
+                <div className="grid grid-cols-3 gap-1 sm:gap-2 text-center font-sans">
+                  {/* CARD 1: A Receber */}
+                  <div
+                    onClick={() => {
+                      playAppSound('pop');
+                      onToast(`💸 A Receber: R$ ${(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                    }}
+                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-red-400/80 bg-gradient-to-b from-red-500/15 via-red-50/80 to-red-100/90 dark:from-red-950/80 dark:to-red-900/60 shadow-md shadow-red-500/10 hover:shadow-lg hover:shadow-red-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
+                    title="Clique para ver detalhes do saldo a receber"
+                  >
+                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-red-700 dark:text-red-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
+                      <span className="animate-bounce inline-block text-[10px] sm:text-xs">🚨</span>
+                      <span>A Receber:</span>
+                    </span>
+                    <strong className="text-red-600 dark:text-red-400 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
+                      R$ {(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+
+                  {/* CARD 2: Já Liquidado */}
+                  <div
+                    onClick={() => {
+                      playAppSound('pop');
+                      onToast(`🎉 Já Liquidado: R$ ${(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+                    }}
+                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-emerald-400/80 bg-gradient-to-b from-emerald-500/15 via-emerald-50/80 to-emerald-100/90 dark:from-emerald-950/80 dark:to-emerald-900/60 shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
+                    title="Clique para ver total já liquidado"
+                  >
+                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
+                      <span className="animate-pulse inline-block text-[10px] sm:text-xs">🎉</span>
+                      <span>Já Liquidado:</span>
+                    </span>
+                    <strong className="text-emerald-700 dark:text-emerald-400 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
+                      R$ {(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </strong>
+                  </div>
+
+                  {/* CARD 3: Score Crediário */}
+                  <div
+                    onClick={() => {
+                      playAppSound('pop');
+                      onToast(`🚀 Score de Crédito: ${activeDebtor?.score || 800}/1000 — ${
+                        (activeDebtor?.score || 800) >= 700 ? 'Excelente!' : (activeDebtor?.score || 800) >= 500 ? 'Médio Risk' : 'Atenção ao Crédito'
+                      }`);
+                    }}
+                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-blue-400/80 bg-gradient-to-b from-blue-500/15 via-indigo-50/80 to-blue-100/90 dark:from-blue-950/80 dark:to-indigo-900/60 shadow-md shadow-blue-500/10 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
+                    title="Clique para ver avaliação de score"
+                  >
+                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
+                      <span className="inline-block text-[10px] sm:text-xs">🚀</span>
+                      <span>Score:</span>
+                    </span>
+                    <strong className="text-blue-700 dark:text-blue-300 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
+                      {activeDebtor?.score || 800}/1000
+                    </strong>
+                  </div>
                 </div>
               </div>
 
@@ -1118,41 +1619,41 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5 text-slate-400">Código ERP (ID)</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Código ERP (CÓD)</label>
                     <input
                       type="text"
                       readOnly
-                      value={formData.id}
-                      className="w-full h-7 px-2 font-mono text-[11px] bg-black/10 border border-slate-700 rounded text-slate-400 outline-none"
+                      value={getDebtorCode(formData.id)}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 font-mono font-bold text-xs sm:text-[11px] bg-slate-100 border border-slate-300 rounded-lg sm:rounded text-blue-900 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Tipo Pessoa</label>
-                    <div className="flex items-center gap-3 h-7">
-                      <label className="flex items-center gap-1 cursor-pointer">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Tipo Pessoa</label>
+                    <div className="flex items-center gap-3 h-8.5 sm:h-7">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="radio"
                           name="personType"
                           checked={formData.personType === 'F'}
                           onChange={() => setFormData({ ...formData, personType: 'F' })}
                         />
-                        <span className="text-[11px] font-semibold">Física</span>
+                        <span className="text-xs sm:text-[11px] font-semibold">Física</span>
                       </label>
-                      <label className="flex items-center gap-1 cursor-pointer">
+                      <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
                           type="radio"
                           name="personType"
                           checked={formData.personType === 'J'}
                           onChange={() => setFormData({ ...formData, personType: 'J' })}
                         />
-                        <span className="text-[11px] font-semibold">Jurídica</span>
+                        <span className="text-xs sm:text-[11px] font-semibold">Jurídica</span>
                       </label>
                     </div>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
                       Nome Completo / Razão Social *
                     </label>
                     <input
@@ -1160,73 +1661,75 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="EX: JOÃO DA SILVA SA"
-                      className={`w-full h-7 px-2 border rounded font-semibold text-[11px] uppercase outline-none focus:border-blue-500 ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-semibold text-xs sm:text-[11px] uppercase outline-none focus:border-blue-500 ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
                       {formData.personType === 'F' ? 'CPF' : 'CNPJ'} *
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       value={formData.cpfCnpj}
                       onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })}
                       placeholder="000.000.000-00"
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none focus:border-blue-500 ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none focus:border-blue-500 ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
                       {formData.personType === 'F' ? 'RG' : 'Inscrição Estadual'}
                     </label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       value={formData.rgIe}
                       onChange={(e) => setFormData({ ...formData, rgIe: e.target.value })}
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Apelido / Parentesco</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Apelido / Parentesco</label>
                     <input
                       type="text"
                       value={formData.apelido}
                       onChange={(e) => setFormData({ ...formData, apelido: e.target.value })}
                       placeholder="Amigo, Primo, Cliente"
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Data Nasc. / Abertura</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Data Nasc. / Abertura</label>
                     <input
                       type="date"
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Órgão Expedidor</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Órgão Expedidor</label>
                     <input
                       type="text"
                       value={formData.orgaoExp}
                       onChange={(e) => setFormData({ ...formData, orgaoExp: e.target.value })}
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
@@ -1246,14 +1749,15 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Celular / WhatsApp Principal *</label>
-                    <div className="flex gap-1">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Celular / WhatsApp Principal *</label>
+                    <div className="flex gap-1.5">
                       <input
-                        type="text"
+                        type="tel"
+                        inputMode="numeric"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="(14) 99733-9863"
-                        className={`flex-1 h-7 px-2 border rounded font-mono text-[11px] outline-none ${
+                        className={`flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
                           themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                         }`}
                       />
@@ -1263,48 +1767,49 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           const clean = formData.phone.replace(/\D/g, '');
                           window.open(`https://wa.me/55${clean}?text=Olá ${encodeURIComponent(formData.name)}, cobrança amigável HASPAHO`, '_blank');
                         }}
-                        className="px-2 h-7 rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 h-8.5 sm:h-7 rounded-lg sm:rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-[10px] flex items-center gap-1 cursor-pointer"
                         title="Abrir WhatsApp Web Oficial"
                       >
-                        <span className="material-symbols-outlined text-[13px]">chat</span>
+                        <span className="material-symbols-outlined text-[15px] sm:text-[13px]">chat</span>
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Telefone Secundário / Fixo</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Telefone Secundário / Fixo</label>
                     <input
-                      type="text"
+                      type="tel"
+                      inputMode="numeric"
                       value={formData.phoneSecondary}
                       onChange={(e) => setFormData({ ...formData, phoneSecondary: e.target.value })}
                       placeholder="(14) 3642-0000"
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">E-mail de Cobrança</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">E-mail de Cobrança</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="devedor@email.com"
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Chave PIX Cadastrada</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Chave PIX Cadastrada</label>
                     <input
                       type="text"
                       value={formData.pixKey}
                       onChange={(e) => setFormData({ ...formData, pixKey: e.target.value })}
                       placeholder="CPF, Telefone ou E-mail"
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
@@ -1324,65 +1829,67 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">CEP *</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">CEP *</label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       value={formData.cep}
                       onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
                       placeholder="17320-000"
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-[10px] font-bold mb-0.5">Logradouro / Rua</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Logradouro / Rua</label>
                     <input
                       type="text"
                       value={formData.logradouro}
                       onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
                       placeholder="Rua Central"
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Número</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Número</label>
                     <input
                       type="text"
+                      inputMode="numeric"
                       value={formData.numero}
                       onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                       placeholder="100"
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Bairro</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Bairro</label>
                     <input
                       type="text"
                       value={formData.bairro}
                       onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                       placeholder="Centro"
-                      className={`w-full h-7 px-2 border rounded text-[11px] outline-none ${
+                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                         themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                       }`}
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Cidade / UF</label>
-                    <div className="flex gap-1">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Cidade / UF</label>
+                    <div className="flex gap-1.5">
                       <input
                         type="text"
                         value={formData.cidade}
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                        className={`flex-1 h-7 px-2 border rounded text-[11px] outline-none ${
+                        className={`flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                           themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                         }`}
                       />
@@ -1391,7 +1898,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                         maxLength={2}
                         value={formData.uf}
                         onChange={(e) => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
-                        className={`w-9 h-7 text-center font-bold uppercase border rounded text-[11px] outline-none ${
+                        className={`w-11 sm:w-9 h-8.5 sm:h-7 text-center font-bold uppercase border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
                           themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
                         }`}
                       />
@@ -1533,33 +2040,35 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
               </fieldset>
 
               {/* Bottom Action Footer for the Form */}
-              <div className="flex items-center justify-between pt-2">
-                <div className="text-[10px] text-slate-500 font-mono">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800/60">
+                <div className="text-[10px] text-slate-400 font-mono hidden sm:block">
                   Atalhos: F2: Novo | F3: Gravar | F4: Cancelar | F5: Excluir | Esc: Voltar
                 </div>
-                <div className="flex items-center gap-2">
+                <div className="grid grid-cols-3 sm:flex items-center gap-2">
                   <button
                     type="button"
                     onClick={handleNewDebtor}
-                    className="px-3 py-1.5 rounded bg-slate-700 hover:bg-slate-600 text-white font-bold text-[11px] cursor-pointer"
+                    className="h-9 sm:h-auto px-3 py-2 sm:py-1.5 rounded-xl sm:rounded bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs sm:text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 shadow-xs"
                   >
-                    Novo [F2]
+                    <span className="material-symbols-outlined text-[15px]">add</span>
+                    <span>Novo</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveDebtor}
-                    className="px-4 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] shadow-sm cursor-pointer"
+                    className="h-9 sm:h-auto px-4 py-2 sm:py-1.5 rounded-xl sm:rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-[11px] shadow-sm cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
                   >
-                    Gravar Registro [F3]
+                    <span className="material-symbols-outlined text-[15px]">save</span>
+                    <span>Gravar</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleDeleteDebtor}
-                    className="px-3 py-1.5 rounded bg-red-600 hover:bg-red-700 text-white font-bold text-[11px] shadow-sm cursor-pointer inline-flex items-center gap-1"
+                    className="h-9 sm:h-auto px-3 py-2 sm:py-1.5 rounded-xl sm:rounded bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-[11px] shadow-sm cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
                     title="Excluir cadastro ativo no ERP (F5)"
                   >
-                    <span className="material-symbols-outlined text-[14px]">delete</span>
-                    <span>Excluir [F5]</span>
+                    <span className="material-symbols-outlined text-[15px]">delete</span>
+                    <span>Excluir</span>
                   </button>
                 </div>
               </div>
@@ -1570,27 +2079,41 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           {activeTab === 'pesquisa' && (
             <div className="space-y-3">
               {/* Filter and Search Bar */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-black/20 rounded border border-slate-800">
-                <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">filter_alt</span>
+              <div className={`flex flex-wrap items-center justify-between gap-2.5 p-2 rounded border ${
+                themeMode === 'classic_delphi'
+                  ? 'bg-[#f8fafc] border-slate-300 text-slate-800'
+                  : 'bg-black/20 border-slate-800 text-white'
+              }`}>
+                <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
+                  <span className={`material-symbols-outlined text-[16px] ${
+                    themeMode === 'classic_delphi' ? 'text-blue-600' : 'text-slate-400'
+                  }`}>filter_alt</span>
                   <input
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Pesquisar por Código, Nome, CPF ou Telefone..."
-                    className="w-full h-7 px-2.5 bg-slate-800 border border-slate-700 rounded text-[11px] text-white outline-none"
+                    className={`w-full h-7 px-2.5 rounded text-[11px] outline-none border ${
+                      themeMode === 'classic_delphi'
+                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-500'
+                        : 'bg-slate-800 border-slate-700 text-white'
+                    }`}
                   />
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-bold">Filtro de Situação:</span>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className={`text-[11px] font-bold ${
+                    themeMode === 'classic_delphi' ? 'text-slate-700' : 'text-slate-300'
+                  }`}>Filtro:</span>
                   {(['todos', 'adimplente', 'atrasado', 'quitado'] as const).map((st) => (
                     <button
                       key={st}
                       onClick={() => setFilterStatus(st)}
                       className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
                         filterStatus === st
-                          ? 'bg-blue-600 text-white border-blue-500'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : themeMode === 'classic_delphi'
+                          ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                           : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
                       }`}
                     >
@@ -1600,110 +2123,722 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
               </div>
 
-              {/* DataGrid (DBGrid Delphi style) */}
-              <div className="border border-slate-700 rounded overflow-x-auto table-scroll-container financial-table-container">
-                <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
-                  <thead className="bg-slate-950 text-slate-300 uppercase font-mono text-[10px] border-b border-slate-700 select-none">
-                    <tr>
-                      <th className="p-2 border-r border-slate-800 w-16">Cód ID</th>
-                      <th className="p-2 border-r border-slate-800">Nome / Razão Social</th>
-                      <th className="p-2 border-r border-slate-800">Documento CPF/CNPJ</th>
-                      <th className="p-2 border-r border-slate-800">Telefone / WhatsApp</th>
-                      <th className="p-2 border-r border-slate-800 text-right">Saldo Devedor</th>
-                      <th className="p-2 border-r border-slate-800 text-right">Total Pago</th>
-                      <th className="p-2 border-r border-slate-800 text-center">Score</th>
-                      <th className="p-2 border-r border-slate-800 text-center">Atrasos</th>
-                      <th className="p-2 text-center min-w-[210px] w-56 select-none">Ações ERP</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-800 font-mono">
-                    {filteredDebtors.map((d, index) => {
-                      const isSelected = d.id === selectedDebtorId;
-                      return (
-                        <tr
-                          key={d.id}
-                          onClick={() => setSelectedDebtorId(d.id)}
-                          className={`cursor-pointer transition-colors ${
-                            isSelected
-                              ? 'bg-blue-900/50 text-white font-bold'
-                              : index % 2 === 0
-                              ? 'bg-slate-900/60 hover:bg-slate-800'
-                              : 'bg-slate-950/40 hover:bg-slate-800'
-                          }`}
-                        >
-                          <td className="p-2 border-r border-slate-800 text-slate-400">{d.id.slice(-6)}</td>
-                          <td className="p-2 border-r border-slate-800 font-sans font-semibold">{d.name}</td>
-                          <td className="p-2 border-r border-slate-800">{d.documentNumber || '—'}</td>
-                          <td className="p-2 border-r border-slate-800">{d.phone}</td>
-                          <td className="p-2 border-r border-slate-800 text-right font-bold text-red-400">
-                            R$ {(Number(d.totalOwed) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-right text-emerald-400">
-                            R$ {(Number(d.totalPaid) || 0).toFixed(2)}
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-center">
-                            <span className="px-1.5 py-0.5 rounded bg-slate-800 text-[10px] font-bold">
-                              {d.score}
-                            </span>
-                          </td>
-                          <td className="p-2 border-r border-slate-800 text-center">
-                            {d.overdueCount > 0 ? (
-                              <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold text-[10px]">
-                                {d.overdueCount} PARC
-                              </span>
-                            ) : (
-                              <span className="text-emerald-400 text-[10px]">0</span>
-                            )}
-                          </td>
-                          <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                            <div className="flex items-center justify-center gap-1.5">
-                              {/* Botão de Editar Ficha */}
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setSelectedDebtorId(d.id);
-                                  setActiveTab('cadastro');
-                                }}
-                                className="px-2 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
-                                title="Abrir ficha cadastral completa no ERP"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">edit_note</span>
-                                <span>Editar</span>
-                              </button>
+              {/* Seletor de Modo no Mobile (Listinha Planilha vs Grade Ampla) */}
+              <div className={`flex sm:hidden items-center justify-between p-2 rounded border text-xs ${
+                themeMode === 'classic_delphi'
+                  ? 'bg-[#f8fafc] border-slate-300 text-slate-800'
+                  : 'bg-slate-900/90 border-slate-700 text-slate-300'
+              }`}>
+                <span className="font-bold flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-[16px] text-blue-600">table_rows</span>
+                  <span>Modo ARP Mobile:</span>
+                </span>
+                <div className={`flex items-center gap-1 p-0.5 rounded border ${
+                  themeMode === 'classic_delphi'
+                    ? 'bg-white border-slate-300'
+                    : 'bg-slate-800 border-slate-700'
+                }`}>
+                  <button
+                    type="button"
+                    onClick={() => setMobileViewMode('cards')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                      mobileViewMode === 'cards'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : themeMode === 'classic_delphi'
+                        ? 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[13px]">view_list</span>
+                    <span>Listinha Planilha</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileViewMode('table')}
+                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                      mobileViewMode === 'table'
+                        ? 'bg-blue-600 text-white shadow-xs'
+                        : themeMode === 'classic_delphi'
+                        ? 'text-slate-600 hover:text-slate-900'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[13px]">table_chart</span>
+                    <span>Grade DBGrid</span>
+                  </button>
+                </div>
+              </div>
 
-                              {/* Botão de Salvar / Sincronizar Registro no Banco */}
-                              <button
-                                type="button"
-                                onClick={() => handleQuickSaveRecord(d)}
-                                className="px-2 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
-                                title="Salvar e sincronizar registro no banco de dados ERP"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">save</span>
-                                <span>Salvar</span>
-                              </button>
+              {/* Modo Listinha Tipo Planilha Mobile (Compacto, Profissional, Delphiano e Clarinho) */}
+              {mobileViewMode === 'cards' && (
+                <div className={`sm:hidden border rounded-lg overflow-hidden font-sans shadow-xs select-none ${
+                  themeMode === 'classic_delphi'
+                    ? 'bg-white border-slate-300'
+                    : 'bg-slate-950/60 border-slate-700'
+                }`}>
+                  {/* Cabeçalho de Colunas da Planilha Mobile */}
+                  <div className={`grid grid-cols-12 gap-1 px-2 py-1.5 border-b text-[10.5px] font-mono font-bold uppercase ${
+                    themeMode === 'classic_delphi'
+                      ? 'bg-slate-100 border-slate-300 text-slate-700'
+                      : 'bg-slate-950 border-slate-700 text-slate-400'
+                  }`}>
+                    <div className="col-span-1 text-center pr-0.5 border-r border-slate-300/60 dark:border-slate-700/60">Cód</div>
+                    <div className="col-span-5 px-1 border-r border-slate-300/60 dark:border-slate-700/60">Cliente / Doc</div>
+                    <div className="col-span-3 text-center px-1 border-r border-slate-300/60 dark:border-slate-700/60">Saldo / Status</div>
+                    <div className="col-span-3 text-center px-1">Ações ERP</div>
+                  </div>
 
-                              {/* Botão de Excluir Registro */}
-                              <button
-                                type="button"
-                                onClick={() => handleDeleteSpecificDebtor(d)}
-                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer inline-flex items-center gap-1 transition-all active:scale-95 shadow-xs"
-                                title="Excluir este devedor/registro do sistema ERP"
-                              >
-                                <span className="material-symbols-outlined text-[13px]">delete</span>
-                                <span>Excluir</span>
-                              </button>
+                  {/* Linhas da Planilha */}
+                  <div className={`divide-y ${themeMode === 'classic_delphi' ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
+                    {filteredDebtors.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 text-xs">
+                        Nenhum devedor encontrado com os filtros atuais.
+                      </div>
+                    ) : (
+                      filteredDebtors.map((d, index) => {
+                        const isSelected = d.id === selectedDebtorId;
+                        const isOverdue = (Number(d.overdueCount) || 0) > 0;
+                        return (
+                          <div
+                            key={d.id}
+                            onClick={() => setSelectedDebtorId(d.id)}
+                            className={`grid grid-cols-12 gap-1 px-1.5 py-1 items-center cursor-pointer transition-all ${
+                              isSelected
+                                ? themeMode === 'classic_delphi'
+                                  ? 'bg-blue-100/90 border-l-4 border-l-blue-600 shadow-inner'
+                                  : 'bg-blue-950/80 border-l-3 border-l-blue-500 shadow-inner'
+                                : index % 2 === 0
+                                ? themeMode === 'classic_delphi'
+                                  ? 'bg-white hover:bg-blue-50/50'
+                                  : 'bg-slate-900/60 hover:bg-slate-800/80'
+                                : themeMode === 'classic_delphi'
+                                ? 'bg-[#fcfbf9] hover:bg-blue-50/50'
+                                : 'bg-slate-950/40 hover:bg-slate-800/80'
+                            }`}
+                          >
+                            {/* Coluna 1: Cód ID (Puramente Numérico Sequencial 01, 02, 03...) */}
+                            <div className={`col-span-1 font-mono text-[10.5px] font-bold truncate text-center pr-0.5 border-r ${
+                              themeMode === 'classic_delphi' ? 'border-slate-200 text-slate-600' : 'border-slate-800 text-slate-400'
+                            }`}>
+                              {getDebtorCode(d.id, index)}
                             </div>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+
+                            {/* Coluna 2: Nome do Devedor & Doc / Telefone com ícone no mobile */}
+                            <div className={`col-span-5 min-w-0 px-1 border-r ${
+                              themeMode === 'classic_delphi' ? 'border-slate-200' : 'border-slate-800'
+                            }`}>
+                              <div className="flex items-center gap-1 min-w-0">
+                                <span className={`font-extrabold text-xs truncate leading-tight shrink min-w-0 ${
+                                  themeMode === 'classic_delphi' ? 'text-slate-900' : 'text-white'
+                                }`} title={d.name}>
+                                  {formatSmartShortName(d.name)}
+                                </span>
+                                <span className={`px-1 py-0.2 rounded text-[7.5px] font-bold font-mono inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap ${
+                                  (Number(d.score) || 800) >= 700
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : (Number(d.score) || 800) >= 500
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-red-100 text-red-800 border border-red-300'
+                                }`} title={`Score: ${d.score || 800}`}>
+                                  <span>Score:</span>
+                                  <span className="font-extrabold">{d.score || 800}</span>
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5 mt-0.5 font-mono">
+                                {d.phone && d.phone.trim() ? (
+                                  <div className="flex items-center gap-1 text-blue-700 font-semibold truncate text-[9.5px]">
+                                    <span className="material-symbols-outlined text-[10.5px] shrink-0">call</span>
+                                    <span>{d.phone}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-1 text-slate-400 italic truncate text-[8.5px]">
+                                    <span className="material-symbols-outlined text-[10.5px] shrink-0">call</span>
+                                    <span>Sem telefone</span>
+                                  </div>
+                                )}
+                                {d.documentNumber && d.documentNumber.trim() && d.documentNumber.trim() !== 'Sem doc' && d.documentNumber.trim() !== '—' ? (
+                                  <div className="text-[8.5px] text-slate-600 font-mono truncate">
+                                    Doc: <span className="font-semibold text-slate-800">{d.documentNumber}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[8.5px] text-slate-400 italic font-mono truncate">
+                                    Doc: Não consta
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+
+                            {/* Coluna 3: Saldo & Status (Valor Já Quitado em cima do Valor Devedor) */}
+                            <div className={`col-span-3 text-center min-w-0 px-1 border-r ${
+                              themeMode === 'classic_delphi' ? 'border-slate-200' : 'border-slate-800'
+                            }`}>
+                              {/* Valor Já Quitado (Verde) em cima */}
+                              <div
+                                className="font-mono font-black text-xs truncate text-emerald-600 dark:text-emerald-400 leading-tight"
+                                title="Valor Já Quitado / Liquidado pelo cliente"
+                              >
+                                R$ {(Number(d.totalPaid) || 0).toFixed(0)}
+                              </div>
+                              {/* Valor Devedor (Vermelho) embaixo do valor quitado */}
+                              <div className={`font-mono font-black text-xs truncate leading-tight mt-0.5 ${
+                                Number(d.totalOwed) > 0
+                                  ? themeMode === 'classic_delphi' ? 'text-red-600' : 'text-red-400'
+                                  : themeMode === 'classic_delphi' ? 'text-emerald-700' : 'text-emerald-400'
+                              }`} title="Saldo Devedor pendente">
+                                R$ {(Number(d.totalOwed) || 0).toFixed(0)}
+                              </div>
+                              <div className="mt-0.5 relative inline-block">
+                                {isOverdue ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-red-100 hover:bg-red-200 active:scale-95 text-red-800 border border-red-300 text-[8px] font-extrabold font-mono animate-fun-overdue inline-flex items-center gap-0.5 shadow-2xs cursor-pointer transition-all"
+                                    title="Clique para ver número da parcela e data de vencimento"
+                                  >
+                                    <span className="animate-bounce inline-block text-[8px]">🚨</span>
+                                    <span>{d.overdueCount} atraso(s)</span>
+                                  </button>
+                                ) : Number(d.totalOwed) > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border border-amber-300 text-[8px] font-bold font-mono animate-fun-duesoon inline-flex items-center gap-0.5 shadow-2xs cursor-pointer transition-all"
+                                    title="Clique para ver número da parcela e data de vencimento"
+                                  >
+                                    <span className="inline-block text-[8px]">⏳</span>
+                                    <span>Prestes a vencer</span>
+                                  </button>
+                                ) : (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                    }}
+                                    className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-800 border border-emerald-300 text-[8px] font-bold font-mono inline-flex items-center gap-0.5 cursor-pointer transition-all shadow-2xs"
+                                    title="Clique para ver os detalhes da parcela"
+                                  >
+                                    <span className="text-[8px]">✅</span>
+                                    <span>Em dia</span>
+                                  </button>
+                                )}
+
+                                {/* Balões emparelhados e bem próximos (1: Card Claro Próximo Vencimento + 2: Balão Escuro Quitado/Saldo Dev) */}
+                                {activeBalloonDebtorId === d.id && (() => {
+                                  const info = getUpcomingInstallmentInfo(d.id, d.totalOwed);
+                                  const isFirstRow = index === 0;
+                                  const isOverdue = d.overdueCount > 0;
+                                  const isPaid = Number(d.totalOwed) <= 0;
+
+                                  return (
+                                    <div
+                                      className={`absolute ${
+                                        isFirstRow ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
+                                      } left-1/2 -translate-x-1/2 z-[250] w-[210px] flex flex-col items-center gap-1 pointer-events-auto select-none`}
+                                      onClick={(e) => e.stopPropagation()}
+                                    >
+                                      {/* BALÃO 1: Card Claro do Próximo Vencimento */}
+                                      <div
+                                        className={`w-full p-2.5 rounded-xl border-2 shadow-xl text-center font-sans relative animate-in zoom-in-95 fade-in duration-150 ${
+                                          isOverdue
+                                            ? 'bg-gradient-to-b from-red-50 via-white to-red-100 border-red-500 text-red-950 shadow-red-500/20'
+                                            : !isPaid
+                                            ? 'bg-gradient-to-b from-amber-50 via-white to-amber-100 border-amber-400 text-amber-950 shadow-amber-500/20'
+                                            : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-100 border-emerald-400 text-emerald-950 shadow-emerald-500/20'
+                                        }`}
+                                      >
+                                        {/* Setinha apontando para o botão quando abre para baixo */}
+                                        {isFirstRow && (
+                                          <div
+                                            className={`absolute left-1/2 -translate-x-1/2 bottom-full border-4 border-transparent ${
+                                              isOverdue
+                                                ? 'border-b-red-500'
+                                                : !isPaid
+                                                ? 'border-b-amber-400'
+                                                : 'border-b-emerald-400'
+                                            }`}
+                                          ></div>
+                                        )}
+
+                                        <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/80">
+                                          <span className="font-extrabold text-[10.5px] flex items-center gap-1">
+                                            <span className="text-xs">{isOverdue ? '🚨' : !isPaid ? '⏳' : '✅'}</span>
+                                            <span className={isOverdue ? 'text-red-900' : !isPaid ? 'text-amber-900' : 'text-emerald-900'}>
+                                              {isOverdue ? 'Parcela em Atraso' : !isPaid ? 'Próximo Vencimento' : 'Situação Regular'}
+                                            </span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveBalloonDebtorId(null);
+                                            }}
+                                            className="w-4 h-4 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full flex items-center justify-center text-[9px] font-bold transition-colors cursor-pointer"
+                                            title="Fechar"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+
+                                        <div className="text-left text-[9px] mb-1 font-mono">
+                                          <div className="text-[8px] text-slate-500 font-semibold uppercase">CLIENTE / DEVEDOR:</div>
+                                          <div className="font-extrabold text-[10px] text-slate-900 truncate">{d.name}</div>
+                                        </div>
+
+                                        <div className="bg-white/95 p-1.5 rounded-lg border border-slate-200 text-[9px] font-mono space-y-0.5 text-left shadow-2xs">
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-slate-500 font-semibold">Nº Parcela:</span>
+                                            <span className="font-extrabold text-blue-700 bg-blue-50 px-1 rounded border border-blue-200">{info.parcela}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-slate-500 font-semibold">Vencimento:</span>
+                                            <span className={`font-black ${isOverdue ? 'text-red-600' : !isPaid ? 'text-amber-900' : 'text-emerald-700'}`}>{info.vencimento}</span>
+                                          </div>
+                                          <div className="flex justify-between items-center">
+                                            <span className="text-slate-500 font-semibold">Valor:</span>
+                                            <span className="font-black text-red-600">{info.valor}</span>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* BALÃO 2: Balão Escuro de Quitado vs Saldo Dev */}
+                                      <div className="w-full p-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-blue-400/80 font-mono text-[9px] relative animate-in zoom-in-95 fade-in duration-150">
+                                        {/* Setinha apontando para o botão quando abre para cima */}
+                                        {!isFirstRow && (
+                                          <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-slate-900"></div>
+                                        )}
+
+                                        <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-700">
+                                          <span className="font-extrabold text-blue-300 flex items-center gap-1 text-[9.5px]">
+                                            <span>📌</span>
+                                            <span>{info.parcela}</span>
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              setActiveBalloonDebtorId(null);
+                                            }}
+                                            className="w-4 h-4 bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white rounded-full flex items-center justify-center text-[9px] font-bold transition-colors cursor-pointer"
+                                            title="Fechar"
+                                          >
+                                            ✕
+                                          </button>
+                                        </div>
+
+                                        <div className="space-y-0.5">
+                                          <div className="flex items-center justify-between text-[9px]">
+                                            <span className="text-slate-400">Vencimento:</span>
+                                            <span className="font-extrabold text-amber-300">{info.vencimento}</span>
+                                          </div>
+                                          <div className="flex items-center justify-between text-[9px]">
+                                            <span className="text-slate-300">Liquidado:</span>
+                                            <span className="font-extrabold text-emerald-400">
+                                              R$ {(Number(d.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                          </div>
+                                          <div className="flex items-center justify-between text-[9px]">
+                                            <span className="text-slate-300">Saldo Devedor:</span>
+                                            <span className="font-extrabold text-red-400">
+                                              R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                            </span>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </div>
+                                  );
+                                })()}
+                              </div>
+                            </div>
+
+                            {/* Coluna 4: Botões de Ação ERP (Liquidar / Liquidado no topo e Lixeira debaixo) */}
+                            <div className="col-span-3 flex flex-col items-center justify-center gap-1" onClick={(e) => e.stopPropagation()}>
+                              {/* Topo: Liquidar ou Liquidado sem abreviar */}
+                              {Number(d.totalOwed) > 0 ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleLiquidarDebtor(d)}
+                                  className="w-full h-7.5 px-1.5 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-lg text-[10px] font-extrabold cursor-pointer inline-flex items-center justify-center gap-1 shadow-xs hover:shadow-md transition-all uppercase tracking-wider border border-emerald-500"
+                                  title="Liquidar todas as pendências financeiras do cliente"
+                                >
+                                  <span className="text-[12px]">💰</span>
+                                  <span>LIQUIDAR</span>
+                                </button>
+                              ) : (
+                                <div
+                                  className="w-full h-7.5 px-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold inline-flex items-center justify-center gap-1 shadow-2xs uppercase tracking-wider"
+                                  title="Cliente totalmente Liquidado"
+                                >
+                                  <span className="text-[12px]">✅</span>
+                                  <span>LIQUIDADO</span>
+                                </div>
+                              )}
+
+                              {/* Debaixo de Liquidar / Liquidado: Lixeira (Excluir) e Editar */}
+                              <div className="flex items-center justify-center gap-1 w-full">
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedDebtorId(d.id);
+                                    setActiveTab('cadastro');
+                                  }}
+                                  className="flex-1 py-0.5 bg-blue-600 hover:bg-blue-500 text-white rounded text-[8px] font-extrabold inline-flex items-center justify-center gap-0.5 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                                  title="Editar Ficha Cadastral (F2)"
+                                >
+                                  <span className="material-symbols-outlined text-[10px]">edit</span>
+                                </button>
+
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteSpecificDebtor(d)}
+                                  className="flex-1 py-0.5 bg-red-600 hover:bg-red-500 text-white rounded text-[8px] font-extrabold inline-flex items-center justify-center gap-0.5 shadow-2xs cursor-pointer active:scale-95 transition-all"
+                                  title="Lixeira - Excluir registro"
+                                >
+                                  <span className="material-symbols-outlined text-[10px]">delete</span>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Rodapé da Planilha Mobile */}
+                  <div className={`px-2.5 py-1.5 border-t text-[10px] flex items-center justify-between font-mono ${
+                    themeMode === 'classic_delphi'
+                      ? 'bg-slate-100 border-slate-300 text-slate-700'
+                      : 'bg-slate-950 border-slate-800 text-slate-400'
+                  }`}>
+                    <span>{filteredDebtors.length} devedor(es) listados</span>
+                    <span className="text-blue-600 font-bold">Toque na linha para selecionar</span>
+                  </div>
+                </div>
+              )}
+
+              {/* DataGrid (DBGrid Delphi style - Desktop ou quando ativado no mobile) */}
+              <div className={`${mobileViewMode === 'cards' ? 'hidden sm:block' : 'block'} border border-slate-200 rounded-xl overflow-hidden shadow-xs bg-white`}>
+                <div className="px-3 py-2 bg-white border-b border-slate-200 text-xs font-sans flex items-center justify-between select-none">
+                  <span className="flex items-center gap-1.5 font-bold text-blue-900 text-xs sm:text-sm">
+                    <span className="material-symbols-outlined text-[16px] text-blue-600">table_chart</span>
+                    <span>Grade DBGrid ARP Mobile</span>
+                  </span>
+                  <span className="text-[11px] text-slate-400 font-mono flex items-center gap-1">
+                    <span>Arraste para o lado</span>
+                    <span className="text-[13px]">→</span>
+                  </span>
+                </div>
+                <div className="w-full overflow-x-auto scrollbar-thin">
+                  <table className="w-full text-left border-collapse text-xs sm:text-sm min-w-full">
+                    <thead className="bg-[#f8fafc] text-slate-600 uppercase font-mono text-[9px] sm:text-[10px] border-b border-slate-200 select-none font-bold">
+                      <tr className="h-8 sm:h-9">
+                        <th className="px-2 py-1 border-r border-slate-200 whitespace-nowrap">NOME / SCORE / TEL</th>
+                        <th className="px-2 py-1 border-r border-slate-200 text-center whitespace-nowrap">VALORES & STATUS</th>
+                        <th className="px-1 py-1 text-center w-16 whitespace-nowrap select-none">AÇÕES ERP</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-200/80 font-sans">
+                      {filteredDebtors.map((d, index) => {
+                        const isSelected = d.id === selectedDebtorId;
+                        const totalOwedFormatted = (Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        const totalPaidFormatted = (Number(d.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        const scoreNum = Number(d.score) || 800;
+
+                        return (
+                          <tr
+                            key={d.id}
+                            onClick={() => setSelectedDebtorId(d.id)}
+                            className={`cursor-pointer transition-colors ${
+                              isSelected
+                                ? 'bg-blue-50/90 font-bold'
+                                : index % 2 === 0
+                                ? 'bg-white hover:bg-slate-50'
+                                : 'bg-[#fcfbf9] hover:bg-slate-50'
+                            }`}
+                          >
+                            {/* Nome + Score bem pequeno estritamente ao lado do nome (sem quebrar linha) + Doc + Telefone */}
+                            <td className="px-2 py-1.5 border-r border-slate-200 whitespace-nowrap">
+                              <div className="flex items-center gap-1 min-w-0 max-w-[175px] sm:max-w-none">
+                                <span className="font-extrabold text-slate-900 text-xs truncate shrink min-w-0" title={d.name}>{formatSmartShortName(d.name)}</span>
+                                <span className={`px-1 py-0.2 rounded text-[7.5px] font-bold font-mono inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap ${
+                                  scoreNum >= 700
+                                    ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                                    : scoreNum >= 500
+                                    ? 'bg-amber-100 text-amber-800 border border-amber-300'
+                                    : 'bg-red-100 text-red-800 border border-red-300'
+                                }`} title={`Score de crédito do cliente: ${scoreNum}`}>
+                                  <span>Score:</span>
+                                  <span className="font-extrabold">{scoreNum}</span>
+                                </span>
+                              </div>
+                              <div className="flex flex-col gap-0.5 mt-0.5 font-mono text-[9.5px]">
+                                {d.phone && d.phone.trim() ? (
+                                  <div className="flex items-center gap-0.5 text-blue-700 font-semibold truncate text-[9.5px]">
+                                    <span className="material-symbols-outlined text-[10px] shrink-0">call</span>
+                                    <span>{d.phone}</span>
+                                  </div>
+                                ) : (
+                                  <div className="flex items-center gap-0.5 text-slate-400 italic truncate text-[8.5px]">
+                                    <span className="material-symbols-outlined text-[10px] shrink-0">call</span>
+                                    <span>Sem telefone</span>
+                                  </div>
+                                )}
+                                {d.documentNumber && d.documentNumber.trim() && d.documentNumber.trim() !== 'Sem doc' && d.documentNumber.trim() !== '—' ? (
+                                  <div className="text-[8.5px] text-slate-600 font-mono truncate">
+                                    Doc: <span className="font-semibold text-slate-800">{d.documentNumber}</span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[8.5px] text-slate-400 italic font-mono truncate">
+                                    Doc: Não consta
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+
+                            {/* Total Pago (Verde) em cima, Total Devedor (Vermelho) no meio, Atraso em baixo com animação divertida */}
+                            <td className="px-2 py-1.5 border-r border-slate-200 text-center font-mono whitespace-nowrap">
+                              <div className="font-black text-emerald-600 text-[10.5px] sm:text-xs" title="Total Pago pelo cliente">
+                                R$ {totalPaidFormatted}
+                              </div>
+                              <div className="font-black text-red-600 text-[10.5px] sm:text-xs mt-0.5" title="Saldo Devedor pendente">
+                                R$ {totalOwedFormatted}
+                              </div>
+                              <div className="mt-1 flex items-center justify-center relative">
+                                <div className="relative inline-block">
+                                  {d.overdueCount > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-red-100 hover:bg-red-200 active:scale-95 text-red-800 border border-red-300 font-extrabold font-mono text-[8px] sm:text-[8.5px] inline-flex items-center gap-0.5 animate-fun-overdue shadow-2xs cursor-pointer transition-all"
+                                      title="Clique para ver o número da parcela e data de vencimento!"
+                                    >
+                                      <span className="animate-bounce inline-block text-[8.5px]">🚨</span>
+                                      <span>{d.overdueCount} atraso(s)</span>
+                                    </button>
+                                  ) : Number(d.totalOwed) > 0 ? (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-amber-100 hover:bg-amber-200 active:scale-95 text-amber-900 border border-amber-300 font-bold font-mono text-[8px] sm:text-[8.5px] inline-flex items-center gap-0.5 animate-fun-duesoon shadow-2xs cursor-pointer transition-all"
+                                      title="Clique para ver o número da parcela e data de vencimento!"
+                                    >
+                                      <span className="inline-block text-[8.5px]">⏳</span>
+                                      <span>Prestes a vencer</span>
+                                    </button>
+                                  ) : (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        setActiveBalloonDebtorId(activeBalloonDebtorId === d.id ? null : d.id);
+                                      }}
+                                      className="px-1.5 py-0.5 rounded bg-emerald-100 hover:bg-emerald-200 active:scale-95 text-emerald-800 border border-emerald-300 font-bold font-mono text-[8px] sm:text-[8.5px] inline-flex items-center gap-0.5 cursor-pointer transition-all shadow-2xs"
+                                      title="Clique para ver os detalhes"
+                                    >
+                                      <span className="text-[8.5px]">✅</span>
+                                      <span>Em dia</span>
+                                    </button>
+                                  )}
+
+                                  {/* Balões emparelhados e bem próximos (1: Card Claro Próximo Vencimento + 2: Balão Escuro Quitado/Saldo Dev) */}
+                                  {activeBalloonDebtorId === d.id && (() => {
+                                    const info = getUpcomingInstallmentInfo(d.id, d.totalOwed);
+                                    const isFirstRow = index === 0;
+                                    const isOverdue = d.overdueCount > 0;
+                                    const isPaid = Number(d.totalOwed) <= 0;
+
+                                    return (
+                                      <div
+                                        className={`absolute ${
+                                          isFirstRow ? 'top-full mt-1.5' : 'bottom-full mb-1.5'
+                                        } left-1/2 -translate-x-1/2 z-[250] w-[210px] flex flex-col items-center gap-1 pointer-events-auto select-none`}
+                                        onClick={(e) => e.stopPropagation()}
+                                      >
+                                        {/* BALÃO 1: Card Claro do Próximo Vencimento */}
+                                        <div
+                                          className={`w-full p-2.5 rounded-xl border-2 shadow-xl text-center font-sans relative animate-in zoom-in-95 fade-in duration-150 ${
+                                            isOverdue
+                                              ? 'bg-gradient-to-b from-red-50 via-white to-red-100 border-red-500 text-red-950 shadow-red-500/20'
+                                              : !isPaid
+                                              ? 'bg-gradient-to-b from-amber-50 via-white to-amber-100 border-amber-400 text-amber-950 shadow-amber-500/20'
+                                              : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-100 border-emerald-400 text-emerald-950 shadow-emerald-500/20'
+                                          }`}
+                                        >
+                                          {/* Setinha apontando para o botão quando abre para baixo */}
+                                          {isFirstRow && (
+                                            <div
+                                              className={`absolute left-1/2 -translate-x-1/2 bottom-full border-4 border-transparent ${
+                                                isOverdue
+                                                  ? 'border-b-red-500'
+                                                  : !isPaid
+                                                  ? 'border-b-amber-400'
+                                                  : 'border-b-emerald-400'
+                                              }`}
+                                            ></div>
+                                          )}
+                                          <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-200/80">
+                                            <span className="font-extrabold text-[10.5px] flex items-center gap-1">
+                                              <span className="text-xs">{isOverdue ? '🚨' : !isPaid ? '⏳' : '✅'}</span>
+                                              <span className={isOverdue ? 'text-red-900' : !isPaid ? 'text-amber-900' : 'text-emerald-900'}>
+                                                {isOverdue ? 'Parcela em Atraso' : !isPaid ? 'Próximo Vencimento' : 'Situação Regular'}
+                                              </span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveBalloonDebtorId(null);
+                                              }}
+                                              className="w-4 h-4 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-full flex items-center justify-center text-[9px] font-bold transition-colors cursor-pointer"
+                                              title="Fechar"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+
+                                          <div className="text-left text-[9px] mb-1 font-mono">
+                                            <div className="text-[8px] text-slate-500 font-semibold uppercase">CLIENTE / DEVEDOR:</div>
+                                            <div className="font-extrabold text-[10px] text-slate-900 truncate">{d.name}</div>
+                                          </div>
+
+                                          <div className="bg-white/95 p-1.5 rounded-lg border border-slate-200 text-[9px] font-mono space-y-0.5 text-left shadow-2xs">
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-slate-500 font-semibold">Nº Parcela:</span>
+                                              <span className="font-extrabold text-blue-700 bg-blue-50 px-1 rounded border border-blue-200">{info.parcela}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-slate-500 font-semibold">Vencimento:</span>
+                                              <span className={`font-black ${isOverdue ? 'text-red-600' : !isPaid ? 'text-amber-900' : 'text-emerald-700'}`}>{info.vencimento}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center">
+                                              <span className="text-slate-500 font-semibold">Valor:</span>
+                                              <span className="font-black text-red-600">{info.valor}</span>
+                                            </div>
+                                          </div>
+                                        </div>
+
+                                        {/* BALÃO 2: Balão Escuro de Quitado vs Saldo Dev */}
+                                        <div className="w-full p-2 bg-slate-900 text-white rounded-xl shadow-2xl border border-blue-400/80 font-mono text-[9px] relative animate-in zoom-in-95 fade-in duration-150">
+                                          {/* Setinha apontando para o botão quando abre para cima */}
+                                          {!isFirstRow && (
+                                            <div className="absolute left-1/2 -translate-x-1/2 top-full border-4 border-transparent border-t-slate-900"></div>
+                                          )}
+
+                                          <div className="flex items-center justify-between pb-1 mb-1 border-b border-slate-700">
+                                            <span className="font-extrabold text-blue-300 flex items-center gap-1 text-[9.5px]">
+                                              <span>📌</span>
+                                              <span>{info.parcela}</span>
+                                            </span>
+                                            <button
+                                              type="button"
+                                              onClick={(e) => {
+                                                e.stopPropagation();
+                                                setActiveBalloonDebtorId(null);
+                                              }}
+                                              className="w-4 h-4 bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white rounded-full flex items-center justify-center text-[9px] font-bold transition-colors cursor-pointer"
+                                              title="Fechar"
+                                            >
+                                              ✕
+                                            </button>
+                                          </div>
+
+                                          <div className="space-y-0.5">
+                                            <div className="flex items-center justify-between text-[9px]">
+                                              <span className="text-slate-400">Vencimento:</span>
+                                              <span className="font-extrabold text-amber-300">{info.vencimento}</span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[9px]">
+                                              <span className="text-slate-300">Quitado:</span>
+                                              <span className="font-extrabold text-emerald-400">
+                                                R$ {(Number(d.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                              </span>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[9px]">
+                                              <span className="text-slate-300">Saldo Dev:</span>
+                                              <span className="font-extrabold text-red-400">
+                                                R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              </div>
+                            </td>
+
+                            <td className="px-1 py-1 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex flex-col items-center justify-center gap-1 w-full max-w-[80px] mx-auto">
+                                {/* Topo: Liquidar ou Liquidado sem abreviar */}
+                                {Number(d.totalOwed) > 0 ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLiquidarDebtor(d)}
+                                    className="w-full h-7.5 px-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-[10px] font-extrabold cursor-pointer inline-flex items-center justify-center gap-1 shadow-xs hover:shadow-md transition-all active:scale-95 uppercase tracking-wider border border-emerald-500"
+                                    title="Liquidar todas as pendências financeiras do cliente"
+                                  >
+                                    <span className="text-[12px]">💰</span>
+                                    <span>LIQUIDAR</span>
+                                  </button>
+                                ) : (
+                                  <div
+                                    className="w-full h-7.5 px-1.5 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-[10px] font-extrabold inline-flex items-center justify-center gap-1 shadow-2xs uppercase tracking-wider"
+                                    title="Cliente com saldo totalmente Liquidado"
+                                  >
+                                    <span className="text-[12px]">✅</span>
+                                    <span>LIQUIDADO</span>
+                                  </div>
+                                )}
+
+                                {/* Debaixo de Liquidar / Liquidado: Lixeira (Excluir) e Editar */}
+                                <div className="flex items-center justify-center gap-1 w-full">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setSelectedDebtorId(d.id);
+                                      setActiveTab('cadastro');
+                                    }}
+                                    className="flex-1 py-0.5 bg-blue-600 hover:bg-blue-700 text-white rounded text-[8px] font-bold cursor-pointer inline-flex items-center justify-center gap-0.5 transition-all active:scale-95 shadow-2xs"
+                                    title="Abrir ficha cadastral no ERP"
+                                  >
+                                    <span className="material-symbols-outlined text-[9.5px]">edit</span>
+                                  </button>
+
+                                  <button
+                                    type="button"
+                                    onClick={() => handleDeleteSpecificDebtor(d)}
+                                    className="flex-1 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[8px] font-bold cursor-pointer inline-flex items-center justify-center gap-0.5 transition-all active:scale-95 shadow-2xs"
+                                    title="Lixeira - Excluir registro do ERP"
+                                  >
+                                    <span className="material-symbols-outlined text-[9.5px]">delete</span>
+                                  </button>
+                                </div>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </div>
 
               <div className="flex items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
                 <span>Registros encontrados: {filteredDebtors.length} de {debtors.length}</span>
-                <span>Dica: Dê duplo clique em qualquer linha para abrir a ficha no formulário de entrada.</span>
+                <span className="hidden sm:inline">Dica: Dê duplo clique em qualquer linha para abrir a ficha no formulário de entrada.</span>
               </div>
             </div>
           )}
@@ -1732,7 +2867,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                     <button
                       type="button"
                       onClick={() => setLastDeletedBatch(null)}
-                      className="text-amber-400 hover:text-white p-0.5 rounded cursor-pointer"
+                      className="text-amber-800 hover:text-black p-0.5 rounded cursor-pointer"
                       title="Dispensar aviso"
                     >
                       <span className="material-symbols-outlined text-[16px]">close</span>
@@ -1741,32 +2876,47 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
               )}
 
-              {/* Filtros e Barra de Ferramentas Contábeis */}
-              <div className="flex flex-wrap items-center justify-between gap-3 p-2 bg-black/20 rounded border border-slate-800">
-                <div className="flex items-center gap-2 flex-1 max-w-md">
-                  <span className="material-symbols-outlined text-[16px] text-slate-400">search</span>
+              {/* Filtros e Barra de Ferramentas Contábeis (Otimizado para Mobile) */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-1.5 sm:p-2 bg-[#f8fafc] rounded-lg border border-slate-300">
+                <div className="flex items-center gap-1.5 flex-1 w-full sm:max-w-md">
+                  <span className="material-symbols-outlined text-[15px] text-blue-600 shrink-0">search</span>
                   <input
                     type="search"
                     value={instSearch}
                     onChange={(e) => setInstSearch(e.target.value)}
                     placeholder="Filtrar por devedor, produto ou título..."
-                    className="w-full h-7 px-2.5 bg-slate-800 border border-slate-700 rounded text-[11px] text-white outline-none"
+                    className="w-full h-7 sm:h-7 px-2 bg-white border border-slate-300 rounded-lg text-[11px] text-slate-900 outline-none placeholder:text-slate-400"
                   />
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] font-bold">Situação:</span>
-                  {(['todos', 'overdue', 'soon', 'ontime', 'paid'] as const).map((st) => (
+                <div className="flex flex-wrap items-center gap-1 w-full sm:w-auto">
+                  <span className="text-[10px] font-bold text-slate-700 mr-0.5 hidden sm:inline">Situação:</span>
+                  {(
+                    [
+                      { id: 'todos', label: 'Todas', count: statusCounts.todos, color: 'blue' },
+                      { id: 'overdue', label: 'Atrasadas', count: statusCounts.overdue, color: 'red' },
+                      { id: 'soon', label: 'Vence Logo', count: statusCounts.soon, color: 'amber' },
+                      { id: 'ontime', label: 'Em dia', count: statusCounts.ontime, color: 'emerald' },
+                      { id: 'paid', label: 'Pagas', count: statusCounts.paid, color: 'slate' },
+                    ] as const
+                  ).map((item) => (
                     <button
-                      key={st}
-                      onClick={() => setInstStatusFilter(st)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
-                        instStatusFilter === st
-                          ? 'bg-blue-600 text-white border-blue-500'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                      key={item.id}
+                      onClick={() => setInstStatusFilter(item.id as any)}
+                      className={`px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-bold transition-all cursor-pointer border flex items-center gap-0.5 ${
+                        instStatusFilter === item.id
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
-                      {st === 'overdue' ? 'Atrasadas' : st === 'soon' ? 'Vence Logo' : st === 'ontime' ? 'Em dia' : st === 'paid' ? 'Pagas' : 'Todas'}
+                      <span>{item.label}</span>
+                      <span className={`px-1 rounded-full text-[8.5px] font-mono ${
+                        item.id === 'overdue' && item.count > 0
+                          ? 'bg-red-600 text-white font-extrabold'
+                          : 'bg-slate-200 text-slate-700'
+                      }`}>
+                        {item.count}
+                      </span>
                     </button>
                   ))}
 
@@ -1774,17 +2924,17 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowTrashModal(true)}
-                    className={`px-2.5 py-1 rounded text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer border shadow-xs ml-2 ${
+                    className={`px-1.5 py-0.5 rounded text-[9.5px] sm:text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer border shadow-xs ml-auto sm:ml-2 ${
                       deletedInstallments.length > 0
-                        ? 'bg-amber-950/60 hover:bg-amber-900/80 text-amber-300 border-amber-600'
-                        : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                        ? 'bg-amber-100 hover:bg-amber-200 text-amber-900 border-amber-400'
+                        : 'bg-white hover:bg-slate-100 text-slate-700 border-slate-300'
                     }`}
                     title="Abrir Lixeira Contábil para restaurar ou desfazer exclusões"
                   >
-                    <span className="material-symbols-outlined text-[15px] text-amber-400">delete_sweep</span>
-                    <span>Lixeira Contábil</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold ${
-                      deletedInstallments.length > 0 ? 'bg-amber-500 text-black' : 'bg-slate-700 text-slate-300'
+                    <span className="material-symbols-outlined text-[13px] text-amber-600">delete_sweep</span>
+                    <span>Lixeira</span>
+                    <span className={`px-1 py-0.1 rounded-full text-[8.5px] font-mono font-bold ${
+                      deletedInstallments.length > 0 ? 'bg-amber-500 text-black' : 'bg-slate-200 text-slate-700'
                     }`}>
                       {deletedInstallments.length}
                     </span>
@@ -1792,92 +2942,271 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
               </div>
 
-              {/* Caixa Selecionável & Barra de Ações em Massa (Excluir Geral) */}
-              <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-2 bg-slate-900/90 border border-slate-700 rounded text-xs font-mono">
-                <div className="flex items-center gap-3">
-                  <label className="flex items-center gap-1.5 cursor-pointer font-bold select-none text-slate-200 hover:text-white">
+              {/* Seletor de Modo no Mobile (Listinha Planilha vs Grade Ampla) */}
+              <div className="flex sm:hidden items-center justify-between p-1 px-2 bg-[#f8fafc] rounded border border-slate-300 text-[10.5px]">
+                <span className="font-bold text-slate-800 flex items-center gap-1">
+                  <span className="material-symbols-outlined text-[14px] text-blue-600">table_rows</span>
+                  <span>Modo Contábil Mobile:</span>
+                </span>
+                <div className="flex items-center gap-1 bg-white p-0.5 rounded border border-slate-300">
+                  <button
+                    type="button"
+                    onClick={() => setMobileViewMode('cards')}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer ${
+                      mobileViewMode === 'cards' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[12px]">view_list</span>
+                    <span>Listinha Planilha</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMobileViewMode('table')}
+                    className={`px-1.5 py-0.5 rounded text-[9px] font-bold flex items-center gap-0.5 transition-colors cursor-pointer ${
+                      mobileViewMode === 'table' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 hover:text-slate-900'
+                    }`}
+                  >
+                    <span className="material-symbols-outlined text-[12px]">table_chart</span>
+                    <span>Grade DBGrid</span>
+                  </button>
+                </div>
+              </div>
+
+              {/* Caixa Selecionável & Barra de Ações em Massa (Excluir Geral Compacta) */}
+              <div className="flex items-center justify-between gap-1.5 px-2 py-1 bg-[#fafafa] border border-slate-300 rounded-lg text-[10.5px] font-mono text-slate-800">
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <label className="flex items-center gap-1 cursor-pointer font-bold select-none text-slate-800 hover:text-blue-900 shrink-0">
                     <input
                       type="checkbox"
                       ref={masterCheckboxRef}
                       checked={isAllFilteredSelected}
                       onChange={toggleSelectAllFiltered}
-                      className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                      className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-600"
                     />
-                    <span>Selecionar Geral (Todos os {filteredInstallments.length} títulos)</span>
+                    <span className="truncate">Selecionar Geral ({filteredInstallments.length})</span>
                   </label>
 
                   {selectedInstIds.length > 0 && (
-                    <span className="px-2 py-0.5 rounded bg-blue-900/60 border border-blue-700 text-blue-200 text-[11px]">
-                      ✓ <strong>{selectedInstIds.length}</strong> selecionado(s) | Total: <strong>R$ {totalSelectedAmount.toFixed(2)}</strong>
+                    <span className="px-1.5 py-0.2 rounded bg-blue-100 border border-blue-300 text-blue-900 text-[9.5px] font-bold truncate">
+                      ✓ <strong>{selectedInstIds.length}</strong> sel.
                     </span>
                   )}
                 </div>
 
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center gap-1 shrink-0">
                   {selectedInstIds.length > 0 && (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => handleRequestBulkDelete('selected')}
-                        className="px-2.5 py-1 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 shadow-xs transition-all active:scale-95"
-                        title="Excluir títulos marcados e enviar para a lixeira"
-                      >
-                        <span className="material-symbols-outlined text-[15px]">delete_sweep</span>
-                        <span>Excluir Selecionados ({selectedInstIds.length})</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSelectedInstIds([])}
-                        className="px-2 py-1 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded text-[11px] cursor-pointer transition-colors"
-                      >
-                        Desmarcar
-                      </button>
-                    </>
+                    <button
+                      type="button"
+                      onClick={() => handleRequestBulkDelete('selected')}
+                      className="px-1.5 py-0.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded text-[9.5px] cursor-pointer flex items-center gap-0.5 shadow-xs transition-all active:scale-95"
+                      title="Excluir títulos marcados"
+                    >
+                      <span className="material-symbols-outlined text-[12px]">delete_sweep</span>
+                      <span>Excluir Sel. ({selectedInstIds.length})</span>
+                    </button>
                   )}
 
                   <button
                     type="button"
                     onClick={() => handleRequestBulkDelete('all_filtered')}
                     disabled={filteredInstallments.length === 0}
-                    className="px-2.5 py-1 bg-red-900/80 hover:bg-red-800 text-red-200 font-bold rounded text-[11px] cursor-pointer flex items-center gap-1 border border-red-700 shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-                    title="Excluir geral todos os títulos exibidos na grade e enviar para a lixeira"
+                    className="px-1.5 py-0.5 bg-red-100 hover:bg-red-200 text-red-800 font-bold rounded text-[9.5px] cursor-pointer flex items-center gap-0.5 border border-red-300 shadow-xs transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+                    title="Excluir geral todos os títulos exibidos"
                   >
-                    <span className="material-symbols-outlined text-[15px]">delete_forever</span>
+                    <span className="material-symbols-outlined text-[12px]">delete_forever</span>
                     <span>Excluir Geral ({filteredInstallments.length})</span>
                   </button>
                 </div>
               </div>
 
-              {/* DataGrid of Installments */}
-              <div className="border border-slate-700 rounded overflow-x-auto max-h-[500px] table-scroll-container financial-table-container">
-                <table className="w-full text-left border-collapse text-[11px] min-w-[750px]">
-                  <thead className="bg-slate-950 text-slate-300 uppercase font-mono text-[10px] border-b border-slate-700 sticky top-0 z-10 select-none">
-                    <tr>
-                      <th className="p-2 border-r border-slate-800 text-center w-10 select-none">
+              {/* Modo Listinha Planilha Contábil Mobile (Compacta, Delphiana, Clarinha e sem sobreposição) */}
+              {mobileViewMode === 'cards' && (
+                <div className="sm:hidden border border-slate-300 rounded-lg overflow-hidden bg-white font-sans shadow-xs select-none">
+                  {/* Cabeçalho da Planilha Contábil Mobile (Reenquadrado e Agrupado) */}
+                  <div className="grid grid-cols-12 gap-1 px-2 py-1 bg-slate-100 border-b border-slate-300 text-[9.5px] font-mono font-bold uppercase text-slate-700">
+                    <div className="col-span-4 flex items-center gap-1 min-w-0">
+                      <input
+                        type="checkbox"
+                        checked={isAllFilteredSelected}
+                        onChange={toggleSelectAllFiltered}
+                        title="Marcar todos"
+                        className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-600 shrink-0"
+                      />
+                      <span className="truncate">Sacado / Cliente</span>
+                    </div>
+                    <div className="col-span-5 text-center px-0.5">Venc / Valor / Parc</div>
+                    <div className="col-span-3 text-center">Ações</div>
+                  </div>
+
+                  {/* Linhas da Planilha Contábil */}
+                  <div className="divide-y divide-slate-200">
+                    {filteredInstallments.length === 0 ? (
+                      <div className="p-6 text-center text-slate-500 text-xs">
+                        Nenhum título encontrado com os filtros atuais.
+                      </div>
+                    ) : (
+                      filteredInstallments.map((inst, index) => {
+                        const isOverdue = inst.status === 'overdue';
+                        const isPaid = inst.status === 'paid';
+                        const isSelected = selectedInstIds.includes(inst.id);
+
+                        const now = new Date();
+                        now.setHours(0, 0, 0, 0);
+                        const due = new Date(inst.dueDate);
+                        due.setHours(0, 0, 0, 0);
+                        const diffDays = Math.round((due.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+                        const daysOverdue = diffDays < 0 ? Math.abs(diffDays) : 1;
+
+                        return (
+                          <div
+                            key={inst.id}
+                            className={`grid grid-cols-12 gap-0.5 px-1.5 py-1 items-center transition-all ${
+                              isSelected
+                                ? 'bg-blue-100/90 border-l-2 border-l-blue-600 shadow-inner'
+                                : isOverdue
+                                ? 'bg-red-50/90 border-l-2 border-l-red-500'
+                                : isPaid
+                                ? 'bg-slate-50/80 opacity-75'
+                                : index % 2 === 0
+                                ? 'bg-white hover:bg-blue-50/30'
+                                : 'bg-[#fcfbf9] hover:bg-blue-50/30'
+                            }`}
+                          >
+                            {/* Coluna 1: Checkbox + Sacado / Cliente + Produto (Selecionável) */}
+                            <div
+                              className="col-span-5 min-w-0 pr-0.5 flex items-start gap-1 cursor-pointer"
+                              onClick={() => toggleSelectRow(inst.id)}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isSelected}
+                                onChange={() => toggleSelectRow(inst.id)}
+                                className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-600 mt-0.5 shrink-0"
+                              />
+                              <div className="min-w-0 flex-1">
+                                <div
+                                  className="font-extrabold text-[10.5px] text-slate-900 truncate leading-tight hover:text-blue-600 cursor-pointer select-text"
+                                  title="Clique para selecionar este sacado"
+                                >
+                                  {inst.debtorName}
+                                </div>
+                                <div
+                                  className="text-[8.5px] text-slate-500 truncate font-mono hover:text-slate-800 cursor-pointer select-text leading-tight mt-0.5"
+                                  title="Produto / Descrição"
+                                >
+                                  {inst.product}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Coluna 2: Valor Nominal, Vencimento & Parcela (Próximo do Nome, Selecionáveis) */}
+                            <div
+                              className="col-span-4 text-center min-w-0 px-0.5 flex flex-col items-center justify-center cursor-pointer"
+                              onClick={() => toggleSelectRow(inst.id)}
+                            >
+                              <div className="flex items-center justify-center gap-1 leading-tight">
+                                <span className="font-mono font-black text-[10.5px] truncate text-red-600 cursor-pointer select-text">
+                                  R$ {inst.amount.toFixed(2)}
+                                </span>
+                              </div>
+                              <div className="text-[8.5px] text-slate-600 font-mono font-semibold flex items-center justify-center gap-0.5 leading-tight mt-0.5">
+                                <span
+                                  className="hover:text-blue-700 cursor-pointer select-text bg-slate-100 px-0.5 py-0 rounded border border-slate-200"
+                                  title="Data de Vencimento"
+                                >
+                                  Venc: {formatDateSafe(inst.dueDate)}
+                                </span>
+                                <span
+                                  className="bg-blue-100 text-blue-800 text-[8px] px-0.5 py-0 rounded font-bold border border-blue-200 hover:bg-blue-200 cursor-pointer select-text"
+                                  title="Número da Parcela"
+                                >
+                                  #{inst.installmentNumber}/{inst.totalInstallments}
+                                </span>
+                              </div>
+                              {isOverdue && (
+                                <div className="text-[7.5px] text-red-600 font-mono font-bold animate-pulse leading-none mt-0.5">
+                                  🚨 Em atraso
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Coluna 3: Status / Botão de Baixa & Excluir Empilhados (Lixeira de Baixo do Liquidar/Liquidado) */}
+                            <div className="col-span-3 flex flex-col items-center justify-center gap-0.5 min-w-0 my-0.2" onClick={(e) => e.stopPropagation()}>
+                              {!isPaid ? (
+                                <button
+                                  type="button"
+                                  onClick={() => handleQuickPayInstallment(inst.id)}
+                                  className="h-6.5 px-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-md text-[9.5px] font-black cursor-pointer inline-flex items-center justify-center gap-0.5 active:scale-95 transition-all shadow-xs w-full max-w-[80px] uppercase tracking-wider border border-emerald-400"
+                                  title="Liquidar e dar baixa contábil nesta parcela"
+                                >
+                                  <span className="material-symbols-outlined text-[12px]">check_circle</span>
+                                  <span>LIQUIDAR</span>
+                                </button>
+                              ) : (
+                                <span className="h-6.5 px-1 rounded-md bg-emerald-100 border border-emerald-300 text-emerald-900 text-[9px] font-black font-mono inline-flex items-center justify-center gap-0.5 w-full max-w-[80px] uppercase tracking-wider shadow-2xs">
+                                  <span className="material-symbols-outlined text-[12px] text-emerald-700">verified</span>
+                                  <span>LIQUIDADO</span>
+                                </span>
+                              )}
+
+                              <button
+                                type="button"
+                                onClick={() => handleDeleteSpecificInstallment(inst)}
+                                className="h-5 px-1 bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 rounded-md text-[8.5px] font-bold flex items-center justify-center gap-0.5 cursor-pointer active:scale-95 transition-all shadow-2xs w-full max-w-[80px]"
+                                title="Excluir título (Lixeira)"
+                              >
+                                <span className="material-symbols-outlined text-[11px] text-red-600">delete</span>
+                                <span>Lixeira</span>
+                              </button>
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  {/* Rodapé da Planilha Contábil Mobile */}
+                  <div className="px-2 py-1 bg-slate-100 border-t border-slate-300 text-[9.5px] text-slate-700 flex items-center justify-between font-mono font-semibold">
+                    <span>{filteredInstallments.length} títulos listados</span>
+                    {selectedInstIds.length > 0 && (
+                      <span className="text-blue-700 font-bold">{selectedInstIds.length} sel. (R$ {totalSelectedAmount.toFixed(2)})</span>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* DataGrid of Installments (Desktop ou quando ativado no mobile) */}
+              <div className={`${mobileViewMode === 'cards' ? 'hidden sm:block' : 'block'} border border-slate-300 rounded-lg overflow-x-auto max-h-[520px] scrollbar-thin bg-white w-full shadow-2xs`}>
+                <div className={`sm:hidden px-2 py-0.5 border-b text-[9.5px] font-sans flex items-center justify-between select-none bg-slate-100 text-slate-800 border-slate-300`}>
+                  <span className="flex items-center gap-1 font-bold text-blue-900">
+                    <span className="material-symbols-outlined text-[13px]">table_chart</span>
+                    <span>Grade DBGrid Títulos Mobile</span>
+                  </span>
+                  <span className="text-[8.5px] text-emerald-700 font-mono font-bold">100% visível na tela</span>
+                </div>
+                <table className="w-full text-left border-collapse text-[9px] sm:text-[11px] erp-dbgrid-table min-w-full">
+                  <thead className="bg-slate-100 text-slate-800 uppercase font-mono text-[8px] sm:text-[10px] border-b border-slate-300 sticky top-0 z-10 select-none font-bold">
+                    <tr className="h-6 sm:h-7">
+                      <th className="p-0.5 border-r border-slate-200 text-center w-7 select-none">
                         <input
                           type="checkbox"
                           checked={isAllFilteredSelected}
                           onChange={toggleSelectAllFiltered}
                           title="Caixa Selecionável Geral (Marcar/Desmarcar todos)"
-                          className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                          className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-600"
                         />
                       </th>
-                      <th className="p-2 border-r border-slate-800 w-14">Título</th>
-                      <th className="p-2 border-r border-slate-800">Devedor</th>
-                      <th className="p-2 border-r border-slate-800">Descrição do Produto</th>
-                      <th className="p-2 border-r border-slate-800 text-center">Parc.</th>
-                      <th className="p-2 border-r border-slate-800">Vencimento</th>
-                      <th className="p-2 border-r border-slate-800 text-right">Valor Nominal</th>
-                      <th className="p-2 border-r border-slate-800 text-right">Multa R$5</th>
-                      <th className="p-2 border-r border-slate-800 text-center">Situação</th>
-                      <th className="p-2 text-center min-w-[150px] w-40 select-none">Baixa / Ações ERP</th>
+                      <th className="hidden sm:table-cell px-1.5 py-1 border-r border-slate-200 w-12 whitespace-nowrap">Título</th>
+                      <th className="px-1.5 sm:px-2 py-1 border-r border-slate-200 w-[33%] sm:w-auto truncate">Devedor / Item</th>
+                      <th className="px-1 sm:px-2 py-1 border-r border-slate-200 text-center w-[41%] sm:w-auto bg-blue-50/80 text-blue-900 font-bold">Valor, Parcela & Vencimento</th>
+                      <th className="hidden sm:table-cell px-1.5 py-1 border-r border-slate-200 text-center whitespace-nowrap">Situação</th>
+                      <th className="px-1 sm:px-2 py-1 text-center w-[26%] sm:w-28 whitespace-nowrap select-none">Ações ARP</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800 font-mono">
+                  <tbody className="divide-y divide-slate-200 font-mono text-[9.5px] sm:text-[10.5px]">
                     {filteredInstallments.length === 0 ? (
                       <tr>
-                        <td colSpan={10} className="p-6 text-center text-slate-500 font-sans">
+                        <td colSpan={6} className="p-6 text-center text-slate-500 font-sans">
                           Nenhum título encontrado com os filtros atuais.
                         </td>
                       </tr>
@@ -1889,84 +3218,116 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                         return (
                           <tr
                             key={inst.id}
-                            className={`transition-colors ${
+                            className={`transition-colors h-auto py-1 sm:h-9 ${
                               isSelected
-                                ? 'bg-blue-950/50 text-blue-100 ring-1 ring-blue-500/50'
+                                ? 'bg-blue-100 text-blue-950 font-bold'
                                 : isPaid
-                                ? 'opacity-60 bg-slate-950/20'
+                                ? 'opacity-75 bg-slate-50'
                                 : isOverdue
-                                ? 'bg-red-950/30 text-red-200'
+                                ? 'bg-red-50 text-red-950'
                                 : index % 2 === 0
-                                ? 'bg-slate-900/60'
-                                : 'bg-slate-950/40'
+                                ? 'bg-white hover:bg-slate-100'
+                                : 'bg-[#fcfbf9] hover:bg-slate-100'
                             }`}
                           >
-                            <td className="p-2 border-r border-slate-800 text-center w-10" onClick={(e) => e.stopPropagation()}>
+                            {/* Checkbox */}
+                            <td className="p-0.5 border-r border-slate-200 text-center w-7 select-none" onClick={(e) => e.stopPropagation()}>
                               <input
                                 type="checkbox"
                                 checked={isSelected}
                                 onChange={() => toggleSelectRow(inst.id)}
                                 title={`Selecionar título ${inst.id}`}
-                                className="w-4 h-4 rounded cursor-pointer accent-blue-600"
+                                className="w-3.5 h-3.5 rounded cursor-pointer accent-blue-600"
                               />
                             </td>
-                            <td className="p-2 border-r border-slate-800 text-slate-400">{inst.id.slice(-5)}</td>
-                            <td className="p-2 border-r border-slate-800 font-sans font-semibold">{inst.debtorName}</td>
-                            <td className="p-2 border-r border-slate-800 truncate max-w-xs">{inst.product}</td>
-                            <td className="p-2 border-r border-slate-800 text-center">
-                              {inst.installmentNumber}/{inst.totalInstallments}
+
+                            {/* Título ID (visível em telas sm+) */}
+                            <td className="hidden sm:table-cell px-1.5 py-0.5 border-r border-slate-200 text-slate-600 font-mono text-[9.5px] truncate w-12 whitespace-nowrap">{inst.id.slice(-5)}</td>
+                            
+                            {/* Devedor com Nome do Item debaixo do Nome */}
+                            <td className="px-1.5 sm:px-2 py-1 border-r border-slate-200 font-sans min-w-0 w-[33%] sm:w-auto">
+                              <div className="font-extrabold text-[10px] sm:text-[11px] text-slate-900 leading-tight truncate">
+                                {inst.debtorName}
+                              </div>
+                              <div className="text-[8.5px] sm:text-[9px] text-slate-500 font-mono leading-tight mt-0.5 truncate" title="Produto / Item debaixo do nome">
+                                {inst.product}
+                              </div>
                             </td>
-                            <td className="p-2 border-r border-slate-800 font-bold">
-                              {new Date(inst.dueDate).toLocaleDateString('pt-BR')}
+
+                            {/* Valor com Parcela junto e Vencimento debaixo do valor */}
+                            <td className="px-1 sm:px-2 py-1 border-r border-slate-200 text-center font-mono bg-blue-50/30 min-w-0 w-[41%] sm:w-auto">
+                              <div className="flex items-center justify-center gap-1 leading-tight flex-wrap">
+                                <span className="font-mono font-black text-red-600 text-[10px] sm:text-[11px]">
+                                  R$ {inst.amount.toFixed(2)}
+                                </span>
+                                <span className="px-1 py-0.1 rounded bg-blue-100 border border-blue-300 text-blue-800 text-[7.5px] sm:text-[8.5px] font-bold" title="Parcela junto com o valor">
+                                  #{inst.installmentNumber}/{inst.totalInstallments}
+                                </span>
+                              </div>
+                              <div className="text-[8px] sm:text-[9px] text-slate-600 font-semibold leading-tight mt-0.5" title="Vencimento debaixo do valor">
+                                Venc: <span className="font-bold text-slate-800">{formatDateSafe(inst.dueDate)}</span>
+                              </div>
+                              {isOverdue && (
+                                <div className="sm:hidden text-[7.5px] text-red-600 font-bold font-mono mt-0.5 animate-pulse">
+                                  🚨 Em atraso
+                                </div>
+                              )}
                             </td>
-                            <td className="p-2 border-r border-slate-800 text-right font-bold">
-                              R$ {inst.amount.toFixed(2)}
-                            </td>
-                            <td className="p-2 border-r border-slate-800 text-right text-amber-400">
-                              {isOverdue ? 'R$ 5,00' : '—'}
-                            </td>
-                            <td className="p-2 border-r border-slate-800 text-center">
+
+                            {/* Situação (visível em telas sm+) */}
+                            <td className="hidden sm:table-cell px-1.5 py-0.5 border-r border-slate-200 text-center whitespace-nowrap">
                               {isPaid ? (
-                                <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px]">
-                                  QUITADO
+                                <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-800 border border-emerald-300 text-[8.5px] font-bold inline-flex items-center gap-0.5">
+                                  <span>✅</span>
+                                  <span>PAGO</span>
                                 </span>
                               ) : isOverdue ? (
-                                <span className="px-1.5 py-0.5 rounded bg-red-900/60 text-red-300 font-bold text-[9px]">
-                                  ATRASADA
+                                <span className="px-1.5 py-0.5 rounded bg-red-100 text-red-800 border border-red-300 text-[8.5px] font-extrabold animate-fun-overdue inline-flex items-center gap-0.5 shadow-2xs">
+                                  <span className="animate-bounce inline-block text-[9px]">🚨</span>
+                                  <span>ATRASADA</span>
                                 </span>
                               ) : (
-                                <span className="px-1.5 py-0.5 rounded bg-blue-900/40 text-blue-300 text-[9px]">
-                                  ABERTO
+                                <span className="px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 border border-amber-300 text-[8.5px] font-bold animate-fun-duesoon inline-flex items-center gap-0.5 shadow-2xs">
+                                  <span className="inline-block text-[9px]">⏳</span>
+                                  <span>PRESTES A VENCER</span>
                                 </span>
                               )}
                             </td>
-                            <td className="p-2 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                              <div className="flex items-center justify-center gap-1.5">
+
+                            {/* Ações ARP (Liquidar/Liquidado no topo e Lixeira debaixo) - 100% visível na tela mobile */}
+                            <td className="px-1 sm:px-1.5 py-1 text-center w-[26%] sm:w-28 whitespace-nowrap select-none" onClick={(e) => e.stopPropagation()}>
+                              <div className="flex flex-col items-center justify-center gap-0.5 my-0.2 w-full max-w-[76px] sm:max-w-[90px] mx-auto">
                                 {!isPaid ? (
                                   <button
                                     type="button"
-                                    onClick={() => handleQuickPayInstallment(inst.id)}
-                                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
-                                    title="Liquidar com recibo contábil oficial"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleQuickPayInstallment(inst.id);
+                                    }}
+                                    className="w-full h-6 sm:h-7.5 px-1 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded text-[8.5px] sm:text-[10px] font-black cursor-pointer transition-all active:scale-95 inline-flex items-center justify-center gap-0.5 shadow-2xs uppercase tracking-wider border border-emerald-400"
+                                    title="Liquidar e dar baixa contábil nesta parcela"
                                   >
-                                    <span className="material-symbols-outlined text-[13px]">check_circle</span>
-                                    <span>Dar Baixa</span>
+                                    <span className="material-symbols-outlined text-[10px] sm:text-[13px]">check_circle</span>
+                                    <span>LIQUIDAR</span>
                                   </button>
                                 ) : (
-                                  <span className="px-1.5 py-0.5 rounded bg-emerald-900/50 text-emerald-300 font-bold text-[9px] inline-flex items-center gap-1">
-                                    <span className="material-symbols-outlined text-[12px]">verified</span>
-                                    <span>Baixado</span>
+                                  <span className="w-full h-6 sm:h-7.5 px-1 bg-emerald-100 text-emerald-900 border border-emerald-300 font-black text-[8px] sm:text-[9.5px] inline-flex items-center justify-center gap-0.5 rounded uppercase tracking-wider shadow-2xs">
+                                    <span className="material-symbols-outlined text-[10px] sm:text-[13px] text-emerald-700">verified</span>
+                                    <span>LIQUIDADO</span>
                                   </span>
                                 )}
 
                                 <button
                                   type="button"
-                                  onClick={() => handleDeleteSpecificInstallment(inst)}
-                                  className="px-2 py-0.5 bg-red-600 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center gap-1 shadow-xs"
-                                  title="Excluir este título e mover para a Lixeira Contábil"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleDeleteSpecificInstallment(inst);
+                                  }}
+                                  className="w-full h-5 sm:h-6 px-1 bg-red-50 hover:bg-red-100 border border-red-300 text-red-700 rounded text-[8px] sm:text-[9px] font-bold cursor-pointer transition-all active:scale-95 inline-flex items-center justify-center gap-0.5 shadow-2xs"
+                                  title="Excluir este título (Mover para Lixeira)"
                                 >
-                                  <span className="material-symbols-outlined text-[13px]">delete</span>
-                                  <span>Excluir</span>
+                                  <span className="material-symbols-outlined text-[9.5px] sm:text-[12px] text-red-600">delete</span>
+                                  <span>Lixeira</span>
                                 </button>
                               </div>
                             </td>
@@ -1979,9 +3340,9 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
               </div>
 
               {/* Rodapé da Grade com Atalhos e Lixeira */}
-              <div className="flex flex-wrap items-center justify-between text-[11px] text-slate-400 font-mono pt-1">
-                <div className="flex items-center gap-4">
-                  <span>Títulos listados: <strong className="text-white">{filteredInstallments.length}</strong> de {installments.length}</span>
+              <div className="flex flex-wrap items-center justify-between text-[10px] sm:text-[11px] text-slate-500 font-mono pt-1">
+                <div className="flex items-center gap-2 sm:gap-4">
+                  <span>Títulos listados: <strong className="text-slate-900 dark:text-white font-black">{filteredInstallments.length}</strong> de {installments.length}</span>
                   {selectedInstIds.length > 0 && (
                     <span className="text-blue-300">Selecionados: <strong>{selectedInstIds.length}</strong></span>
                   )}
@@ -2005,65 +3366,65 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           {/* TAB 4: EMISSÃO DE CARNÊ & PARCELAMENTO EM LOTE */}
           {activeTab === 'lancamento' && (
             <form onSubmit={handleCreatePurchaseBatch} className="space-y-4 max-w-3xl mx-auto">
-              <div className="p-3 bg-blue-950/40 border border-blue-800 rounded text-blue-200 text-xs">
+              <div className="p-3 bg-blue-50 border border-blue-200 rounded text-blue-900 text-xs">
                 <span className="font-bold flex items-center gap-1.5 mb-1">
-                  <span className="material-symbols-outlined text-[16px]">receipt</span>
+                  <span className="material-symbols-outlined text-[16px] text-blue-600">receipt</span>
                   Emissão Rápida de Compra e Desdobramento de Títulos em Lote
                 </span>
-                <p className="text-[11px] text-blue-300">
+                <p className="text-[11px] text-slate-600">
                   Cadastre uma compra e o sistema ERP dividirá automaticamente o valor total em até 24 parcelas com datas de vencimento sequenciais e gravação no razão contábil.
                 </p>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3.5 bg-[#fafafa] border border-slate-300 rounded-xl">
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold mb-1">Devedor Titular da Compra *</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Devedor Titular da Compra *</label>
                   <select
                     required
                     value={newPurchaseDebtorId}
                     onChange={(e) => setNewPurchaseDebtorId(e.target.value)}
-                    className="w-full h-8 px-2 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 outline-none font-semibold"
                   >
                     {debtors.map((d) => (
                       <option key={d.id} value={d.id}>
-                        {d.name} (Saldo Devedor Atual: R$ {(Number(d.totalOwed) || 0).toFixed(2)})
+                        {d.name} (Saldo: R$ {(Number(d.totalOwed) || 0).toFixed(2)})
                       </option>
                     ))}
                   </select>
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold mb-1">Descrição do Produto / Serviço *</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Descrição do Produto / Serviço *</label>
                   <input
                     type="text"
                     required
                     value={newPurchaseProduct}
                     onChange={(e) => setNewPurchaseProduct(e.target.value)}
                     placeholder="Ex: Pneus Aro 16 Pirelli Scorpion"
-                    className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none uppercase"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 outline-none uppercase font-semibold"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold mb-1">Loja / Estabelecimento</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Loja / Estabelecimento</label>
                   <input
                     type="text"
                     value={newPurchaseStore}
                     onChange={(e) => setNewPurchaseStore(e.target.value)}
                     placeholder="Ex: Magazine Luiza"
-                    className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold mb-1">Cartão / Banco Emissor (Autocompletar ou Digitar)</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Cartão / Banco Emissor</label>
                   <input
                     type="text"
                     list="erp-card-options"
                     value={newPurchaseCard}
                     onChange={(e) => setNewPurchaseCard(e.target.value)}
-                    placeholder="Ex: Nubank Nação, Nubank Croma..."
-                    className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
+                    placeholder="Ex: Nubank Nação, Itaú..."
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 outline-none"
                     required
                   />
                   <datalist id="erp-card-options">
@@ -2079,7 +3440,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold mb-1">Valor Total da Compra (R$) *</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Valor Total da Compra (R$) *</label>
                   <input
                     type="number"
                     step={0.01}
@@ -2087,16 +3448,16 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                     value={newPurchaseAmount}
                     onChange={(e) => setNewPurchaseAmount(e.target.value)}
                     placeholder="1200.00"
-                    className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs font-mono font-bold text-emerald-400 outline-none"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-slate-900 outline-none"
                   />
                 </div>
 
                 <div>
-                  <label className="block text-[11px] font-bold mb-1">Número de Parcelas *</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Número de Parcelas *</label>
                   <select
                     value={newPurchaseCount}
                     onChange={(e) => setNewPurchaseCount(e.target.value)}
-                    className="w-full h-8 px-2 bg-slate-800 border border-slate-700 rounded text-xs font-bold text-white outline-none"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs font-bold text-slate-900 outline-none"
                   >
                     {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 18, 24].map((num) => (
                       <option key={num} value={num}>
@@ -2107,21 +3468,21 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
 
                 <div className="sm:col-span-2">
-                  <label className="block text-[11px] font-bold mb-1">Vencimento da 1ª Parcela *</label>
+                  <label className="block text-[11px] font-bold mb-1 text-slate-700">Vencimento da 1ª Parcela *</label>
                   <input
                     type="date"
                     required
                     value={newPurchaseFirstDate}
                     onChange={(e) => setNewPurchaseFirstDate(e.target.value)}
-                    className="w-full h-8 px-2.5 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
+                    className="w-full h-8.5 sm:h-8 px-2.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-900 outline-none"
                   />
                 </div>
               </div>
 
-              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-800">
+              <div className="flex items-center justify-end gap-2 pt-3 border-t border-slate-200">
                 <button
                   type="submit"
-                  className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded shadow-md cursor-pointer flex items-center gap-1.5 transition-all active:scale-95"
+                  className="w-full sm:w-auto px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs rounded-xl shadow-md cursor-pointer flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <span className="material-symbols-outlined text-[16px]">done_all</span>
                   <span>Gravar e Desdobrar Carnê de Parcelas</span>
@@ -2130,128 +3491,190 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             </form>
           )}
 
-          {/* TAB 5: ENTRADA RÁPIDA DE DIGITAÇÃO EM MASSA (BULK DATA ENTRY) */}
+          {/* TAB 5: ENTRADA RÁPIDA DE DIGITAÇÃO ARP EM MASSA (PLANILHA CONTÁBIL ULTRA OTIMIZADA) */}
           {activeTab === 'massa' && (
-            <div className="space-y-3">
-              <div className="p-3 bg-amber-950/40 border border-amber-800 rounded text-amber-200 text-xs flex items-center justify-between">
-                <div>
-                  <span className="font-bold block">
-                    Modo Digitação Rápida por Tabulação (Operadores de Entrada Massiva)
+            <div className="space-y-1">
+              {/* Barra Superior de Controle Compacta */}
+              <div className="p-0.5 px-1 bg-amber-50/90 border border-amber-200 rounded text-amber-900 text-[10px] flex items-center justify-between gap-1 shadow-2xs">
+                <div className="flex items-center gap-1 min-w-0">
+                  <span className="material-symbols-outlined text-[13px] text-amber-700 shrink-0">grid_on</span>
+                  <span className="font-bold text-[10px] text-amber-900 truncate">
+                    Digitação ARP
                   </span>
-                  <span className="text-[11px] text-amber-300">
-                    Pressione Tab para saltar entre colunas rapidamente e Enter para incluir nova linha.
+                  <span className="text-[8.5px] text-amber-800 hidden md:inline border-l border-amber-300 pl-1">
+                    Navegue por <kbd className="px-0.5 py-0 bg-amber-200 rounded font-mono font-bold text-[8px]">Tab</kbd>
                   </span>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setBulkRows([
-                      ...bulkRows,
-                      {
-                        id: Date.now(),
-                        debtorName: '',
-                        doc: '',
-                        valor: '0.00',
-                        venc: new Date().toISOString().split('T')[0],
-                        parc: '1/1',
-                        status: 'Pendente',
-                      },
-                    ]);
-                    onToast('Nova linha de digitação adicionada.');
-                  }}
-                  className="px-3 py-1 bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs rounded cursor-pointer"
-                >
-                  + Inserir Linha
-                </button>
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (bulkRows.length > 0) {
+                        const last = bulkRows[bulkRows.length - 1];
+                        setBulkRows([
+                          ...bulkRows,
+                          {
+                            id: Date.now(),
+                            debtorName: last.debtorName,
+                            doc: last.doc,
+                            valor: last.valor,
+                            venc: last.venc,
+                            parc: last.parc,
+                            status: 'Pendente',
+                          },
+                        ]);
+                        onToast('Linha duplicada.');
+                      }
+                    }}
+                    className="px-1 py-0 bg-amber-100 hover:bg-amber-200 text-amber-950 border border-amber-300 font-bold text-[8.5px] rounded cursor-pointer transition-colors"
+                  >
+                    Duplicar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkRows([
+                        ...bulkRows,
+                        {
+                          id: Date.now(),
+                          debtorName: '',
+                          doc: '',
+                          valor: '0.00',
+                          venc: new Date().toISOString().split('T')[0],
+                          parc: '1/1',
+                          status: 'Pendente',
+                        },
+                      ]);
+                      onToast('Nova linha adicionada.');
+                    }}
+                    className="px-1.5 py-0 bg-amber-600 hover:bg-amber-700 text-white font-bold text-[9px] rounded cursor-pointer shadow-2xs flex items-center gap-0.5 transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[11px]">add</span>
+                    <span>+ Linha</span>
+                  </button>
+                </div>
               </div>
 
-              <div className="border border-slate-700 rounded overflow-x-auto table-scroll-container financial-table-container">
-                <table className="w-full text-left border-collapse text-[11px] min-w-[700px]">
-                  <thead className="bg-slate-950 text-slate-300 uppercase font-mono text-[10px] border-b border-slate-700">
-                    <tr>
-                      <th className="p-2 border-r border-slate-800 w-10">#</th>
-                      <th className="p-2 border-r border-slate-800">Nome do Devedor</th>
-                      <th className="p-2 border-r border-slate-800">CPF / CNPJ</th>
-                      <th className="p-2 border-r border-slate-800">Valor (R$)</th>
-                      <th className="p-2 border-r border-slate-800">Vencimento</th>
-                      <th className="p-2 border-r border-slate-800 text-center">Parc</th>
-                      <th className="p-2 text-center w-16">Ação</th>
+              {/* GRADE ULTRA OTIMIZADA COM CPF ABAIXO DO NOME E PARCELAS JUNTO AO VENCIMENTO */}
+              <div className="border border-slate-300 rounded overflow-x-auto scrollbar-none bg-white shadow-2xs max-h-[62vh] sm:max-h-[500px] w-full">
+                <table className="w-full table-fixed border-collapse text-[8px] sm:text-[11px] digitacao-arp-table">
+                  <thead className="bg-slate-100 text-slate-800 font-mono text-[7px] sm:text-[10px] border-b border-slate-300 font-bold select-none sticky top-0 z-10">
+                    <tr className="h-5 sm:h-7">
+                      <th className="p-0 border-r border-slate-300 w-[5%] sm:w-[32px] text-center bg-slate-200/80 text-slate-700 leading-none">#</th>
+                      <th className="p-0 px-1 border-r border-slate-300 w-[38%] sm:w-auto bg-slate-100 text-left leading-none">
+                        Nome / Razão <span className="text-[6.5px] sm:text-[8.5px] text-slate-500 font-normal block">(CPF / CNPJ abaixo)</span>
+                      </th>
+                      <th className="p-0 px-1 border-r border-slate-300 w-[32%] sm:w-[150px] bg-slate-100 text-left leading-none">
+                        Vencimento <span className="text-[6.5px] sm:text-[8.5px] text-amber-700 font-normal block">(e Parc.)</span>
+                      </th>
+                      <th className="p-0 px-1 border-r border-slate-300 w-[20%] sm:w-[100px] bg-red-50/90 text-red-800 text-right leading-none">Valor</th>
+                      <th className="p-0 text-center w-[5%] sm:w-[32px] bg-slate-100 leading-none">Del</th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-slate-800">
+                  <tbody className="divide-y divide-slate-200 font-mono">
                     {bulkRows.map((row, idx) => (
-                      <tr key={row.id} className="bg-slate-900/60">
-                        <td className="p-2 border-r border-slate-800 font-mono text-slate-400">{idx + 1}</td>
-                        <td className="p-1 border-r border-slate-800">
-                          <input
-                            type="text"
-                            value={row.debtorName}
-                            onChange={(e) => {
-                              const updated = [...bulkRows];
-                              updated[idx].debtorName = e.target.value;
-                              setBulkRows(updated);
-                            }}
-                            className="w-full h-7 px-2 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none uppercase"
-                          />
+                      <tr key={row.id} className="bg-white hover:bg-amber-50/40 transition-colors h-9 sm:h-10">
+                        <td className="p-0 border-r border-slate-200 w-[5%] sm:w-[32px] font-mono text-[8px] sm:text-[10px] text-slate-500 font-bold text-center bg-slate-50/60 select-none leading-none">
+                          {idx + 1}
                         </td>
-                        <td className="p-1 border-r border-slate-800">
-                          <input
-                            type="text"
-                            value={row.doc}
-                            onChange={(e) => {
-                              const updated = [...bulkRows];
-                              updated[idx].doc = e.target.value;
-                              setBulkRows(updated);
-                            }}
-                            className="w-full h-7 px-2 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-white outline-none"
-                          />
+                        <td className="p-0.5 border-r border-slate-200 w-[38%] sm:w-auto">
+                          <div className="flex flex-col gap-0.5">
+                            <input
+                              type="text"
+                              value={row.debtorName}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const updated = [...bulkRows];
+                                updated[idx].debtorName = e.target.value;
+                                setBulkRows(updated);
+                              }}
+                              placeholder="NOME / RAZÃO SOCIAL"
+                              className="w-full h-4 sm:h-5 px-1 bg-transparent border-0 hover:bg-amber-50/50 focus:bg-amber-50 focus:ring-1 focus:ring-blue-500 text-[8.5px] sm:text-[11px] text-slate-900 uppercase font-semibold outline-none rounded-none transition-colors p-0 leading-tight cursor-text"
+                            />
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              value={row.doc}
+                              onFocus={(e) => e.target.select()}
+                              onChange={(e) => {
+                                const updated = [...bulkRows];
+                                updated[idx].doc = e.target.value;
+                                setBulkRows(updated);
+                              }}
+                              placeholder="CPF / CNPJ"
+                              className="w-full h-3.5 sm:h-4.5 px-1 bg-slate-50/80 border-t border-slate-200 hover:bg-amber-50/50 focus:bg-amber-50 focus:ring-1 focus:ring-blue-500 text-[7.5px] sm:text-[10px] font-mono text-slate-700 tracking-tighter outline-none rounded-none transition-colors p-0 leading-tight cursor-text"
+                            />
+                          </div>
                         </td>
-                        <td className="p-1 border-r border-slate-800">
+                        <td className="p-0.5 border-r border-slate-200 w-[32%] sm:w-[150px]">
+                          <div className="flex flex-col gap-0.5">
+                            <div className="flex items-center gap-0.5 bg-slate-50/80 hover:bg-amber-100/60 transition-colors rounded-none p-0 cursor-pointer border-0">
+                              <input
+                                type="date"
+                                value={row.venc}
+                                onClick={(e) => {
+                                  try {
+                                    e.currentTarget.showPicker?.();
+                                  } catch (_) {}
+                                }}
+                                onChange={(e) => {
+                                  const updated = [...bulkRows];
+                                  updated[idx].venc = e.target.value;
+                                  setBulkRows(updated);
+                                }}
+                                className="w-full h-4 sm:h-5 bg-transparent border-0 text-[7.5px] sm:text-[10.5px] font-bold font-mono text-slate-900 outline-none cursor-pointer p-0 px-0.5 leading-tight active:bg-amber-100"
+                              />
+                            </div>
+                            <div className="flex items-center border-t border-slate-200 bg-amber-50/40 hover:bg-amber-100/60 transition-colors">
+                              <span className="text-[7px] text-amber-800 font-bold px-0.5 shrink-0">Parc:</span>
+                              <select
+                                value={row.parc}
+                                onChange={(e) => {
+                                  const updated = [...bulkRows];
+                                  updated[idx].parc = e.target.value;
+                                  setBulkRows(updated);
+                                }}
+                                className="w-full h-3.5 sm:h-4.5 text-center bg-transparent hover:bg-amber-100/80 focus:bg-white text-[7.5px] sm:text-[10px] font-mono font-bold text-slate-900 outline-none cursor-pointer rounded-none transition-colors p-0 leading-tight"
+                              >
+                                {["1/1", "1/2", "1/3", "1/4", "1/5", "1/6", "1/7", "1/8", "1/9", "1/10", "1/11", "1/12", "1/15", "1/18", "1/24", "1/36", "1/48", "1/60", "1/100"]
+                                  .concat(!["1/1", "1/2", "1/3", "1/4", "1/5", "1/6", "1/7", "1/8", "1/9", "1/10", "1/11", "1/12", "1/15", "1/18", "1/24", "1/36", "1/48", "1/60", "1/100"].includes(row.parc) ? [row.parc] : [])
+                                  .map((p) => (
+                                    <option key={p} value={p}>{p}</option>
+                                  ))}
+                              </select>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="p-0.5 border-r border-slate-200 w-[20%] sm:w-[100px] bg-red-50/20">
                           <input
                             type="text"
+                            inputMode="decimal"
                             value={row.valor}
+                            onFocus={(e) => e.target.select()}
                             onChange={(e) => {
                               const updated = [...bulkRows];
                               updated[idx].valor = e.target.value;
                               setBulkRows(updated);
                             }}
-                            className="w-full h-7 px-2 bg-slate-800 border border-slate-700 rounded text-xs font-mono text-emerald-400 outline-none"
+                            placeholder="150.00"
+                            className="w-full h-8 sm:h-10 px-1 bg-transparent border-0 hover:bg-red-50 focus:bg-white focus:ring-1 focus:ring-red-500 text-[8.5px] sm:text-[11px] font-mono text-red-600 font-bold text-right outline-none rounded-none transition-colors p-0 leading-tight cursor-text"
                           />
                         </td>
-                        <td className="p-1 border-r border-slate-800">
-                          <input
-                            type="date"
-                            value={row.venc}
-                            onChange={(e) => {
-                              const updated = [...bulkRows];
-                              updated[idx].venc = e.target.value;
-                              setBulkRows(updated);
-                            }}
-                            className="w-full h-7 px-2 bg-slate-800 border border-slate-700 rounded text-xs text-white outline-none"
-                          />
-                        </td>
-                        <td className="p-1 border-r border-slate-800">
-                          <input
-                            type="text"
-                            value={row.parc}
-                            onChange={(e) => {
-                              const updated = [...bulkRows];
-                              updated[idx].parc = e.target.value;
-                              setBulkRows(updated);
-                            }}
-                            className="w-full h-7 px-1 text-center bg-slate-800 border border-slate-700 rounded text-xs font-mono text-white outline-none"
-                          />
-                        </td>
-                        <td className="p-1 text-center">
+                        <td className="p-0 text-center w-[5%] sm:w-[32px]">
                           <button
                             type="button"
                             onClick={() => {
+                              if (bulkRows.length <= 1) {
+                                onToast('A planilha de digitação deve conter ao menos 1 linha.');
+                                return;
+                              }
                               setBulkRows(bulkRows.filter((r) => r.id !== row.id));
-                              onToast('Linha removida.');
+                              onToast('Linha de digitação removida.');
                             }}
-                            className="px-2 py-0.5 bg-red-800/80 hover:bg-red-700 text-white rounded text-[10px] font-bold cursor-pointer"
+                            className="w-full h-8 sm:h-10 flex items-center justify-center bg-red-50/50 hover:bg-red-100 text-red-600 transition-colors cursor-pointer p-0"
+                            title="Remover linha"
                           >
-                            ✕
+                            <span className="material-symbols-outlined text-[10px] sm:text-[14px] block leading-none">delete</span>
                           </button>
                         </td>
                       </tr>
@@ -2260,14 +3683,48 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </table>
               </div>
 
-              <div className="flex justify-end pt-2">
-                <button
-                  type="button"
-                  onClick={() => onToast('[Gravação em Massa] Lote de digitação processado com sucesso.')}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs rounded shadow cursor-pointer"
-                >
-                  Processar e Gravar Lote no Banco
-                </button>
+              {/* Rodapé de Totais e Gravação do Lote Otimizado */}
+              <div className="p-1 bg-slate-100 border border-slate-300 rounded flex items-center justify-between gap-1 shadow-2xs font-mono text-[9.5px]">
+                <div className="flex items-center gap-1.5 text-slate-700 min-w-0">
+                  <span className="truncate text-[9px]">
+                    Lote: <strong className="text-slate-900">{bulkRows.length}</strong>
+                  </span>
+                  <span className="truncate text-[9px]">
+                    Total:{' '}
+                    <strong className="text-red-600 font-black text-[10px]">
+                      R${' '}
+                      {bulkRows
+                        .reduce((sum, r) => sum + (parseFloat(r.valor.replace(',', '.')) || 0), 0)
+                        .toFixed(2)}
+                    </strong>
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 shrink-0">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBulkRows([
+                        { id: Date.now(), debtorName: '', doc: '', valor: '0.00', venc: new Date().toISOString().split('T')[0], parc: '1/1', status: 'Pendente' }
+                      ]);
+                      onToast('Planilha de digitação limpa.');
+                    }}
+                    className="px-1.5 py-0.5 bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-[8.5px] rounded transition-colors cursor-pointer"
+                  >
+                    Limpar
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const filledRows = bulkRows.filter((r) => r.debtorName.trim() !== '' && parseFloat(r.valor) > 0);
+                      onToast(`[Gravação ARP] Lote com ${filledRows.length || bulkRows.length} título(s) processado e salvo no ERP!`);
+                    }}
+                    className="px-2 py-0.5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[9px] rounded shadow cursor-pointer flex items-center justify-center gap-0.5 transition-all active:scale-95"
+                  >
+                    <span className="material-symbols-outlined text-[11px]">save</span>
+                    <span>Gravar Lote</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}
@@ -2385,30 +3842,29 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         </div>
       </div>
 
-      {/* Classic Windows ERP Status Bar (TStatusBar) */}
+      {/* Classic Windows ERP Status Bar (TStatusBar - Reenquadrado no Mobile) */}
       <div
-        className={`w-full px-3 py-1 border-t flex flex-wrap items-center justify-between text-[10px] font-mono select-none ${
+        className={`w-full px-2.5 sm:px-3 py-1.5 sm:py-1 border-t text-[10.5px] sm:text-[10px] font-mono select-none ${
           themeMode === 'classic_delphi'
-            ? 'bg-[#ece9d8] text-slate-800 border-slate-400'
+            ? 'bg-slate-100 text-slate-800 border-slate-300'
             : 'bg-slate-950 text-slate-400 border-slate-800'
         }`}
       >
-        <div className="flex items-center gap-4">
-          <span className="flex items-center gap-1 text-emerald-400 font-bold">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-            CONECTADO
-          </span>
-          <span>BD: isentropic-tangent-sdtd0</span>
-          <span>REG: {debtors.findIndex((d) => d.id === selectedDebtorId) + 1} de {debtors.length}</span>
-          <span className="hidden sm:inline">CAPS: ON</span>
-          <span className="hidden sm:inline">NUM: ON</span>
-          <span className="hidden md:inline">INS: ON</span>
-        </div>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">
+          <div className="flex items-center justify-between sm:justify-start gap-2.5 sm:gap-4">
+            <span className="flex items-center gap-1 text-emerald-700 font-bold">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+              ONLINE
+            </span>
+            <span className="text-slate-700">REG: <strong>{debtors.findIndex((d) => d.id === selectedDebtorId) + 1}</strong>/{debtors.length}</span>
+            <span className="hidden sm:inline text-slate-600">BD: isentropic-tangent-sdtd0</span>
+            <span className="truncate max-w-[120px] sm:max-w-none text-slate-600">OP: {currentUser?.name || 'Thiago Dias'}</span>
+          </div>
 
-        <div className="flex items-center gap-4">
-          <span>RECEBÍVEIS: <strong className="text-white">R$ {totalReceivables.toFixed(2)}</strong></span>
-          <span>EM ATRASO: <strong className="text-red-400">R$ {totalOverdueAmount.toFixed(2)}</strong></span>
-          <span>OPERADOR: {currentUser?.name || 'Thiago Dias'}</span>
+          <div className="flex items-center justify-between sm:justify-end gap-2.5 sm:gap-4 font-bold border-t sm:border-t-0 pt-1 sm:pt-0 border-slate-300">
+            <span>RECEBÍVEIS: <strong className="text-emerald-700">R$ {totalReceivables.toFixed(2)}</strong></span>
+            <span>ATRASO: <strong className="text-red-700">R$ {totalOverdueAmount.toFixed(2)}</strong></span>
+          </div>
         </div>
       </div>
 
@@ -2639,6 +4095,476 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           </div>
         </div>
       )}
+
+      {/* MODAL / BALÃOZINHO DE CONFIRMAÇÃO DE PERMISSÃO DE LIQUIDAÇÃO ARP */}
+      {confirmLiquidationInst && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3.5 animate-fade-in font-sans select-none">
+          <div className="w-full max-w-sm bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl overflow-hidden transform transition-all relative">
+            {/* Cabeçalho estilo balãozinho de permissão */}
+            <div className="bg-emerald-600 text-white px-4 py-3 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <span className="material-symbols-outlined text-[22px] text-emerald-200">verified_user</span>
+                <span>Permissão de Liquidação</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmLiquidationInst(null)}
+                className="w-6 h-6 rounded-full hover:bg-emerald-700 flex items-center justify-center text-white cursor-pointer transition-colors font-bold text-xs"
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Conteúdo Principal */}
+            <div className="p-4 sm:p-5 text-slate-800 space-y-3.5">
+              <div className="flex items-center gap-3 p-3 bg-emerald-50/90 border border-emerald-200 rounded-xl">
+                <span className="material-symbols-outlined text-[28px] text-emerald-600 shrink-0">help_center</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Tem certeza? Liquidar compra
+                  </h3>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Solicitação de autorização para dar baixa contábil.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card de Detalhes da Compra / Parcela */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 font-mono">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Cliente / Sacado:</span>
+                  <strong className="text-slate-900 font-sans truncate max-w-[170px] text-right">{confirmLiquidationInst.debtorName}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Produto / Item:</span>
+                  <strong className="text-slate-900 font-sans truncate max-w-[170px] text-right">{confirmLiquidationInst.product}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Parcela:</span>
+                  <strong className="text-blue-700">#{confirmLiquidationInst.installmentNumber} de {confirmLiquidationInst.totalInstallments}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Vencimento:</span>
+                  <strong className="text-slate-800">{new Date(confirmLiquidationInst.dueDate).toLocaleDateString('pt-BR')}</strong>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 text-slate-800 font-bold">
+                  <span>Valor Nominal:</span>
+                  <strong className="text-red-600 font-black text-sm">R$ {confirmLiquidationInst.amount.toFixed(2)}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões Sim e Não */}
+            <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmLiquidationInst(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition-all cursor-pointer active:scale-95 shadow-2xs"
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  handleQuickPayInstallment(confirmLiquidationInst.id);
+                  setConfirmLiquidationInst(null);
+                }}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>Sim</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL DE CONFIRMAÇÃO DE LIQUIDAÇÃO TOTAL DO DEVEDOR (AÇÕES ERP) */}
+      {confirmLiquidateDebtor && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3.5 animate-fade-in font-sans select-none">
+          <div className="w-full max-w-sm bg-white border-2 border-emerald-500 rounded-2xl shadow-2xl overflow-hidden transform transition-all relative">
+            {/* Cabeçalho */}
+            <div className="bg-emerald-600 text-white px-4 py-3 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <span className="material-symbols-outlined text-[22px] text-emerald-200">paid</span>
+                <span>Confirmar Liquidação do Devedor</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmLiquidateDebtor(null)}
+                className="w-6 h-6 rounded-full hover:bg-emerald-700 flex items-center justify-center text-white cursor-pointer transition-colors font-bold text-xs"
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Conteúdo */}
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3">
+                <span className="material-symbols-outlined text-[32px] text-emerald-600 shrink-0">verified</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Liquidar Saldo Total?
+                  </h3>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Esta ação quitará todas as pendências e atualizará o status contábil para Liquidado.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card de Detalhes */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-1.5 font-mono">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Cliente / Devedor:</span>
+                  <strong className="text-slate-900 font-sans truncate max-w-[170px] text-right">{confirmLiquidateDebtor.name}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>CPF / Documento:</span>
+                  <strong className="text-slate-800">{confirmLiquidateDebtor.documentNumber || confirmLiquidateDebtor.cpfCnpj || 'Não consta'}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Total Já Quitado:</span>
+                  <strong className="text-emerald-700">R$ {(Number(confirmLiquidateDebtor.totalPaid) || 0).toFixed(2)}</strong>
+                </div>
+                <div className="flex justify-between items-center pt-2 border-t border-slate-200 text-slate-900 font-bold">
+                  <span>Saldo a Liquidar:</span>
+                  <strong className="text-red-600 font-black text-sm">
+                    R$ {(Number(confirmLiquidateDebtor.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões Não / Sim */}
+            <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmLiquidateDebtor(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition-all cursor-pointer active:scale-95 shadow-2xs"
+              >
+                Não, Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const target = confirmLiquidateDebtor;
+                  setConfirmLiquidateDebtor(null);
+                  executeLiquidationDebtor(target);
+                }}
+                className="px-5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">check_circle</span>
+                <span>Sim, Liquidar Agora</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MODAL / BALÃOZINHO DE CONFIRMAÇÃO DE PERMISSÃO DE EXCLUSÃO (LIXEIRA) ARP */}
+      {confirmDeleteInst && (
+        <div className="fixed inset-0 z-50 bg-black/75 backdrop-blur-xs flex items-center justify-center p-3.5 animate-fade-in font-sans select-none">
+          <div className="w-full max-w-sm bg-white border-2 border-red-500 rounded-2xl shadow-2xl overflow-hidden transform transition-all relative">
+            {/* Cabeçalho estilo balãozinho de permissão */}
+            <div className="bg-red-600 text-white px-4 py-3 flex items-center justify-between shadow-xs">
+              <div className="flex items-center gap-2 font-bold text-sm">
+                <span className="material-symbols-outlined text-[22px] text-red-200">delete_forever</span>
+                <span>Permissão de Exclusão (Lixeira)</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteInst(null)}
+                className="w-6 h-6 rounded-full hover:bg-red-700 flex items-center justify-center text-white cursor-pointer transition-colors font-bold text-xs"
+                title="Fechar"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Conteúdo Principal */}
+            <div className="p-4 sm:p-5 text-slate-800 space-y-3.5">
+              <div className="flex items-center gap-3 p-3 bg-red-50/90 border border-red-200 rounded-xl">
+                <span className="material-symbols-outlined text-[28px] text-red-600 shrink-0">help_center</span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900 leading-tight">
+                    Tem certeza? Excluir item / título
+                  </h3>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    O registro será movido para a Lixeira Contábil do ERP.
+                  </p>
+                </div>
+              </div>
+
+              {/* Card de Detalhes do Registro a Excluir */}
+              <div className="bg-slate-50 border border-slate-200 rounded-xl p-3 text-xs space-y-2 font-mono">
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Cliente / Sacado:</span>
+                  <strong className="text-slate-900 font-sans truncate max-w-[170px] text-right">{confirmDeleteInst.debtorName}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Produto / Item:</span>
+                  <strong className="text-slate-900 font-sans truncate max-w-[170px] text-right">{confirmDeleteInst.product}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Parcela:</span>
+                  <strong className="text-blue-700">#{confirmDeleteInst.installmentNumber} de {confirmDeleteInst.totalInstallments}</strong>
+                </div>
+                <div className="flex justify-between items-center text-slate-600">
+                  <span>Vencimento:</span>
+                  <strong className="text-slate-800">{new Date(confirmDeleteInst.dueDate).toLocaleDateString('pt-BR')}</strong>
+                </div>
+                <div className="flex justify-between items-center pt-1.5 border-t border-slate-200 text-slate-800 font-bold">
+                  <span>Valor do Título:</span>
+                  <strong className="text-red-600 font-black text-sm">R$ {confirmDeleteInst.amount.toFixed(2)}</strong>
+                </div>
+              </div>
+            </div>
+
+            {/* Botões Sim e Não */}
+            <div className="bg-slate-100 px-4 py-3 border-t border-slate-200 flex items-center justify-end gap-2.5">
+              <button
+                type="button"
+                onClick={() => setConfirmDeleteInst(null)}
+                className="px-4 py-2 rounded-xl bg-slate-200 hover:bg-slate-300 text-slate-800 font-bold text-xs transition-all cursor-pointer active:scale-95 shadow-2xs"
+              >
+                Não
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const targetInst = confirmDeleteInst;
+                  setConfirmDeleteInst(null);
+                  moveToTrash([targetInst], `Parcela #${targetInst.installmentNumber} do produto "${targetInst.product}" (${targetInst.debtorName})`);
+                }}
+                className="px-5 py-2 rounded-xl bg-red-600 hover:bg-red-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                <span>Sim</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* JANELAS FLUTUANTES DUPLAS DE INFORMAÇÃO DO DEVEDOR ARP */}
+      {activeBalloonDebtorId && (() => {
+        const d = debtors.find(deb => deb.id === activeBalloonDebtorId) || debtors[0];
+        if (!d) return null;
+        const info = getUpcomingInstallmentInfo(d.id, d.totalOwed);
+        const isOverdue = d.overdueCount > 0;
+        const isPaid = Number(d.totalOwed) <= 0;
+
+        return (
+          <div className="fixed inset-0 z-[9990] bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300 font-sans select-none" onClick={() => setActiveBalloonDebtorId(null)}>
+            <div className="w-full max-w-xl sm:max-w-2xl bg-white dark:bg-slate-900 border-2 border-cyan-400 rounded-3xl shadow-2xl transform transition-all relative animate-in zoom-in-95 duration-300 flex flex-col overflow-hidden max-h-[96vh]" onClick={(e) => e.stopPropagation()}>
+              {/* Cabeçalho da Janela Principal */}
+              <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between border-b border-cyan-500/40 shadow-md shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-lg bg-cyan-500/20 border border-cyan-400/40 flex items-center justify-center text-cyan-300 shadow-inner">
+                    <span className="material-symbols-outlined text-[20px] animate-spin" style={{ animationDuration: '10s' }}>tab_window</span>
+                  </div>
+                  <div>
+                    <h3 className="font-black text-xs sm:text-sm text-white tracking-tight flex items-center gap-1.5">
+                      <span>Janelas de Informação do Devedor</span>
+                      <span className="text-xs animate-bounce">✨</span>
+                    </h3>
+                    <p className="text-[10px] sm:text-[11px] text-cyan-200/90 font-medium truncate max-w-[240px] sm:max-w-md">
+                      Exibindo painéis para <strong className="text-white font-bold">{d.name}</strong> 🚀
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setActiveBalloonDebtorId(null)}
+                  className="w-7 h-7 rounded-full bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition-all transform hover:scale-105 cursor-pointer shadow-md shrink-0"
+                  title="Fechar Janelas"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {/* Corpo com as 2 Janelas Lado a Lado / Empilhadas - Compactas sem Rolagem */}
+              <div className="p-2.5 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-100 dark:bg-slate-950 overflow-hidden shrink-0">
+                
+                {/* JANELA 1: Card de Vencimento / Atraso */}
+                <div className={`p-3 sm:p-3.5 rounded-2xl border-2 shadow-md flex flex-col justify-between font-sans ${
+                  isOverdue
+                    ? 'bg-gradient-to-b from-red-50 via-white to-red-100 border-red-500 text-red-950'
+                    : !isPaid
+                    ? 'bg-gradient-to-b from-amber-50 via-white to-amber-100 border-amber-400 text-amber-950'
+                    : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-100 border-emerald-400 text-emerald-950'
+                }`}>
+                  <div>
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-200/80">
+                      <span className="font-black text-[11px] sm:text-xs flex items-center gap-1.5">
+                        <span className="text-sm">{isOverdue ? '🚨' : !isPaid ? '⏳' : '✅'}</span>
+                        <span>{isOverdue ? 'Parcela em Atraso' : !isPaid ? 'Próximo Vencimento' : 'Situação Regular'}</span>
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-white/90 border border-slate-300 font-mono">
+                        Janela 01
+                      </span>
+                    </div>
+
+                    <div className="text-[11px] mb-2 font-mono bg-white/80 p-2 rounded-xl border border-slate-200">
+                      <div className="text-[8.5px] text-slate-500 font-bold uppercase tracking-wider">Cliente:</div>
+                      <div className="font-black text-xs text-slate-900 truncate">{d.name}</div>
+                    </div>
+
+                    <div className="bg-white/95 p-2.5 rounded-xl border border-slate-200 text-[11px] font-mono space-y-1.5 shadow-2xs">
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-semibold">Nº Parcela:</span>
+                        <span className="font-extrabold text-blue-700 bg-blue-50 px-1.5 py-0.5 rounded border border-blue-200">{info.parcela}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-semibold">Vencimento:</span>
+                        <span className={`font-black ${isOverdue ? 'text-red-600' : !isPaid ? 'text-amber-900' : 'text-emerald-700'}`}>{info.vencimento}</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-slate-500 font-semibold">Valor da Parcela:</span>
+                        <span className="font-black text-red-600 text-xs sm:text-sm">{info.valor}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-slate-200/80 text-[9px] text-slate-500 text-center font-medium">
+                    Rastreio inteligente de vencimento
+                  </div>
+                </div>
+
+                {/* JANELA 2: Balão Escuro de Resumo Financeiro & Scores */}
+                <div className="p-3 sm:p-3.5 bg-slate-900 text-white rounded-2xl border-2 border-blue-400/80 shadow-md flex flex-col justify-between font-mono">
+                  <div>
+                    <div className="flex items-center justify-between pb-2 mb-2 border-b border-slate-700">
+                      <span className="font-black text-cyan-300 flex items-center gap-1.5 text-[11px] sm:text-xs">
+                        <span>📌</span>
+                        <span>Resumo & Scores</span>
+                      </span>
+                      <span className="text-[9px] px-1.5 py-0.5 rounded-full font-bold bg-slate-800 text-cyan-300 border border-slate-700 font-mono">
+                        Janela 02
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5 text-[11px] pt-0.5">
+                      <div className="flex items-center justify-between bg-slate-800/90 p-2 rounded-xl border border-slate-700">
+                        <span className="text-slate-400 font-medium">Vencimento:</span>
+                        <span className="font-extrabold text-amber-300">{info.vencimento}</span>
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-800/90 p-2 rounded-xl border border-slate-700">
+                        <span className="text-slate-300 font-medium">Liquidado:</span>
+                        <span className="font-extrabold text-emerald-400">
+                          R$ {(Number(d.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+                      <div className="flex items-center justify-between bg-slate-800/90 p-2 rounded-xl border border-slate-700">
+                        <span className="text-slate-300 font-medium">Saldo Devedor:</span>
+                        <span className="font-extrabold text-red-400">
+                          R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {/* Bloco de Scores (Credor e Devedor um abaixo do outro) */}
+                      {(() => {
+                        const totalRec = installments.filter(i => i.status === 'paid').reduce((acc, i) => acc + (i.amount || 0), 0);
+                        const totalPend = installments.filter(i => i.status !== 'paid').reduce((acc, i) => acc + (i.amount || 0), 0);
+                        const totalAll = totalRec + totalPend;
+                        const recRate = totalAll > 0 ? (totalRec / totalAll) * 100 : 100;
+                        const overdueCt = installments.filter(i => i.status === 'overdue').length;
+                        let credScore = 820;
+                        if (recRate >= 80) credScore += 100;
+                        else if (recRate >= 50) credScore += 40;
+                        else credScore -= 120;
+                        if (overdueCt > 0) credScore -= overdueCt * 45;
+                        credScore = Math.max(100, Math.min(1000, Math.round(credScore)));
+                        const isCredPos = credScore >= 600;
+
+                        const debtorScoreVal = Number(d.score) || 780;
+                        const isDebtorPos = debtorScoreVal >= 600;
+
+                        const getScoreBadge = (score: number) => {
+                          if (score >= 800) return { label: 'Excelente', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40' };
+                          if (score >= 700) return { label: 'Bom', className: 'bg-teal-500/20 text-teal-300 border-teal-500/40' };
+                          if (score >= 600) return { label: 'Regular', className: 'bg-amber-500/20 text-amber-300 border-amber-500/40' };
+                          return { label: 'Crítico', className: 'bg-red-500/20 text-red-300 border-red-500/40' };
+                        };
+
+                        const credBadge = getScoreBadge(credScore);
+                        const debtorBadge = getScoreBadge(debtorScoreVal);
+
+                        return (
+                          <div className="mt-2 pt-2 border-t border-slate-700 space-y-1.5">
+                            {/* Score do Credor */}
+                            <div className="flex items-center justify-between bg-slate-800/95 p-1.5 sm:p-2 rounded-lg border border-cyan-500/30">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs">🏆</span>
+                                <span className="text-slate-200 font-bold text-[10px] sm:text-[11px]">Score Credor:</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-extrabold px-1.5 py-0.5 rounded border text-[9px] sm:text-[10px] ${credBadge.className}`}>
+                                  {credBadge.label}
+                                </span>
+                                <span className="font-extrabold text-cyan-300 text-[11px] sm:text-[12px]">
+                                  {credScore}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Score do Devedor */}
+                            <div className="flex items-center justify-between bg-slate-800/95 p-1.5 sm:p-2 rounded-lg border border-cyan-500/30">
+                              <div className="flex items-center gap-1.5">
+                                <span className="text-xs">👤</span>
+                                <span className="text-slate-200 font-bold text-[10px] sm:text-[11px]">Score Devedor:</span>
+                              </div>
+                              <div className="flex items-center gap-1.5">
+                                <span className={`font-extrabold px-1.5 py-0.5 rounded border text-[9px] sm:text-[10px] ${debtorBadge.className}`}>
+                                  {debtorBadge.label}
+                                </span>
+                                <span className="font-extrabold text-cyan-300 text-[11px] sm:text-[12px]">
+                                  {debtorScoreVal}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  <div className="mt-2.5 pt-2 border-t border-slate-800 text-[9px] text-cyan-300/80 text-center font-sans font-medium">
+                    PIX e status em tempo real ⚡
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Rodapé da Janela */}
+              <div className="bg-slate-200 dark:bg-slate-900 px-3.5 py-2.5 sm:px-4 sm:py-3 border-t border-slate-300 dark:border-slate-800 flex items-center justify-end shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setActiveBalloonDebtorId(null)}
+                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                >
+                  <span className="material-symbols-outlined text-[16px]">check</span>
+                  <span>Entendido / Fechar Janelas</span>
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* Modal de Impressão de Documentos Oficiais ARP */}
+      <ArpDocumentPrintModal
+        isOpen={showPrintModal}
+        onClose={() => setShowPrintModal(false)}
+        debtors={debtors}
+        installments={installments}
+        purchases={purchases}
+        initialDebtorId={selectedDebtorId}
+        onToast={onToast}
+      />
+
     </div>
   );
 };

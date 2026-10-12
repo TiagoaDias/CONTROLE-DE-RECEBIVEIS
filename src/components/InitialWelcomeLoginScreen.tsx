@@ -234,6 +234,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         onSuccess={(u) => onLoginSuccess(u, false)}
       />
 
+
+
       <div className="w-full max-w-5xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-xl border border-slate-200 overflow-hidden relative z-20 pointer-events-auto">
         {/* Left Column: Brand & Security Presentation (Desktop / Tablet) */}
         <div className="hidden md:flex md:w-[45%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex-col justify-between text-white relative z-10 overflow-hidden shrink-0">
@@ -269,6 +271,21 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               <div className="flex items-center gap-3 text-xs text-slate-200">
                 <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
                 <span>Sincronização em nuvem via Firebase Firestore</span>
+              </div>
+            </div>
+
+            {/* Imagem Cósmica do Usuário Integrada com Ícones Verdadeiros */}
+            <div className="mt-6 rounded-2xl overflow-hidden border border-cyan-400/50 shadow-lg relative group">
+              <img
+                src="https://lh3.googleusercontent.com/aida/AEtjO1VIeB1pf5kJ65u-K8ABl2wb0Fz01JfI9wX_UAjcADxbFdoaH390Wxi5KMXd6zyaYGwiihWj4_vB7eP7D8dZ9wiV032m_2xlTMXgfNLxkUPFLzm7RhjCzEbrfVVwRmwze_99_P6MrNvWaqqA_W4QDl718SQ4SnTtiTm9e8W3TAw4-fRhO-pYEr5N0x6yHKuDhUsKXzfx1lDBMoYj6J5ZNC6S__JqHEiTStAg-puRZUxo3jIqgkGfJwWkC_0"
+                alt="Workspace Cósmico & IA"
+                className="w-full h-36 object-cover group-hover:scale-105 transition-transform duration-500"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-transparent to-transparent flex items-end p-2.5">
+                <span className="text-[10px] font-bold text-cyan-300 bg-slate-900/90 px-2 py-0.5 rounded-md border border-cyan-500/40 flex items-center gap-1">
+                  <span>✨</span>
+                  <span>Stack Verificado (Gemini • Firebase • GitHub • Vercel)</span>
+                </span>
               </div>
             </div>
           </div>

@@ -86,14 +86,14 @@
   }
 
   /* Containers de tabelas financeiras com ajuste perfeito na tela */
-  .table-scroll-container,
-  .financial-table-container {
-    display: block !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    overflow-x: auto !important;
+  .table-scroll-container:not(.hidden),
+  .financial-table-container:not(.hidden) {
+    display: block;
+    width: 100%;
+    max-width: 100%;
+    overflow-x: auto;
     -webkit-overflow-scrolling: touch;
-    box-sizing: border-box !important;
+    box-sizing: border-box;
   }
 
   /* Mantém flexbox em containers de abas e chips horizontais com overflow-x-auto */
@@ -102,10 +102,8 @@
     display: flex !important;
   }
 
-  /* Compactação harmônica das tabelas no mobile: 100% da largura da tela sem sobras ou cortes */
-  .table-scroll-container > table,
-  .financial-table-container > table,
-  .overflow-x-auto > table {
+  /* Compactação harmônica apenas para tabelas explicitamente compactas no mobile */
+  .table-compact-mobile > table {
     width: 100% !important;
     min-width: 0 !important;
     max-width: 100% !important;
@@ -113,19 +111,54 @@
     border-collapse: collapse;
   }
 
-  /* Células de tabelas financeiras compactadas no mobile para deixar parcelas, vencimento, valor, status e ação juntinhos e caber na tela */
-  .table-scroll-container th,
-  .table-scroll-container td,
-  .financial-table-container th,
-  .financial-table-container td {
-    padding-left: 1px !important;
-    padding-right: 1px !important;
-    padding-top: 0.15rem !important;
-    padding-bottom: 0.15rem !important;
-    font-size: 8.5px !important;
+  .table-compact-mobile th,
+  .table-compact-mobile td {
+    padding-left: 2px !important;
+    padding-right: 2px !important;
+    padding-top: 0.2rem !important;
+    padding-bottom: 0.2rem !important;
+    font-size: 9px !important;
     white-space: nowrap !important;
-    word-break: normal !important;
-    overflow-wrap: normal !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Regras de proteção para DBGrid e Planilhas ERP no Mobile (largura exata, 100% visível na tela sem espaços vazios) */
+  .erp-dbgrid-table:not(.digitacao-arp-table) {
+    min-width: 100% !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  .erp-dbgrid-table:not(.digitacao-arp-table) th,
+  .erp-dbgrid-table:not(.digitacao-arp-table) td {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+    padding-top: 0.25rem !important;
+    padding-bottom: 0.25rem !important;
+    font-size: 10px !important;
+    box-sizing: border-box !important;
+  }
+
+  /* Otimização Absoluta da Planilha Digitação ARP (Remove 100% dos espaços em branco no Mobile) */
+  .digitacao-arp-table,
+  table.digitacao-arp-table,
+  .erp-dbgrid-table.digitacao-arp-table {
+    min-width: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: fixed !important;
+    border-collapse: collapse !important;
+  }
+
+  .digitacao-arp-table th,
+  .digitacao-arp-table td,
+  .erp-dbgrid-table.digitacao-arp-table th,
+  .erp-dbgrid-table.digitacao-arp-table td {
+    padding: 0 !important;
+    margin: 0 !important;
+    white-space: nowrap !important;
     box-sizing: border-box !important;
   }
 }
@@ -605,5 +638,179 @@
   transform: translateY(0px) scale(0.985);
   transition-duration: 0.12s;
 }
+
+/* ==========================================================================
+   ANIMAÇÕES DIVERTIDAS PARA ATRASO E PRESTES A VENCER
+   ========================================================================== */
+
+@keyframes fun-wiggle-shake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  15% { transform: rotate(-7deg) scale(1.06); }
+  30% { transform: rotate(7deg) scale(1.06); }
+  45% { transform: rotate(-5deg) scale(1.03); }
+  60% { transform: rotate(5deg) scale(1.03); }
+  75% { transform: rotate(-2deg) scale(1.01); }
+}
+
+.animate-fun-overdue {
+  animation: fun-wiggle-shake 1.8s ease-in-out infinite;
+  display: inline-flex;
+}
+
+@keyframes fun-glowing-alarm {
+  0%, 100% {
+    box-shadow: 0 0 3px rgba(245, 158, 11, 0.4), 0 0 8px rgba(245, 158, 11, 0.2);
+    transform: scale(1);
+  }
+  50% {
+    box-shadow: 0 0 10px rgba(245, 158, 11, 0.85), 0 0 18px rgba(217, 119, 6, 0.45);
+    transform: scale(1.04);
+  }
+}
+
+.animate-fun-duesoon {
+  animation: fun-glowing-alarm 1.4s ease-in-out infinite;
+  display: inline-flex;
+}
+
+/* ==========================================================================
+   ANIMAÇÃO DO SELETOR DE DEVEDOR (ARP / ERP)
+   ========================================================================== */
+
+@keyframes debtor-selector-pulse-glow {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.25), 0 4px 14px rgba(37, 99, 235, 0.15);
+    border-color: rgba(59, 130, 246, 0.7);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(59, 130, 246, 0.45), 0 8px 24px rgba(14, 165, 233, 0.35);
+    border-color: rgba(14, 165, 233, 1);
+  }
+}
+
+.animate-debtor-selector {
+  animation: debtor-selector-pulse-glow 2.5s ease-in-out infinite;
+}
+
+@keyframes debtor-avatar-wave {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  25% { transform: scale(1.1) rotate(-6deg); }
+  75% { transform: scale(1.1) rotate(6deg); }
+}
+
+.animate-debtor-avatar {
+  animation: debtor-avatar-wave 3s ease-in-out infinite;
+}
+
+@keyframes debtor-shimmer-slide {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+
+.animate-debtor-shimmer {
+  background: linear-gradient(90deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.4) 50%, rgba(255,255,255,0) 100%);
+  background-size: 200% 100%;
+  animation: debtor-shimmer-slide 2.5s infinite;
+}
+
+/* ==========================================================================
+   RADAR DE PUSH & BALÕES FLUENTES INTERATIVOS
+   ========================================================================== */
+
+@keyframes radar-glow-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.4), 0 0 15px rgba(6, 182, 212, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 0 4px rgba(6, 182, 212, 0.7), 0 0 25px rgba(14, 165, 233, 0.5);
+  }
+}
+
+.animate-radar-glow {
+  animation: radar-glow-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes fluent-balloon-enter {
+  0% {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.96);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.animate-fluent-balloon {
+  animation: fluent-balloon-enter 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+@keyframes radar-sweep-beam {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+
+
+/* ==========================================================================
+   ANIMAÇÕES DIVERTIDAS E LÚDICAS (FUN ANIMATIONS)
+   ========================================================================== */
+
+@keyframes party-pop-in {
+  0% {
+    opacity: 0;
+    transform: scale(0.7) translateY(20px) rotate(-3deg);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.05) translateY(-5px) rotate(1.5deg);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0) rotate(0deg);
+  }
+}
+
+.animate-party-pop {
+  animation: party-pop-in 0.45s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
+}
+
+@keyframes float-gentle {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-6px);
+  }
+}
+
+.animate-float-gentle {
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+@keyframes rainbow-shimmer {
+  0% { filter: hue-rotate(0deg); }
+  50% { filter: hue-rotate(90deg); }
+  100% { filter: hue-rotate(0deg); }
+}
+
+.animate-rainbow-shimmer {
+  animation: rainbow-shimmer 6s linear infinite;
+}
+
+@keyframes sparkle-pulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.25); opacity: 0.7; }
+}
+
+.animate-sparkle {
+  animation: sparkle-pulse 1.8s ease-in-out infinite;
+}
+
+
 
 

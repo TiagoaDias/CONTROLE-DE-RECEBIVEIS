@@ -493,6 +493,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
                   </label>
                   <input
                     type="text"
+                    inputMode="numeric"
                     placeholder="000.000.000-00"
                     value={cpf}
                     onChange={(e) => setCpf(e.target.value)}
@@ -506,7 +507,8 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
                     <span>Telefone / WhatsApp</span>
                   </label>
                   <input
-                    type="text"
+                    type="tel"
+                    inputMode="numeric"
                     placeholder="(14) 99999-9999"
                     value={phone}
                     onChange={(e) => setPhone(e.target.value)}

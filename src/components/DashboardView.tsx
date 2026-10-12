@@ -223,6 +223,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   }, [soonInstallments]);
 
   const isDarkMode = activeSection === 'dark';
+  const debtorFullName = selectedPrimaryDebtor ? selectedPrimaryDebtor.name : 'Todos os Clientes (Consolidado)';
   const debtorFirstName = selectedPrimaryDebtor ? selectedPrimaryDebtor.name.split(' ')[0] : 'Geral';
 
   // Devedor ativo garantido para o modal detalhado (enraizado ou consolidado)
@@ -257,7 +258,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <div className="absolute inset-0 opacity-15 pointer-events-none bg-[radial-gradient(#22d3ee_1px,transparent_1px)] [background-size:16px_16px]"></div>
           
           <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
-            <div className="flex flex-col gap-0.5 min-w-0">
+            <div className="flex flex-col gap-0.5 min-w-0 flex-1">
               <h2 className="text-sm sm:text-base font-black text-white leading-tight flex items-center gap-2 flex-wrap">
                 <span>Painel Operacional</span>
                 <span className="text-[9.5px] font-black uppercase px-2 py-0.5 rounded-full bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
@@ -275,19 +276,48 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 )}
               </h2>
               <p className="text-slate-300 text-[11px] max-w-xl leading-snug">
-                Dados e métricas enraizados em {selectedPrimaryDebtor ? selectedPrimaryDebtor.name : 'todos os devedores'}.
+                Dados e métricas enraizados em <strong>{debtorFullName}</strong>.
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => onNavigate('erp-legacy')}
-              className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-400/60"
-              title="Abrir Sistema ERP Corporativo / Delphi Desktop"
-            >
-              <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
-              <span>ERP</span>
-            </button>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {/* Seletor rápido de devedor diretamente no Painel */}
+              {debtors.length > 0 && (
+                <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 border border-cyan-400/60 rounded-xl px-2.5 py-1 text-xs shadow-md transition-colors">
+                  <span className="material-symbols-outlined text-[15px] text-cyan-400">person_search</span>
+                  <span className="text-[10.5px] text-cyan-200 font-bold whitespace-nowrap hidden sm:inline">Cliente:</span>
+                  <select
+                    value={activeDebtorId}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setActiveDebtorId(val);
+                      if (onSelectDebtor) onSelectDebtor(val);
+                    }}
+                    className="bg-transparent text-white font-black text-xs outline-none cursor-pointer border-none py-0.5 max-w-[150px] sm:max-w-[210px] truncate"
+                    title="Selecione o devedor para atualizar as informações deste painel"
+                  >
+                    <option value="all" className="bg-slate-900 text-white font-bold">
+                      Todos os Clientes (Geral)
+                    </option>
+                    {debtors.map((d) => (
+                      <option key={d.id} value={d.id} className="bg-slate-900 text-white font-semibold">
+                        {d.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={() => onNavigate('erp-legacy')}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-400/60"
+                title="Abrir Sistema ERP Corporativo / Delphi Desktop"
+              >
+                <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
+                <span>ERP</span>
+              </button>
+            </div>
           </div>
 
           {/* 4 BOTÕES INTERATIVOS BRANCOS ENRAIZADOS NO DEVEDOR ATIVO (COM LUZ E BRILHO SUAVE) */}
@@ -300,7 +330,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 setActiveKpiModal('open');
               }}
               className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border-2 border-cyan-400/80 shadow-[0_0_16px_rgba(6,182,212,0.22)] ring-1 ring-cyan-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-cyan-400 hover:ring-2 hover:ring-cyan-400/60 hover:shadow-[0_0_28px_rgba(6,182,212,0.5)] hover:scale-[1.015] active:scale-95 transition-all duration-300 cursor-pointer group"
-              title={`Toque para ver o total em aberto de ${selectedPrimaryDebtor?.name || 'Devedor'}`}
+              title={`Toque para ver o total em aberto de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
               <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-cyan-400/30" />
@@ -320,20 +350,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="material-symbols-outlined text-[14px]">account_balance_wallet</span>
                 </div>
               </div>
-              <div className="relative z-10 my-1">
+
+              {/* Babadinho de Identificação da Pessoa */}
+              <div className="relative z-10 mt-1.5 mb-1 flex items-center gap-1.5 bg-gradient-to-r from-cyan-50 to-cyan-100/90 border border-cyan-300/90 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-cyan-900 max-w-full shadow-2xs">
+                <span className="material-symbols-outlined text-[13px] text-cyan-600 shrink-0">person</span>
+                <span className="truncate">{debtorFullName}</span>
+              </div>
+
+              <div className="relative z-10 my-0.5">
                 <div className="text-base sm:text-lg font-black text-slate-900 font-mono tracking-tight leading-tight group-hover:text-cyan-950 transition-colors">
                   R$ {safeToFixed(totalOpenAmount)}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium truncate block">
-                  {pendingCount} parcelas pendentes
+                <span className="text-[10px] text-slate-600 font-medium truncate block">
+                  {pendingCount} parcelas pendentes • <strong className="text-cyan-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
               <div className="relative z-10 mt-1.5 pt-1.5 border-t border-cyan-100/80 flex items-center justify-between text-[9.5px] font-bold text-cyan-700 group-hover:text-cyan-900 transition-colors">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[12px] text-cyan-600 group-hover:scale-110 transition-transform">touch_app</span>
-                  <span>Interativo • Ver detalhes</span>
+                  <span className="truncate">Ver faturas de {debtorFirstName}</span>
                 </span>
-                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-cyan-500">chevron_right</span>
+                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-cyan-500 shrink-0">chevron_right</span>
               </div>
             </button>
 
@@ -345,7 +382,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 setActiveKpiModal('paid');
               }}
               className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border-2 border-emerald-400/80 shadow-[0_0_16px_rgba(16,185,129,0.22)] ring-1 ring-emerald-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/60 hover:shadow-[0_0_28px_rgba(16,185,129,0.5)] hover:scale-[1.015] active:scale-95 transition-all duration-300 cursor-pointer group"
-              title={`Toque para ver o total quitado de ${selectedPrimaryDebtor?.name || 'Devedor'}`}
+              title={`Toque para ver o total quitado de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
               <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-emerald-400/30" />
@@ -365,20 +402,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="material-symbols-outlined text-[14px]">check_circle</span>
                 </div>
               </div>
-              <div className="relative z-10 my-1">
+
+              {/* Babadinho de Identificação da Pessoa */}
+              <div className="relative z-10 mt-1.5 mb-1 flex items-center gap-1.5 bg-gradient-to-r from-emerald-50 to-emerald-100/90 border border-emerald-300/90 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-emerald-900 max-w-full shadow-2xs">
+                <span className="material-symbols-outlined text-[13px] text-emerald-600 shrink-0">person</span>
+                <span className="truncate">{debtorFullName}</span>
+              </div>
+
+              <div className="relative z-10 my-0.5">
                 <div className="text-base sm:text-lg font-black text-emerald-700 font-mono tracking-tight leading-tight group-hover:text-emerald-800 transition-colors">
                   R$ {safeToFixed(totalPaidAmount)}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium truncate block">
-                  {paidCount} liquidadas com sucesso
+                <span className="text-[10px] text-slate-600 font-medium truncate block">
+                  {paidCount} liquidadas • <strong className="text-emerald-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
               <div className="relative z-10 mt-1.5 pt-1.5 border-t border-emerald-100/80 flex items-center justify-between text-[9.5px] font-bold text-emerald-700 group-hover:text-emerald-900 transition-colors">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[12px] text-emerald-600 group-hover:scale-110 transition-transform">touch_app</span>
-                  <span>Interativo • Ver detalhes</span>
+                  <span className="truncate">Ver liquidadas de {debtorFirstName}</span>
                 </span>
-                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-emerald-500">chevron_right</span>
+                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-emerald-500 shrink-0">chevron_right</span>
               </div>
             </button>
 
@@ -390,7 +434,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 setActiveKpiModal('overdue');
               }}
               className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border-2 border-red-400/80 shadow-[0_0_16px_rgba(239,68,68,0.22)] ring-1 ring-red-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-red-400 hover:ring-2 hover:ring-red-400/60 hover:shadow-[0_0_28px_rgba(239,68,68,0.5)] hover:scale-[1.015] active:scale-95 transition-all duration-300 cursor-pointer group"
-              title={`Toque para ver o total em atraso de ${selectedPrimaryDebtor?.name || 'Devedor'}`}
+              title={`Toque para ver o total em atraso de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
               <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-red-400/30" />
@@ -410,20 +454,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="material-symbols-outlined text-[14px]">warning</span>
                 </div>
               </div>
-              <div className="relative z-10 my-1">
+
+              {/* Babadinho de Identificação da Pessoa */}
+              <div className="relative z-10 mt-1.5 mb-1 flex items-center gap-1.5 bg-gradient-to-r from-red-50 to-red-100/90 border border-red-300/90 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-red-900 max-w-full shadow-2xs">
+                <span className="material-symbols-outlined text-[13px] text-red-600 shrink-0">person</span>
+                <span className="truncate">{debtorFullName}</span>
+              </div>
+
+              <div className="relative z-10 my-0.5">
                 <div className="text-base sm:text-lg font-black text-red-700 font-mono tracking-tight leading-tight group-hover:text-red-800 transition-colors">
                   R$ {safeToFixed(overdueTotal)}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium truncate block">
-                  {overdueInstallments.length} vencida(s) no período
+                <span className="text-[10px] text-slate-600 font-medium truncate block">
+                  {overdueInstallments.length} vencida(s) • <strong className="text-red-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
               <div className="relative z-10 mt-1.5 pt-1.5 border-t border-red-100/80 flex items-center justify-between text-[9.5px] font-bold text-red-700 group-hover:text-red-900 transition-colors">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[12px] text-red-600 group-hover:scale-110 transition-transform">touch_app</span>
-                  <span>Interativo • Ver detalhes</span>
+                  <span className="truncate">Ver atrasos de {debtorFirstName}</span>
                 </span>
-                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-red-500">chevron_right</span>
+                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-red-500 shrink-0">chevron_right</span>
               </div>
             </button>
 
@@ -435,7 +486,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 setActiveKpiModal('month');
               }}
               className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-3.5 rounded-2xl border-2 border-amber-400/80 shadow-[0_0_16px_rgba(245,158,11,0.22)] ring-1 ring-amber-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-amber-400 hover:ring-2 hover:ring-amber-400/60 hover:shadow-[0_0_28px_rgba(245,158,11,0.5)] hover:scale-[1.015] active:scale-95 transition-all duration-300 cursor-pointer group"
-              title={`Toque para ver as faturas do mês atual de ${selectedPrimaryDebtor?.name || 'Devedor'}`}
+              title={`Toque para ver as faturas do mês atual de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
               <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full blur-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-amber-400/30" />
@@ -455,20 +506,27 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   <span className="material-symbols-outlined text-[14px]">calendar_month</span>
                 </div>
               </div>
-              <div className="relative z-10 my-1">
+
+              {/* Babadinho de Identificação da Pessoa */}
+              <div className="relative z-10 mt-1.5 mb-1 flex items-center gap-1.5 bg-gradient-to-r from-amber-50 to-amber-100/90 border border-amber-300/90 px-2 py-0.5 rounded-lg text-[10px] font-extrabold text-amber-900 max-w-full shadow-2xs">
+                <span className="material-symbols-outlined text-[13px] text-amber-600 shrink-0">person</span>
+                <span className="truncate">{debtorFullName}</span>
+              </div>
+
+              <div className="relative z-10 my-0.5">
                 <div className="text-base sm:text-lg font-black text-amber-700 font-mono tracking-tight leading-tight group-hover:text-amber-800 transition-colors">
                   R$ {safeToFixed(soonTotal)}
                 </div>
-                <span className="text-[10px] text-slate-500 font-medium truncate block">
-                  {soonInstallments.length} faturas do mês
+                <span className="text-[10px] text-slate-600 font-medium truncate block">
+                  {soonInstallments.length} faturas em {currentMonthAbbr} • <strong className="text-amber-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
               <div className="relative z-10 mt-1.5 pt-1.5 border-t border-amber-100/80 flex items-center justify-between text-[9.5px] font-bold text-amber-700 group-hover:text-amber-900 transition-colors">
-                <span className="flex items-center gap-1">
+                <span className="flex items-center gap-1 truncate">
                   <span className="material-symbols-outlined text-[12px] text-amber-600 group-hover:scale-110 transition-transform">touch_app</span>
-                  <span>Interativo • Ver detalhes</span>
+                  <span className="truncate">Ver faturas de {debtorFirstName}</span>
                 </span>
-                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-amber-500">chevron_right</span>
+                <span className="material-symbols-outlined text-[12px] group-hover:translate-x-1 transition-transform text-amber-500 shrink-0">chevron_right</span>
               </div>
             </button>
           </div>
@@ -512,6 +570,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onToast={onToast}
           onUpdateInstallment={onUpdateInstallment}
           userPixKey={userPixKey}
+          onRequestDeleteDebtor={onRequestDeleteDebtor}
         />
 
         {/* MODAL DE DETALHES DE KPIS ENRAIZADO NO DEVEDOR ATIVO */}

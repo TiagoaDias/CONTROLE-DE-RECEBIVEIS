@@ -929,6 +929,19 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                       {/* Lado Esquerdo: Avatar Oficial Aprovado + Nome + Relação / Telefone */}
                       <div className="flex items-center gap-2.5 min-w-0 flex-1">
                         <div className="relative shrink-0 w-11 h-11">
+                          {onEditDebtor && (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onEditDebtor(debtor);
+                              }}
+                              className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[9px] shadow-sm z-20 cursor-pointer border border-white"
+                              title={`Opção de edição: Editar cadastro de ${debtor.name}`}
+                            >
+                              <span className="material-symbols-outlined text-[10px]">edit</span>
+                            </button>
+                          )}
                           {avatarSrc ? (
                             <img
                               src={avatarSrc}
@@ -1839,7 +1852,8 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                                       {itemDisplayName}
                                     </span>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      <span className={`${scaleConfig.fontSizeSub} font-extrabold text-blue-600 bg-blue-50/80 px-1 py-0.2 rounded border border-blue-100 font-mono shrink-0`}>
+                                      {/* Caixinha número de parcelas - corzinha suave */}
+                                      <span className={`${scaleConfig.fontSizeSub} font-extrabold text-indigo-700 bg-indigo-50/90 px-1 py-0.2 rounded border border-indigo-200 font-mono shrink-0 shadow-2xs`}>
                                         {installmentSeq}
                                       </span>
                                       {boxShowCardName && (
@@ -1872,9 +1886,13 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                               </div>
                             </td>
 
-                            {/* Coluna 2: Valor */}
+                            {/* Coluna 2: Valor (Verdinho se pago, vermelhinho se não pago) */}
                             <td className={`${scaleConfig.cellPy} px-3 whitespace-nowrap text-center w-[13%]`}>
-                              <div className={`inline-flex flex-col items-center justify-center w-full ${scaleConfig.boxPadding} rounded bg-emerald-50/90 border border-emerald-300 text-emerald-950 ${scaleConfig.fontSizeBadge} font-bold whitespace-nowrap shadow-2xs`}>
+                              <div className={`inline-flex flex-col items-center justify-center w-full ${scaleConfig.boxPadding} rounded ${scaleConfig.fontSizeBadge} font-bold whitespace-nowrap shadow-2xs ${
+                                isPaid
+                                  ? 'bg-emerald-50/90 border border-emerald-300 text-emerald-950'
+                                  : 'bg-red-50/90 border border-red-300 text-red-900 font-extrabold'
+                              }`}>
                                 <span>
                                   R$ {safeToFixed(isOverdue ? item.originalAmount + 5.00 : finalAmount).replace('.', ',')}
                                 </span>
@@ -1890,7 +1908,7 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                               </div>
                             </td>
 
-                            {/* Coluna 3: Vencimento */}
+                            {/* Coluna 3: Vencimento (Caixinha com corzinha suave) */}
                             <td className={`${scaleConfig.cellPy} px-3 whitespace-nowrap text-center w-[13%]`}>
                               <div className={`inline-flex items-center justify-center w-full gap-0.5 ${scaleConfig.boxPadding} rounded border ${scaleConfig.fontSizeBadge} font-semibold whitespace-nowrap shadow-2xs ${
                                 isOverdue
@@ -1914,29 +1932,43 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                               </div>
                             </td>
 
-                            {/* Coluna 4: Status (Pills cápsulas idênticas ao print) */}
+                            {/* Coluna 4: Status com o valor a quitar debaixo do status */}
                             <td className={`${scaleConfig.cellPy} px-3 text-center whitespace-nowrap w-[13%]`}>
-                              {isPaid ? (
-                                <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
-                                  <span>PAGO</span>
+                              <div className="flex flex-col items-center justify-center gap-0.5">
+                                {isPaid ? (
+                                  <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 mr-1.5"></span>
+                                    <span>PAGO</span>
+                                  </span>
+                                ) : isOverdue ? (
+                                  <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[9.5px] font-black tracking-wider w-24 animate-pulse shadow-2xs`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-ping"></span>
+                                    <span>ATRASADO</span>
+                                  </span>
+                                ) : isSoon ? (
+                                  <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
+                                    <span>BREVE</span>
+                                  </span>
+                                ) : (
+                                  <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span>
+                                    <span>PENDENTE</span>
+                                  </span>
+                                )}
+
+                                {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                                <span
+                                  className={`font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
+                                    isPaid
+                                      ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
+                                      : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
+                                  }`}
+                                  title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
+                                >
+                                  R$ {safeToFixed(isOverdue ? item.originalAmount + 5.00 : finalAmount).replace('.', ',')}
                                 </span>
-                              ) : isOverdue ? (
-                                <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-rose-500/10 text-rose-600 border border-rose-500/20 text-[9.5px] font-black tracking-wider w-24 animate-pulse shadow-2xs`}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1.5 animate-ping"></span>
-                                  <span>ATRASADO</span>
-                                </span>
-                              ) : isSoon ? (
-                                <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-amber-500/10 text-amber-600 border border-amber-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-amber-500 mr-1.5 animate-pulse"></span>
-                                  <span>BREVE</span>
-                                </span>
-                              ) : (
-                                <span className={`inline-flex items-center justify-center px-2 py-1.5 rounded-full bg-blue-500/10 text-blue-600 border border-blue-500/20 text-[9.5px] font-extrabold tracking-wider w-24 shadow-2xs`}>
-                                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 mr-1.5"></span>
-                                  <span>PENDENTE</span>
-                                </span>
-                              )}
+                              </div>
                             </td>
 
                             {/* Coluna 5: Pagamento (data e hora ou ---) */}
@@ -2452,12 +2484,28 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                               {/* Cabeçalho do Devedor - Compacto & Responsivo */}
                               <div className="px-3 py-2.5 bg-gradient-to-r from-slate-50 via-blue-50/30 to-slate-50 border-b border-slate-200 flex flex-wrap items-center justify-between gap-2.5">
                                 <div className="flex items-center gap-2.5 min-w-0">
-                                  <SafeDebtorAvatar
-                                    name={dItem.debtor.name}
-                                    avatar={dItem.debtor.avatar}
-                                    size="md"
-                                    className="ring-2 ring-blue-500/30 shadow-2xs"
-                                  />
+                                  <div
+                                    onClick={(e) => {
+                                      if (onEditDebtor) {
+                                        e.stopPropagation();
+                                        onEditDebtor(dItem.debtor);
+                                      }
+                                    }}
+                                    className="relative cursor-pointer group shrink-0"
+                                    title={onEditDebtor ? `Clique para editar o cadastro de ${dItem.debtor.name}` : dItem.debtor.name}
+                                  >
+                                    <SafeDebtorAvatar
+                                      name={dItem.debtor.name}
+                                      avatar={dItem.debtor.avatar}
+                                      size="md"
+                                      className="ring-2 ring-blue-500/30 shadow-2xs group-hover:scale-105 transition-transform"
+                                    />
+                                    {onEditDebtor && (
+                                      <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[9px] shadow-sm border border-white">
+                                        <span className="material-symbols-outlined text-[10px]">edit</span>
+                                      </span>
+                                    )}
+                                  </div>
                                   <div className="min-w-0">
                                     <div className="flex items-center gap-1.5 flex-wrap">
                                       <h4 className="font-extrabold text-slate-900 text-xs sm:text-sm truncate">{dItem.debtor.name}</h4>
