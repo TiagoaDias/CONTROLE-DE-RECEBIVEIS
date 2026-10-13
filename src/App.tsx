@@ -612,7 +612,9 @@ export default function App() {
 
     try {
       localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
+      localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
       localStorage.setItem('haspaho_deleted_debtors', JSON.stringify(nextDeleted));
+      localStorage.setItem(`haspaho_deleted_debtors_${activeUserId}`, JSON.stringify(nextDeleted));
     } catch (e) {
       console.error(e);
     }
@@ -683,6 +685,7 @@ export default function App() {
 
     try {
       localStorage.setItem('haspaho_deleted_debtors', JSON.stringify(nextDeleted));
+      localStorage.setItem(`haspaho_deleted_debtors_${activeUserId}`, JSON.stringify(nextDeleted));
       localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
       localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
       localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));

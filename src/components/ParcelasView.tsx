@@ -1816,8 +1816,12 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           {currentDebtor && onOpenNewPurchase && (
                             <button
                               type="button"
-                              onClick={() => onOpenNewPurchase(currentDebtor.id)}
-                              className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-all cursor-pointer flex items-center gap-1"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                e.preventDefault();
+                                onOpenNewPurchase(currentDebtor.id);
+                              }}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-all cursor-pointer flex items-center gap-1 relative z-10 touch-manipulation"
                             >
                               <span className="material-symbols-outlined text-[15px]">add_circle</span>
                               <span>+ Nova Compra para {currentDebtor.name ? currentDebtor.name.split(' ')[0] : 'Devedor'}</span>
@@ -1923,6 +1927,21 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               >
                 Limpar filtros e ver todas
               </button>
+
+              {currentDebtor && onOpenNewPurchase && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+                    onOpenNewPurchase(currentDebtor.id);
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold text-xs border border-emerald-200 transition-all cursor-pointer flex items-center gap-1 touch-manipulation"
+                >
+                  <span className="material-symbols-outlined text-[15px]">add_circle</span>
+                  <span>+ Nova Compra para {currentDebtor.name ? currentDebtor.name.split(' ')[0] : 'Devedor'}</span>
+                </button>
+              )}
             </div>
           </div>
         ) : (
