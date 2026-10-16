@@ -235,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({
                 HASPAHO
               </span>
               <span className={`text-[10px] font-bold leading-none truncate ${isDarkMode ? 'text-emerald-400' : 'text-emerald-700'}`}>
-                DESENVOLVEDOR FULL STACK
+                GESTÃO DE RECEBÍVEIS
               </span>
             </div>
           </div>

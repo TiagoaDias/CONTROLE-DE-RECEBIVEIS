@@ -177,21 +177,19 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
     setIsUnitaryModalOpen(true);
   };
 
-  // Estado do Devedor selecionado (pesquisa e visualização individual)
+  // Estado do Devedor selecionado (pesquisa e visualização individual ou 'all' para Visão Geral)
   const [selectedDebtorId, setSelectedDebtorId] = useState<string>(() => {
-    if (initialDebtorId && initialDebtorId !== 'all' && debtors.some((d) => d.id === initialDebtorId)) {
+    if (initialDebtorId && (initialDebtorId === 'all' || debtors.some((d) => d.id === initialDebtorId))) {
       return initialDebtorId;
     }
-    return debtors[0]?.id || '';
+    return 'all';
   });
 
   useEffect(() => {
-    if (initialDebtorId && initialDebtorId !== 'all' && debtors.some((d) => d.id === initialDebtorId)) {
+    if (initialDebtorId && (initialDebtorId === 'all' || debtors.some((d) => d.id === initialDebtorId))) {
       setSelectedDebtorId(initialDebtorId);
-    } else if (selectedDebtorId === 'all' && debtors.length > 0) {
-      setSelectedDebtorId(debtors[0].id);
     }
-  }, [initialDebtorId, debtors, selectedDebtorId]);
+  }, [initialDebtorId, debtors]);
 
   // Rolar suavemente até a aba do devedor selecionado
   useEffect(() => {
@@ -401,7 +399,7 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
   // Filtragem de parcelas pelo devedor - com fallback inteligente se houver busca específica
   const debtorInstallments = useMemo(() => {
     const q = (searchQuery || localSearch).trim().toLowerCase();
-    // Se o usuário digitou uma busca (ex: "renata") e ela bate com parcelas fora do devedor atual, busca globalmente
+    // Se o usuário digitou uma busca específica e ela bate com parcelas fora do devedor atual, busca globalmente
     if (q) {
       const matchesAnotherDebtor = installments.some(
         (inst) =>
@@ -696,40 +694,114 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
     });
   }, [debtorInstallments, searchQuery, localSearch, statusFilter, cardFilter, effectivePurchaseFilter, activeDebtorValidProducts, isCategoryFilter, activeCategoryKey]);
 
-  // Itens para o Dropdown "Nome do Devedor" (apenas devedores individuais)
+  // Itens para o Dropdown "Nome do Devedor" (com opção Todos os Devedores e devedores individuais)
   const debtorDropdownItems = useMemo((): DropdownItem<string>[] => {
-    return debtors.map((d) => {
+    const allOption: DropdownItem<string> = {
+      id: 'all',
+      label: 'Visão Geral (Todos)',
+      sublabel: 'Consolidado de todas as pessoas',
+      icon: 'groups',
+      badge: `${debtors.length} cadastrados`,
+      badgeType: 'default',
+      value: 'all',
+    };
+    const list: DropdownItem<string>[] = debtors.map((d) => {
       const isPaid = (d.totalOwed || 0) <= 0;
       const hasOverdue = (d.overdueCount || 0) > 0;
+      const bType: 'success' | 'danger' | 'default' = isPaid ? 'success' : hasOverdue ? 'danger' : 'default';
       return {
         id: d.id,
         label: d.name,
         sublabel: d.relation || 'Cliente',
         avatar: d.avatar,
         badge: `R$ ${(d.totalOwed || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`,
-        badgeType: isPaid ? 'success' : hasOverdue ? 'danger' : 'default',
+        badgeType: bType,
         value: d.id,
       };
     });
+    return [allOption, ...list];
   }, [debtors]);
 
   const selectedDebtorItem = useMemo((): DropdownItem<string> | null => {
+    if (selectedDebtorId === 'all') {
+      return {
+        id: 'all',
+        label: 'Visão Geral (Todos)',
+        sublabel: 'Consolidado de todas as pessoas',
+        icon: 'groups',
+        badge: `${debtors.length} pessoas`,
+        badgeType: 'default',
+        value: 'all',
+      };
+    }
     const debtorToShow = activeDebtor || debtors.find((d) => d.id === selectedDebtorId) || debtors[0];
     if (!debtorToShow) return null;
+    const bType: 'success' | 'danger' | 'default' = (debtorToShow.totalOwed || 0) <= 0 ? 'success' : (debtorToShow.overdueCount || 0) > 0 ? 'danger' : 'default';
     return {
       id: debtorToShow.id,
       label: debtorToShow.name,
       sublabel: debtorToShow.relation || 'Cliente',
       avatar: debtorToShow.avatar,
       badge: `R$ ${(debtorToShow.totalOwed || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`,
-      badgeType: (debtorToShow.totalOwed || 0) <= 0 ? 'success' : (debtorToShow.overdueCount || 0) > 0 ? 'danger' : 'default',
+      badgeType: bType,
       value: debtorToShow.id,
     };
   }, [selectedDebtorId, activeDebtor, debtors]);
 
-  // Itens para o Dropdown "Produto" (estritamente dependente do devedor selecionado)
+  // Itens para o Dropdown "Produto" (estritamente dependente do devedor selecionado ou geral)
   const productDropdownItems = useMemo((): DropdownItem<string>[] => {
-    if (!activeDebtor || selectedDebtorId === 'all') return [];
+    const isGeneral = selectedDebtorId === 'all' || !activeDebtor;
+
+    const cadastrarOption: DropdownItem<string> = {
+      id: '__new_purchase__',
+      label: isGeneral
+        ? '+ Cadastrar Nova Compra / Produto'
+        : `+ Nova Compra (${activeDebtor?.name ? activeDebtor.name.split(' ')[0] : 'Devedor'})`,
+      sublabel: 'Lançar compra, produtos e itens parcelados',
+      icon: 'add_shopping_cart',
+      badge: 'Cadastrar',
+      badgeType: 'success',
+      value: '__new_purchase__',
+    };
+
+    if (isGeneral) {
+      const totalOwedAll = installments
+        .filter((i) => i.status !== 'paid')
+        .reduce((sum, i) => sum + (i.amount || i.originalAmount || 0), 0);
+
+      const allOption: DropdownItem<string> = {
+        id: 'all',
+        label: 'Item e Serviços',
+        sublabel: `${installments.length} parcelas consolidadas`,
+        icon: 'grid_view',
+        badge: totalOwedAll > 0 ? `R$ ${totalOwedAll.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : 'Quitado',
+        badgeType: totalOwedAll <= 0 ? 'success' : 'default',
+        value: 'all',
+      };
+
+      const uniqueProductsMap = new Map<string, { count: number; total: number }>();
+      installments.forEach((inst) => {
+        const prod = inst.product || 'Outros';
+        const cur = uniqueProductsMap.get(prod) || { count: 0, total: 0 };
+        cur.count += 1;
+        if (inst.status !== 'paid') {
+          cur.total += inst.amount || inst.originalAmount || 0;
+        }
+        uniqueProductsMap.set(prod, cur);
+      });
+
+      const allProductItems: DropdownItem<string>[] = Array.from(uniqueProductsMap.entries()).map(([pName, pStats]) => ({
+        id: pName,
+        label: pName,
+        sublabel: `${pStats.count} parcelas no total`,
+        icon: getItemIcon(pName),
+        badge: pStats.total > 0 ? `R$ ${pStats.total.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}` : 'Quitado',
+        badgeType: pStats.total <= 0 ? 'success' : 'default',
+        value: pName,
+      }));
+
+      return [cadastrarOption, allOption, ...allProductItems];
+    }
 
     const totalOwed = debtorInstallments
       .filter((i) => i.status !== 'paid')
@@ -762,11 +834,27 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
       };
     });
 
-    return [allItem, ...productItems];
-  }, [activeDebtor, selectedDebtorId, debtorInstallments, activeDebtorValidProducts]);
+    return [cadastrarOption, allItem, ...productItems];
+  }, [activeDebtor, selectedDebtorId, debtorInstallments, installments, activeDebtorValidProducts]);
 
   const selectedProductItem = useMemo((): DropdownItem<string> | null => {
-    if (selectedDebtorId === 'all' || !activeDebtor) return null;
+    if (selectedDebtorId === 'all' || !activeDebtor) {
+      if (!selectedPurchaseFilter || selectedPurchaseFilter === 'all') {
+        return {
+          id: 'all',
+          label: 'Item e Serviços',
+          sublabel: 'Consolidado Geral',
+          icon: 'grid_view',
+          value: 'all',
+        };
+      }
+      return {
+        id: selectedPurchaseFilter,
+        label: selectedPurchaseFilter,
+        icon: getItemIcon(selectedPurchaseFilter),
+        value: selectedPurchaseFilter,
+      };
+    }
     if (!selectedPurchaseFilter || selectedPurchaseFilter === 'all') {
       return {
         id: 'all',
@@ -783,7 +871,7 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
     return {
       id: selectedPurchaseFilter,
       label: selectedPurchaseFilter,
-      icon: 'shopping_bag',
+      icon: getItemIcon(selectedPurchaseFilter),
       value: selectedPurchaseFilter,
     };
   }, [selectedPurchaseFilter, productDropdownItems, selectedDebtorId, activeDebtor]);
@@ -972,9 +1060,10 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               <div className="w-full flex flex-col gap-2 relative">
                 {/* A Barra com Dropdown de Devedor e Dropdown de Produto (Sem Lupa) */}
                 <div className="bg-white/95 p-2 sm:p-2.5 rounded-2xl border border-cyan-300/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 gap-2 w-full select-none">
-                  {/* 1. DROPDOWN "Pessoa" (Somente o nome da pessoa) */}
+                  {/* 1. DROPDOWN "Devedores" (Seleção intuitiva de pessoas/devedores) */}
                   <SearchableDropdown
-                    placeholder="Nome da Pessoa"
+                    title="Devedores"
+                    placeholder="Selecione o Devedor"
                     selectedItem={selectedDebtorItem}
                     items={debtorDropdownItems}
                     isOpen={activeDropdown === 'debtor'}
@@ -988,13 +1077,15 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       setActiveDropdown(null);
                     }}
                     showSearch={false}
+                    searchPlaceholder="Buscar devedor..."
                     accentColor="cyan"
                     dropdownAlign="left"
                     displayMode="inline"
                   />
 
-                  {/* 2. DROPDOWN "Item e Serviços" (Somente Item e Serviços) */}
+                  {/* 2. DROPDOWN "Item e Serviços" (Cadastramento e Filtro de Compras, Produtos e Itens) */}
                   <SearchableDropdown
+                    title="Item e Serviços"
                     placeholder="Item e Serviços"
                     selectedItem={selectedProductItem}
                     items={productDropdownItems}
@@ -1004,12 +1095,29 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     }
                     onClose={() => setActiveDropdown(null)}
                     onSelect={(item) => {
+                      if (item.value === '__new_purchase__' || item.id === '__new_purchase__') {
+                        if (onOpenNewPurchase) {
+                          onOpenNewPurchase(selectedDebtorId !== 'all' ? activeDebtor?.id : undefined);
+                        }
+                        setActiveDropdown(null);
+                        return;
+                      }
                       setSelectedPurchaseFilter(item.value);
                       setActiveDropdown(null);
                     }}
-                    disabled={selectedDebtorId === 'all' || !activeDebtor}
-                    disabledMessage="Selecione primeiro um devedor"
+                    onAddNewAction={() => {
+                      if (onOpenNewPurchase) {
+                        onOpenNewPurchase(selectedDebtorId !== 'all' ? activeDebtor?.id : undefined);
+                      }
+                    }}
+                    addNewActionLabel={
+                      activeDebtor && selectedDebtorId !== 'all'
+                        ? `+ Cadastrar Nova Compra para ${activeDebtor.name.split(' ')[0]}`
+                        : '+ Cadastrar Nova Compra, Produto e Itens'
+                    }
+                    disabled={false}
                     showSearch={false}
+                    searchPlaceholder="Buscar produto ou item..."
                     accentColor="cyan"
                     dropdownAlign="right"
                     displayMode="inline"
@@ -1323,6 +1431,8 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       <span>Editar Cadastro</span>
                     </button>
                   )}
+
+
                  </div>
               </div>
             </div>
@@ -1345,7 +1455,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 </h3>
                 <span className="text-cyan-600 font-extrabold text-sm sm:text-base">•</span>
                 <span className="text-cyan-700 font-black text-xs sm:text-sm uppercase tracking-wider">
-                  {activeDebtor?.name || 'Jubileu'}
+                  {activeDebtor?.name || 'Cliente'}
                 </span>
                 <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] font-mono font-bold ml-1">
                   {filteredInstallments.length} {filteredInstallments.length === 1 ? 'item' : 'itens'}

@@ -6,3 +6,9 @@ coverage/
 *.log
 .env*
 !.env.example
+.backup_atualizacao_88/
+.backup_versao_oficial/
+*.zip
+*.bundle
+
+

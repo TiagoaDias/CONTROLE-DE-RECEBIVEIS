@@ -12,14 +12,14 @@ interface EditDebtorModalProps {
 }
 
 const AVATAR_OPTIONS = [
-  { label: 'Jucelia', url: APP_IMAGES.jucelia },
-  { label: 'Jubileu', url: APP_IMAGES.jubileu },
-  { label: 'Marcos', url: APP_IMAGES.marcos },
-  { label: 'Maria', url: APP_IMAGES.maria },
-  { label: 'Carlos', url: APP_IMAGES.carlos },
-  { label: 'Fátima', url: APP_IMAGES.fatima },
-  { label: 'João', url: APP_IMAGES.joao },
-  { label: 'Renata', url: APP_IMAGES.renata },
+  { label: 'Perfil 1', url: APP_IMAGES.carlos },
+  { label: 'Perfil 2', url: APP_IMAGES.maria },
+  { label: 'Perfil 3', url: APP_IMAGES.avatar3 },
+  { label: 'Perfil 4', url: APP_IMAGES.avatar4 },
+  { label: 'Perfil 5', url: APP_IMAGES.avatar5 },
+  { label: 'Perfil 6', url: APP_IMAGES.avatar6 },
+  { label: 'Perfil 7', url: APP_IMAGES.avatar7 },
+  { label: 'Perfil 8', url: APP_IMAGES.avatar8 },
 ];
 
 const VINCULO_OPTIONS = [

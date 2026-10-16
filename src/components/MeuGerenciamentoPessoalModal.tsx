@@ -104,6 +104,9 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
   const [editingFixedId, setEditingFixedId] = useState<string | null>(null);
   const [editingAmountText, setEditingAmountText] = useState<string>('');
 
+  // Controle de recolhimento dos 4 cards de resumo para não ocupar a tela no mobile
+  const [isSummaryExpanded, setIsSummaryExpanded] = useState(true);
+
   // Carregar dados salvos do mês
   useEffect(() => {
     try {
@@ -453,26 +456,26 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
 
   return (
     <div className="fixed inset-0 z-[110] bg-black/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-4xl bg-slate-900 border-2 border-emerald-500/40 rounded-3xl shadow-2xl flex flex-col max-h-[92vh] overflow-hidden text-white my-auto">
+      <div className="w-full max-w-4xl bg-slate-900 border-2 border-emerald-500/40 rounded-3xl shadow-2xl flex flex-col h-[92vh] sm:h-[88vh] max-h-[92vh] overflow-hidden text-white my-auto">
         
         {/* ============================================================ */}
         {/* 1. CABEÇALHO DO MODAL                                        */}
         {/* ============================================================ */}
-        <div className="shrink-0 bg-slate-950/90 border-b border-emerald-500/30 px-4 py-3 sm:px-6 sm:py-4 flex items-center justify-between gap-2 flex-wrap">
-          <div className="flex items-center gap-3 min-w-0">
-            <span className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
-              <span className="material-symbols-outlined text-[24px]">account_balance_wallet</span>
+        <div className="shrink-0 bg-slate-950/90 border-b border-emerald-500/30 px-3.5 py-2.5 sm:px-6 sm:py-4 flex items-center justify-between gap-2 flex-wrap z-30">
+          <div className="flex items-center gap-2.5 sm:gap-3 min-w-0">
+            <span className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-lg shadow-emerald-500/20">
+              <span className="material-symbols-outlined text-[20px] sm:text-[24px]">account_balance_wallet</span>
             </span>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-black text-base sm:text-lg text-white leading-tight">
+                <h3 className="font-black text-sm sm:text-lg text-white leading-tight">
                   Meu Gerenciamento Pessoal
                 </h3>
-                <span className="text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                <span className="text-[9.5px] sm:text-[10px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
                   Exclusivo Tiago Dias
                 </span>
               </div>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-[11px] sm:text-xs text-slate-400 mt-0.5 truncate hidden sm:block">
                 Controle 100% privado de despesas fixas, variáveis e gastos do dia a dia (sem devedores).
               </p>
             </div>
@@ -489,7 +492,7 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
               >
                 <span className="material-symbols-outlined text-[16px]">chevron_left</span>
               </button>
-              <span className="font-bold font-mono px-1 text-emerald-300">
+              <span className="font-bold font-mono px-1 text-emerald-300 text-[11px] sm:text-xs whitespace-nowrap">
                 {MONTH_NAMES[currentMonthIndex]} / {currentYear}
               </span>
               <button
@@ -505,7 +508,7 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
             <button
               type="button"
               onClick={handleExportPdf}
-              className="h-8 sm:h-9 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
+              className="h-8 sm:h-9 px-2.5 sm:px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white font-bold text-xs flex items-center gap-1.5 transition-all shadow-sm cursor-pointer"
               title="Exportar Relatório Mensal em PDF"
             >
               <span className="material-symbols-outlined text-[16px]">picture_as_pdf</span>
@@ -524,82 +527,13 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
         </div>
 
         {/* ============================================================ */}
-        {/* 2. CARDS DE RESUMO DO MÊS                                     */}
+        {/* 2. ABAS DE NAVEGAÇÃO FIXAS/STICKY COM ROLAGEM HORIZONTAL     */}
         {/* ============================================================ */}
-        <div className="shrink-0 p-3 sm:p-5 bg-slate-950/60 border-b border-slate-800 grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-          {/* Card 1: Gastos Fixos */}
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-cyan-400">home</span>
-              Gastos Fixos
-            </span>
-            <div className="mt-1">
-              <span className="text-lg sm:text-xl font-mono font-black text-cyan-300">
-                R$ {totalFixed.toFixed(2).replace('.', ',')}
-              </span>
-              <span className="text-[9.5px] block text-slate-400 mt-0.5">
-                Pago: R$ {totalFixedPaid.toFixed(2).replace('.', ',')}
-              </span>
-            </div>
-          </div>
-
-          {/* Card 2: Variáveis do Mês */}
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-amber-400">trending_up</span>
-              Variáveis (Mês)
-            </span>
-            <div className="mt-1">
-              <span className="text-lg sm:text-xl font-mono font-black text-amber-300">
-                R$ {totalVariable.toFixed(2).replace('.', ',')}
-              </span>
-              <span className="text-[9.5px] block text-slate-400 mt-0.5">
-                {variableExpenses.length} lançamentos
-              </span>
-            </div>
-          </div>
-
-          {/* Card 3: Gastos Diários */}
-          <div className="bg-slate-800/80 border border-slate-700/80 rounded-2xl p-3 flex flex-col justify-between shadow-xs">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px] text-purple-400">today</span>
-              Gastos Diários
-            </span>
-            <div className="mt-1">
-              <span className="text-lg sm:text-xl font-mono font-black text-purple-300">
-                R$ {totalDaily.toFixed(2).replace('.', ',')}
-              </span>
-              <span className="text-[9.5px] block text-slate-400 mt-0.5">
-                {dailyExpenses.length} registros
-              </span>
-            </div>
-          </div>
-
-          {/* Card 4: Total Geral */}
-          <div className="bg-gradient-to-br from-emerald-950 to-slate-900 border-2 border-emerald-500/60 rounded-2xl p-3 flex flex-col justify-between shadow-md">
-            <span className="text-[10px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1">
-              <span className="material-symbols-outlined text-[14px]">payments</span>
-              Total Geral ({MONTH_NAMES[currentMonthIndex].slice(0, 3)})
-            </span>
-            <div className="mt-1">
-              <span className="text-xl sm:text-2xl font-mono font-black text-emerald-300">
-                R$ {grandTotal.toFixed(2).replace('.', ',')}
-              </span>
-              <span className="text-[9.5px] block text-emerald-400/80 mt-0.5">
-                Despesas pessoais consolidadas
-              </span>
-            </div>
-          </div>
-        </div>
-
-        {/* ============================================================ */}
-        {/* 3. ABAS DE NAVEGAÇÃO                                         */}
-        {/* ============================================================ */}
-        <div className="shrink-0 flex items-center gap-2 px-3 sm:px-6 pt-3 border-b border-slate-800 bg-slate-950/40">
+        <div className="shrink-0 flex items-center gap-1.5 px-3 sm:px-6 pt-2.5 pb-1 border-b border-slate-800 bg-slate-950/90 backdrop-blur-md overflow-x-auto scrollbar-none z-20">
           <button
             type="button"
             onClick={() => setActiveTab('fixos')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-2 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'fixos'
                 ? 'border-cyan-400 text-cyan-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -615,7 +549,7 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
           <button
             type="button"
             onClick={() => setActiveTab('variaveis')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-2 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'variaveis'
                 ? 'border-amber-400 text-amber-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -631,7 +565,7 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
           <button
             type="button"
             onClick={() => setActiveTab('diarios')}
-            className={`pb-2.5 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 ${
+            className={`pb-2 px-3 text-xs font-bold transition-all border-b-2 cursor-pointer flex items-center gap-1.5 whitespace-nowrap shrink-0 ${
               activeTab === 'diarios'
                 ? 'border-purple-400 text-purple-300'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -646,9 +580,124 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
         </div>
 
         {/* ============================================================ */}
-        {/* 4. CONTEÚDO DA ABA ATIVA                                     */}
+        {/* 3. CONTEÚDO PRINCIPAL ROLÁVEL (CARDS + CONTEÚDO DA ABA)       */}
         {/* ============================================================ */}
-        <div className="flex-1 overflow-y-auto p-3.5 sm:p-6 space-y-4 scrollbar-thin">
+        <div className="flex-1 overflow-y-auto p-3 sm:p-5 space-y-4 scrollbar-thin">
+          
+          {/* CARDS DE RESUMO DO MÊS COM RECOLHIMENTO INTELIGENTE PARA MOBILE */}
+          <div className="bg-slate-950/70 border border-slate-800/90 rounded-2xl p-2.5 sm:p-3 shadow-inner">
+            <div className="flex items-center justify-between gap-2 pb-1.5 border-b border-slate-800/80 mb-2">
+              <div className="flex items-center gap-2">
+                <span className="material-symbols-outlined text-[16px] text-emerald-400">query_stats</span>
+                <span className="text-[11px] sm:text-xs font-bold text-slate-200">
+                  Resumo Financeiro de {MONTH_NAMES[currentMonthIndex]}
+                </span>
+                <span className="text-[10px] font-mono font-black px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                  R$ {grandTotal.toFixed(2).replace('.', ',')}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSummaryExpanded(!isSummaryExpanded)}
+                className="px-2.5 py-1 rounded-xl bg-slate-800 hover:bg-slate-700 active:scale-95 border border-slate-700 text-slate-300 hover:text-white text-[11px] font-bold flex items-center gap-1 transition-all cursor-pointer"
+                title={isSummaryExpanded ? "Recolher cards para dar espaço à lista" : "Expandir os 4 cards de resumo"}
+              >
+                <span className="material-symbols-outlined text-[14px]">
+                  {isSummaryExpanded ? 'unfold_less' : 'unfold_more'}
+                </span>
+                <span>{isSummaryExpanded ? 'Recolher' : 'Expandir'}</span>
+              </button>
+            </div>
+
+            {/* Visualização Expandida: Os 4 Cards Completos */}
+            {isSummaryExpanded ? (
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-2.5 animate-in fade-in duration-200">
+                {/* Card 1: Gastos Fixos */}
+                <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between shadow-xs hover:border-cyan-500/40 transition-colors">
+                  <span className="text-[9px] sm:text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 truncate">
+                    <span className="material-symbols-outlined text-[12px] sm:text-[13px] text-cyan-400 shrink-0">home</span>
+                    <span className="truncate">Gastos Fixos</span>
+                  </span>
+                  <div className="mt-1">
+                    <span className="text-sm sm:text-lg font-mono font-black text-cyan-300 block truncate">
+                      R$ {totalFixed.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9px] block text-slate-400 mt-0.5 truncate">
+                      Pago: R$ {totalFixedPaid.toFixed(2).replace('.', ',')}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 2: Variáveis do Mês */}
+                <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between shadow-xs hover:border-amber-500/40 transition-colors">
+                  <span className="text-[9px] sm:text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 truncate">
+                    <span className="material-symbols-outlined text-[12px] sm:text-[13px] text-amber-400 shrink-0">trending_up</span>
+                    <span className="truncate">Variáveis (Mês)</span>
+                  </span>
+                  <div className="mt-1">
+                    <span className="text-sm sm:text-lg font-mono font-black text-amber-300 block truncate">
+                      R$ {totalVariable.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9px] block text-slate-400 mt-0.5 truncate">
+                      {variableExpenses.length} lançamentos
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 3: Gastos Diários */}
+                <div className="bg-slate-800/80 border border-slate-700/80 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between shadow-xs hover:border-purple-500/40 transition-colors">
+                  <span className="text-[9px] sm:text-[9.5px] font-bold uppercase tracking-wider text-slate-400 flex items-center gap-1 truncate">
+                    <span className="material-symbols-outlined text-[12px] sm:text-[13px] text-purple-400 shrink-0">today</span>
+                    <span className="truncate">Gastos Diários</span>
+                  </span>
+                  <div className="mt-1">
+                    <span className="text-sm sm:text-lg font-mono font-black text-purple-300 block truncate">
+                      R$ {totalDaily.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9px] block text-slate-400 mt-0.5 truncate">
+                      {dailyExpenses.length} registros
+                    </span>
+                  </div>
+                </div>
+
+                {/* Card 4: Total Geral */}
+                <div className="bg-gradient-to-br from-emerald-950 to-slate-900 border border-emerald-500/60 rounded-xl p-2 sm:p-2.5 flex flex-col justify-between shadow-md">
+                  <span className="text-[9px] sm:text-[9.5px] font-black uppercase tracking-wider text-emerald-400 flex items-center gap-1 truncate">
+                    <span className="material-symbols-outlined text-[12px] sm:text-[13px] shrink-0">payments</span>
+                    <span className="truncate">Total ({MONTH_NAMES[currentMonthIndex].slice(0, 3)})</span>
+                  </span>
+                  <div className="mt-1">
+                    <span className="text-sm sm:text-lg font-mono font-black text-emerald-300 block truncate">
+                      R$ {grandTotal.toFixed(2).replace('.', ',')}
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9px] block text-emerald-400/80 mt-0.5 truncate">
+                      Consolidado
+                    </span>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* Visualização Compacta: Barra Mínima para economizar 100% de tela no mobile */
+              <div className="grid grid-cols-4 gap-1.5 py-1 px-1 bg-slate-900/60 rounded-xl text-center text-[10px] animate-in fade-in duration-200">
+                <div className="truncate">
+                  <span className="text-slate-400 block text-[8px] uppercase">Fixos</span>
+                  <span className="font-mono font-bold text-cyan-300">R$ {totalFixed.toFixed(0)}</span>
+                </div>
+                <div className="truncate">
+                  <span className="text-slate-400 block text-[8px] uppercase">Variáveis</span>
+                  <span className="font-mono font-bold text-amber-300">R$ {totalVariable.toFixed(0)}</span>
+                </div>
+                <div className="truncate">
+                  <span className="text-slate-400 block text-[8px] uppercase">Diários</span>
+                  <span className="font-mono font-bold text-purple-300">R$ {totalDaily.toFixed(0)}</span>
+                </div>
+                <div className="truncate bg-emerald-950/60 rounded border border-emerald-500/40">
+                  <span className="text-emerald-400 block text-[8px] uppercase font-bold">Total</span>
+                  <span className="font-mono font-black text-emerald-300">R$ {grandTotal.toFixed(0)}</span>
+                </div>
+              </div>
+            )}
+          </div>
           
           {/* ---------------------------------------------------------- */}
           {/* ABA 1: GASTOS FIXOS (CPFL, Água, Internet, Carro, etc.)    */}

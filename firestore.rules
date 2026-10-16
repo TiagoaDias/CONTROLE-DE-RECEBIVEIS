@@ -8,9 +8,7 @@ service cloud.firestore {
 
     // Helper function to verify that the user owns the resource or is master admin
     function isOwner(userId) {
-      return !isAuthenticated() ||
-             (isAuthenticated() && request.auth.uid == userId) ||
-             userId == 'usr_thiago_dias' ||
+      return (isAuthenticated() && request.auth.uid == userId) ||
              (isAuthenticated() && request.auth.token.email == 'tiagodias8888@gmail.com');
     }
 
@@ -25,12 +23,14 @@ service cloud.firestore {
 
     // Forum topics
     match /forum_topics/{topicId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
-    // Registered credentials lookup and storage
+    // Registered credentials lookup (Escrita restrita a usuários autenticados)
     match /registered_credentials/{credId} {
-      allow read, write: if true;
+      allow read: if true;
+      allow write: if isAuthenticated();
     }
 
     // System connection test

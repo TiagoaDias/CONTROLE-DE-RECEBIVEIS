@@ -4357,8 +4357,8 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         const isPaid = Number(d.totalOwed) <= 0;
 
         return (
-          <div className="fixed inset-0 z-[9990] bg-black/75 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-300 font-sans select-none" onClick={() => setActiveBalloonDebtorId(null)}>
-            <div className="w-full max-w-xl sm:max-w-2xl bg-white dark:bg-slate-900 border-2 border-cyan-400 rounded-3xl shadow-2xl transform transition-all relative animate-in zoom-in-95 duration-300 flex flex-col overflow-hidden max-h-[96vh]" onClick={(e) => e.stopPropagation()}>
+          <div className="fixed inset-0 z-[9990] bg-black/75 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 pb-6 sm:pb-4 animate-in fade-in duration-300 font-sans select-none" onClick={() => { try { playAppSound('click'); } catch {} setActiveBalloonDebtorId(null); }}>
+            <div className="w-full max-w-xl sm:max-w-2xl bg-white dark:bg-slate-900 border-2 border-cyan-400 rounded-3xl shadow-2xl transform transition-all relative animate-in zoom-in-95 duration-300 flex flex-col overflow-hidden max-h-[88vh] sm:max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
               {/* Cabeçalho da Janela Principal */}
               <div className="bg-gradient-to-r from-slate-950 via-slate-900 to-indigo-950 text-white px-3.5 py-2.5 sm:px-4 sm:py-3 flex items-center justify-between border-b border-cyan-500/40 shadow-md shrink-0">
                 <div className="flex items-center gap-2.5">
@@ -4377,16 +4377,16 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setActiveBalloonDebtorId(null)}
+                  onClick={() => { try { playAppSound('click'); } catch {} setActiveBalloonDebtorId(null); }}
                   className="w-7 h-7 rounded-full bg-slate-800 hover:bg-red-600 text-slate-300 hover:text-white flex items-center justify-center text-xs font-bold transition-all transform hover:scale-105 cursor-pointer shadow-md shrink-0"
-                  title="Fechar Janelas"
+                  title="Fechar"
                 >
                   ✕
                 </button>
               </div>
 
-              {/* Corpo com as 2 Janelas Lado a Lado / Empilhadas - Compactas sem Rolagem */}
-              <div className="p-2.5 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-100 dark:bg-slate-950 overflow-hidden shrink-0">
+              {/* Corpo com as 2 Janelas Lado a Lado / Empilhadas - Reenquadrado com rolagem suave no mobile */}
+              <div className="p-2.5 sm:p-4 grid grid-cols-1 md:grid-cols-2 gap-2.5 sm:gap-3 bg-slate-100 dark:bg-slate-950 overflow-y-auto flex-1 scrollbar-thin">
                 
                 {/* JANELA 1: Card de Vencimento / Atraso */}
                 <div className={`p-3 sm:p-3.5 rounded-2xl border-2 shadow-md flex flex-col justify-between font-sans ${
@@ -4538,15 +4538,19 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               </div>
 
-              {/* Rodapé da Janela */}
-              <div className="bg-slate-200 dark:bg-slate-900 px-3.5 py-2.5 sm:px-4 sm:py-3 border-t border-slate-300 dark:border-slate-800 flex items-center justify-end shrink-0">
+              {/* Rodapé da Janela Reenquadrado */}
+              <div className="bg-slate-200 dark:bg-slate-900 px-4 py-3 border-t border-slate-300 dark:border-slate-800 flex items-center justify-end shrink-0">
                 <button
                   type="button"
-                  onClick={() => setActiveBalloonDebtorId(null)}
-                  className="px-5 py-2 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  onClick={() => {
+                    try { playAppSound('click'); } catch {}
+                    setActiveBalloonDebtorId(null);
+                  }}
+                  className="px-6 py-2.5 rounded-xl bg-cyan-600 hover:bg-cyan-500 active:bg-cyan-700 text-white font-extrabold text-xs shadow-md transition-all active:scale-95 cursor-pointer flex items-center gap-1.5"
+                  title="Entendido"
                 >
                   <span className="material-symbols-outlined text-[16px]">check</span>
-                  <span>Entendido / Fechar Janelas</span>
+                  <span>Entendido</span>
                 </button>
               </div>
             </div>

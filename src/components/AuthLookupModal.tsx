@@ -373,11 +373,11 @@ export const AuthLookupModal: React.FC<AuthLookupModalProps> = ({
                         E18236128202609191432
                       </span>
                       <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                        R$ 170,00
+                        R$ 300,00
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate">
-                      Jucelia Aizza • Smart TV (Parcela 1/18)
+                      Carlos Mendes (Demonstração) • Notebook Profissional (Parcela 4/10)
                     </p>
                   </button>
 
@@ -391,11 +391,11 @@ export const AuthLookupModal: React.FC<AuthLookupModalProps> = ({
                         E18236128202609201550
                       </span>
                       <span className="text-[9px] font-bold bg-emerald-100 text-emerald-800 px-1.5 py-0.5 rounded">
-                        R$ 180,00
+                        R$ 185,00
                       </span>
                     </div>
                     <p className="text-[10px] text-slate-500 mt-0.5 font-medium truncate">
-                      Aline Ferreira • Fogão (Parcela 1/10)
+                      Mariana Oliveira (Demonstração) • Smart TV 50" (Parcela 1/10)
                     </p>
                   </button>
                 </div>

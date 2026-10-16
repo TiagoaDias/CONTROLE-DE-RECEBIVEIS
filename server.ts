@@ -428,6 +428,12 @@ ${text ? `Texto do comprovante:\n"""\n${text}\n"""` : 'Analise o print ou foto d
   }
 });
 
+// Download direto da Atualização 88
+app.get('/download-atualizacao-88', (req: Request, res: Response) => {
+  const filePath = path.join(process.cwd(), 'public', 'atualizacao_88.zip');
+  res.download(filePath, 'haspaho-controle-recebiveis-atualizacao-88.zip');
+});
+
 // Setup Vite middleware ou Static serving
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

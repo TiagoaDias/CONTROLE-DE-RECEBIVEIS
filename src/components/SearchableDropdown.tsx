@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 
 export interface DropdownItem<T = any> {
   id: string;
@@ -20,6 +20,8 @@ export interface SearchableDropdownProps<T = any> {
   onToggle: () => void;
   onClose: () => void;
   onSelect: (item: DropdownItem<T>) => void;
+  onAddNewAction?: () => void;
+  addNewActionLabel?: string;
   disabled?: boolean;
   disabledMessage?: string;
   searchPlaceholder?: string;
@@ -40,10 +42,12 @@ export function SearchableDropdown<T = any>({
   onToggle,
   onClose,
   onSelect,
+  onAddNewAction,
+  addNewActionLabel,
   disabled = false,
   disabledMessage = 'Opção indisponível',
   searchPlaceholder = 'Pesquisar...',
-  showSearch = true,
+  showSearch = false,
   className = '',
   emptyMessage = 'Nenhum resultado encontrado.',
   accentColor = 'cyan',
@@ -53,6 +57,11 @@ export function SearchableDropdown<T = any>({
   const [searchTerm, setSearchTerm] = useState('');
   const containerRef = useRef<HTMLDivElement>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Extrair avatares dos devedores para empilhar dinamicamente no item "Visão Geral / Todos os Devedores"
+  const debtorAvatars = useMemo(() => {
+    return items.filter((i) => i.avatar && i.avatar.trim().length > 0).map((i) => i.avatar!).slice(0, 3);
+  }, [items]);
 
   // Fecha ao clicar fora
   useEffect(() => {
@@ -135,6 +144,44 @@ export function SearchableDropdown<T = any>({
     return 'left-0 right-auto w-full min-w-[280px] sm:min-w-[340px] max-w-[calc(100vw-24px)] sm:max-w-[440px]';
   };
 
+  // Renderizar o avatar/ícone visual do item de forma limpa
+  const renderItemVisual = (item: DropdownItem<T> | null, isSelected: boolean, size: 'sm' | 'md' = 'md') => {
+    if (!item) {
+      return (
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 flex items-center justify-center shrink-0 border-2 border-cyan-300 shadow-2xs">
+          <span className="material-symbols-outlined text-[18px]">
+            {disabled ? 'lock' : 'bolt'}
+          </span>
+        </div>
+      );
+    }
+
+    const sizeClasses = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9';
+
+    if (item.avatar) {
+      return (
+        <img
+          src={item.avatar}
+          alt=""
+          referrerPolicy="no-referrer"
+          className={`${sizeClasses} rounded-xl object-cover shadow-xs border-2 border-cyan-400 shrink-0`}
+        />
+      );
+    }
+
+    return (
+      <div className={`${sizeClasses} rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
+        isSelected
+          ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-cyan-400 shadow-xs'
+          : 'bg-gradient-to-br from-cyan-100 via-sky-50 to-blue-100 text-cyan-900 border-cyan-300'
+      }`}>
+        <span className="material-symbols-outlined text-[18px]">
+          {item.icon || (disabled ? 'lock' : 'bolt')}
+        </span>
+      </div>
+    );
+  };
+
   return (
     <div ref={containerRef} className={`relative flex flex-col min-w-0 select-none ${className}`}>
       {/* Campo / Botão do Dropdown */}
@@ -148,29 +195,8 @@ export function SearchableDropdown<T = any>({
         title={disabled ? disabledMessage : title || placeholder}
       >
         <div className="flex items-center gap-2.5 min-w-0 flex-1">
-          {/* Avatar ou Ícone com Efeito Brilhante */}
-          {selectedItem?.avatar ? (
-            <img
-              src={selectedItem.avatar}
-              alt=""
-              referrerPolicy="no-referrer"
-              className="w-8 h-8 rounded-xl object-cover shadow-xs border-2 border-cyan-400 shrink-0"
-            />
-          ) : selectedItem?.icon ? (
-            <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
-              accentColor === 'cyan'
-                ? 'bg-gradient-to-br from-cyan-400 to-blue-500 text-white border-cyan-300'
-                : 'bg-gradient-to-br from-slate-700 to-slate-900 text-white border-slate-600'
-            }`}>
-              <span className="material-symbols-outlined text-[18px]">{selectedItem.icon}</span>
-            </div>
-          ) : (
-            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 flex items-center justify-center shrink-0 border-2 border-cyan-300 shadow-2xs">
-              <span className="material-symbols-outlined text-[18px]">
-                {disabled ? 'lock' : 'bolt'}
-              </span>
-            </div>
-          )}
+          {/* Avatar ou Ícone com Suporte a Grupo de Rostos */}
+          {renderItemVisual(selectedItem, isOpen, 'sm')}
 
           {/* Textos: Título / Nome Selecionado */}
           {displayMode === 'inline' ? (
@@ -262,6 +288,23 @@ export function SearchableDropdown<T = any>({
             </button>
           </div>
 
+          {/* Ação de Novo Cadastro Rápido de Compra / Produto */}
+          {onAddNewAction && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                onClose();
+                onAddNewAction();
+              }}
+              className="w-full p-2.5 rounded-xl bg-gradient-to-r from-blue-600 via-cyan-600 to-blue-700 hover:from-blue-500 hover:to-cyan-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-sm hover:shadow-md active:scale-[0.98] transition-all cursor-pointer border border-cyan-400/40 select-none"
+            >
+              <span className="material-symbols-outlined text-[18px]">add_circle</span>
+              <span>{addNewActionLabel || '+ Cadastrar Nova Compra / Produto'}</span>
+            </button>
+          )}
+
           {/* Campo de Pesquisa em Tempo Real */}
           {showSearch && items.length > 2 && (
             <div className="relative w-full">
@@ -324,23 +367,8 @@ export function SearchableDropdown<T = any>({
                         </span>
                       </span>
 
-                      {/* Avatar ou Ícone do Item */}
-                      {item.avatar ? (
-                        <img
-                          src={item.avatar}
-                          alt=""
-                          referrerPolicy="no-referrer"
-                          className="w-9 h-9 rounded-xl object-cover shadow-xs border-2 border-cyan-300 shrink-0"
-                        />
-                      ) : item.icon ? (
-                        <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
-                          isSelected
-                            ? 'bg-cyan-600 text-white border-cyan-500'
-                            : 'bg-cyan-50 text-cyan-800 border-cyan-200'
-                        }`}>
-                          <span className="material-symbols-outlined text-[18px]">{item.icon}</span>
-                        </div>
-                      ) : null}
+                      {/* Avatar ou Ícone do Item com Grupo de Rostos */}
+                      {renderItemVisual(item, isSelected, 'md')}
 
                       {/* Nome e Subtítulo */}
                       <div className="min-w-0 leading-tight">

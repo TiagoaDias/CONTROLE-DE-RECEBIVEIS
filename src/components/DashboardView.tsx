@@ -118,7 +118,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   
   // O devedor ativo raiz (Root Active Debtor)
   const [activeDebtorId, setActiveDebtorId] = useState<string>(
-    () => initialDebtorId || (debtors.length > 0 ? debtors[0].id : 'all')
+    () => initialDebtorId || 'all'
   );
   const [activeKpiModal, setActiveKpiModal] = useState<DebtorKpiType | null>(null);
 
@@ -131,6 +131,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const [isUnitaryModalOpen, setIsUnitaryModalOpen] = useState(false);
   const [selectedDebtorForUnitary, setSelectedDebtorForUnitary] = useState<Debtor | null>(null);
   const [initialUnitaryItemId, setInitialUnitaryItemId] = useState<string | undefined>(undefined);
+
+  // Modal interativo de seleção de devedor
+  const [isDebtorSelectModalOpen, setIsDebtorSelectModalOpen] = useState(false);
+  const [debtorSearchTerm, setDebtorSearchTerm] = useState('');
 
   const isInstallmentInCurrentMonth = (dateStr: string) => {
     if (!dateStr) return false;
@@ -161,14 +165,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     });
   }, [debtors, searchQuery, localSearch, statusFilter]);
 
-  // Enraizamento rigoroso no devedor ativo
+  // Enraizamento rigoroso no devedor ativo (ou null para Visão Geral / Consolidado)
   const selectedPrimaryDebtor = useMemo(() => {
     if (activeDebtorId && activeDebtorId !== 'all') {
       const found = debtors.find((d) => d.id === activeDebtorId);
       if (found) return found;
     }
-    return filteredDebtors.length > 0 ? filteredDebtors[0] : (debtors.length > 0 ? debtors[0] : null);
-  }, [filteredDebtors, debtors, activeDebtorId]);
+    return null;
+  }, [debtors, activeDebtorId]);
 
   // Parcelas estritamente enraizadas no devedor selecionado
   const targetInstallments = useMemo(() => {
@@ -281,41 +285,38 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
 
             <div className="flex items-center gap-2 shrink-0 flex-wrap">
-              {/* Seletor rápido de devedor diretamente no Painel */}
+              {/* Seletor rápido de devedor diretamente no Painel via Modal Personalizado */}
               {debtors.length > 0 && (
-                <div className="flex items-center gap-1.5 bg-slate-800/90 hover:bg-slate-800 border border-cyan-400/60 rounded-xl px-2.5 py-1 text-xs shadow-md transition-colors">
-                  <span className="material-symbols-outlined text-[15px] text-cyan-400">person_search</span>
-                  <span className="text-[10.5px] text-cyan-200 font-bold whitespace-nowrap hidden sm:inline">Cliente:</span>
-                  <select
-                    value={activeDebtorId}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setActiveDebtorId(val);
-                      if (onSelectDebtor) onSelectDebtor(val);
-                    }}
-                    className="bg-transparent text-white font-black text-xs outline-none cursor-pointer border-none py-0.5 max-w-[150px] sm:max-w-[210px] truncate"
-                    title="Selecione o devedor para atualizar as informações deste painel"
-                  >
-                    <option value="all" className="bg-slate-900 text-white font-bold">
-                      Todos os Clientes (Geral)
-                    </option>
-                    {debtors.map((d) => (
-                      <option key={d.id} value={d.id} className="bg-slate-900 text-white font-semibold">
-                        {d.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    playAppSound('pop');
+                    setIsDebtorSelectModalOpen(true);
+                  }}
+                  className="flex items-center gap-2 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border-2 border-cyan-400/80 hover:border-cyan-300 rounded-xl px-3 py-1.5 text-xs font-black text-white shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all cursor-pointer active:scale-95 group"
+                  title="Toque para abrir a lista interativa de clientes"
+                >
+                  <span className="material-symbols-outlined text-[16px] text-cyan-400 group-hover:scale-110 transition-transform">person_search</span>
+                  <span className="text-[10.5px] text-cyan-200 font-bold uppercase tracking-wider hidden sm:inline">Cliente:</span>
+                  <span className="text-white font-extrabold max-w-[130px] sm:max-w-[180px] truncate">
+                    {selectedPrimaryDebtor ? selectedPrimaryDebtor.name : 'Todos os Clientes'}
+                  </span>
+                  <span className="material-symbols-outlined text-[18px] text-cyan-400 group-hover:translate-y-0.5 transition-transform">keyboard_arrow_down</span>
+                </button>
               )}
 
+              {/* Botão Oficial ERP Corporativo / Delphi Desktop (Ao lado de Todos os Clientes) */}
               <button
                 type="button"
-                onClick={() => onNavigate('erp-legacy')}
-                className="px-3 py-1.5 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-400/60"
+                onClick={() => {
+                  try { playAppSound('pop'); } catch {}
+                  onNavigate('erp-legacy');
+                }}
+                className="px-3 py-1.5 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-xs flex items-center gap-1.5 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-300/80 group"
                 title="Abrir Sistema ERP Corporativo / Delphi Desktop"
               >
-                <span className="material-symbols-outlined text-[16px]">desktop_windows</span>
-                <span>ERP</span>
+                <span className="material-symbols-outlined text-[16px] text-slate-950 group-hover:scale-110 transition-transform">desktop_windows</span>
+                <span className="font-black tracking-wide">ERP</span>
               </button>
             </div>
           </div>
@@ -609,6 +610,218 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onOpenNewPurchaseForDebtor={onOpenNewPurchaseForDebtor}
           onOpenExtratoTotal={onOpenExtratoTotal}
         />
+
+        {/* MODAL INTERATIVO DE SELEÇÃO DE CLIENTE / DEVEDOR */}
+        {isDebtorSelectModalOpen && (
+          <div 
+            className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex items-center justify-center p-3 sm:p-5 overflow-y-auto animate-in fade-in duration-200"
+            onClick={() => setIsDebtorSelectModalOpen(false)}
+          >
+            <div
+              className="w-full max-w-lg bg-gradient-to-b from-[#0b1b36] via-[#0f274d] to-[#081326] border-2 border-cyan-400/90 rounded-3xl shadow-[0_0_50px_rgba(6,182,212,0.4)] flex flex-col max-h-[85vh] overflow-hidden text-white relative animate-in zoom-in-95 duration-200 my-auto"
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Topo do Modal */}
+              <div className="p-4 border-b border-cyan-500/20 bg-slate-950/80 flex items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-10 h-10 rounded-2xl bg-cyan-500/20 border border-cyan-400/50 flex items-center justify-center text-cyan-300 shadow-xs shrink-0">
+                    <span className="material-symbols-outlined text-[22px]">groups</span>
+                  </div>
+                  <div className="min-w-0">
+                    <h3 className="font-black text-base text-white leading-tight truncate">
+                      Selecionar Cliente / Devedor
+                    </h3>
+                    <p className="text-[11px] text-cyan-200/80 font-medium truncate">
+                      Escolha quem deseja visualizar no painel
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setIsDebtorSelectModalOpen(false)}
+                  className="w-8 h-8 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer border border-white/10 shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[18px]">close</span>
+                </button>
+              </div>
+
+              {/* Campo de Busca Rápida */}
+              <div className="p-3 bg-slate-900/60 border-b border-cyan-500/10 shrink-0">
+                <div className="relative flex items-center">
+                  <span className="material-symbols-outlined text-cyan-400 text-[18px] absolute left-3 pointer-events-none">
+                    search
+                  </span>
+                  <input
+                    type="text"
+                    value={debtorSearchTerm}
+                    onChange={(e) => setDebtorSearchTerm(e.target.value)}
+                    placeholder="Buscar por nome, telefone ou CPF..."
+                    className="w-full bg-slate-950/80 border border-cyan-500/30 focus:border-cyan-400 rounded-xl pl-9 pr-8 py-2 text-xs text-white placeholder-slate-400 outline-none transition-all"
+                  />
+                  {debtorSearchTerm && (
+                    <button
+                      type="button"
+                      onClick={() => setDebtorSearchTerm('')}
+                      className="absolute right-2.5 text-slate-400 hover:text-white text-xs cursor-pointer p-1"
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Lista de Opções */}
+              <div className="p-3 overflow-y-auto space-y-2 flex-1 scrollbar-thin">
+                {/* Opção 1: Todos os Clientes (Geral) */}
+                {!debtorSearchTerm && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playAppSound('pop');
+                      setActiveDebtorId('all');
+                      if (onSelectDebtor) onSelectDebtor('all');
+                      setIsDebtorSelectModalOpen(false);
+                    }}
+                    className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer group ${
+                      activeDebtorId === 'all'
+                        ? 'bg-gradient-to-r from-cyan-950/90 to-blue-950/90 border-cyan-400 ring-2 ring-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+                        : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-cyan-400/40'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-cyan-500 to-blue-600 flex items-center justify-center text-white shadow-md shrink-0">
+                        <span className="material-symbols-outlined text-[20px]">groups</span>
+                      </div>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-black text-sm text-white group-hover:text-cyan-200 transition-colors truncate">
+                            Todos os Clientes (Geral)
+                          </span>
+                          <span className="px-2 py-0.5 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 text-[9.5px] font-bold">
+                            Consolidado
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-slate-300 truncate mt-0.5 font-medium">
+                          Visão geral unificada de todos os {debtors.length} devedores
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                      activeDebtorId === 'all' ? 'bg-cyan-400 text-slate-950 font-black' : 'border border-white/30 text-transparent'
+                    }`}>
+                      ✓
+                    </div>
+                  </button>
+                )}
+
+                {/* Clientes Filtrados */}
+                {debtors
+                  .filter((d) => {
+                    if (!debtorSearchTerm) return true;
+                    const q = debtorSearchTerm.toLowerCase().trim();
+                    return (
+                      d.name.toLowerCase().includes(q) ||
+                      (d.phone && d.phone.includes(q)) ||
+                      (d.cpfCnpj && d.cpfCnpj.includes(q))
+                    );
+                  })
+                  .map((d) => {
+                    const isSelected = activeDebtorId === d.id;
+                    const hasOverdue = (d.overdueCount || 0) > 0;
+                    const isPaidOff = d.totalOwed <= 0;
+
+                    return (
+                      <button
+                        key={d.id}
+                        type="button"
+                        onClick={() => {
+                          playAppSound('pop');
+                          setActiveDebtorId(d.id);
+                          if (onSelectDebtor) onSelectDebtor(d.id);
+                          setIsDebtorSelectModalOpen(false);
+                        }}
+                        className={`w-full p-3 rounded-2xl border text-left flex items-center justify-between gap-3 transition-all cursor-pointer group ${
+                          isSelected
+                            ? 'bg-gradient-to-r from-cyan-950/90 to-blue-950/90 border-cyan-400 ring-2 ring-cyan-400/60 shadow-[0_0_20px_rgba(6,182,212,0.3)]'
+                            : 'bg-white/5 hover:bg-white/10 border-white/10 hover:border-cyan-400/40'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 min-w-0 flex-1">
+                          <SafeDebtorAvatar
+                            name={d.name}
+                            avatar={d.avatar}
+                            size="md"
+                            status={hasOverdue ? 'late' : 'ok'}
+                            className="ring-2 ring-cyan-400/50 shrink-0"
+                          />
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="font-black text-sm text-white group-hover:text-cyan-200 transition-colors truncate">
+                                {d.name}
+                              </span>
+                              <span className="w-3.5 h-3.5 rounded-full bg-[#1d9bf0] text-white flex items-center justify-center text-[8px] font-black shrink-0">
+                                ✓
+                              </span>
+                              {d.relation && (
+                                <span className="px-1.5 py-0.2 rounded bg-white/10 text-cyan-200 text-[9.5px] font-bold">
+                                  {d.relation}
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="text-[11px] text-slate-300 flex items-center gap-2 mt-0.5 truncate font-medium">
+                              <span>Em aberto: <strong className="text-amber-300 font-mono">R$ {safeToFixed(d.totalOwed)}</strong></span>
+                              {hasOverdue && (
+                                <span className="text-red-400 font-bold">({d.overdueCount} atraso)</span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0">
+                          {hasOverdue ? (
+                            <span className="px-2 py-0.5 rounded-full bg-red-500/20 text-red-300 border border-red-500/40 text-[9.5px] font-bold">
+                              Atrasado
+                            </span>
+                          ) : isPaidOff ? (
+                            <span className="px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-300 border border-blue-500/40 text-[9.5px] font-bold">
+                              Quitado
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[9.5px] font-bold">
+                              Em dia
+                            </span>
+                          )}
+
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs shrink-0 ${
+                            isSelected ? 'bg-cyan-400 text-slate-950 font-black' : 'border border-white/30 text-transparent'
+                          }`}>
+                            ✓
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
+              </div>
+
+              {/* Rodapé do Modal */}
+              <div className="p-3 bg-slate-950/80 border-t border-cyan-500/20 flex items-center justify-between gap-2 shrink-0">
+                <span className="text-[11px] text-slate-300 font-medium">
+                  Total de {debtors.length} clientes cadastrados
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setIsDebtorSelectModalOpen(false)}
+                  className="px-4 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-black text-xs transition-all cursor-pointer shadow-md"
+                >
+                  Concluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </>
   );

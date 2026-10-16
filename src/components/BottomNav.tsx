@@ -98,12 +98,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
           {/* 1. Novo Devedor / Comprador */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => {
-              playAppSound('click');
               setIsMenuOpen(false);
               if (onOpenNewDebtor) onOpenNewDebtor();
+              try { playAppSound('click'); } catch {}
             }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsMenuOpen(false);
+                if (onOpenNewDebtor) onOpenNewDebtor();
+                try { playAppSound('click'); } catch {}
+              }
+            }}
+            className="w-full text-left p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">person_add</span>
@@ -126,12 +136,22 @@ export const BottomNav: React.FC<BottomNavProps> = ({
 
           {/* 2. Nova Compra Parcelada */}
           <div
+            role="button"
+            tabIndex={0}
             onClick={() => {
-              playAppSound('click');
               setIsMenuOpen(false);
-              onOpenNewPurchase();
+              if (onOpenNewPurchase) onOpenNewPurchase();
+              try { playAppSound('click'); } catch {}
             }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsMenuOpen(false);
+                if (onOpenNewPurchase) onOpenNewPurchase();
+                try { playAppSound('click'); } catch {}
+              }
+            }}
+            className="w-full text-left p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(37,99,235,0.4)] group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
@@ -152,60 +172,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </div>
 
-          {/* 3. Registrar Pagamento (Liquidar Parcelas) */}
-          <div
-            onClick={() => {
-              playAppSound('click');
-              setIsMenuOpen(false);
-              onNavigate('parcelas');
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-teal-500/50 hover:bg-teal-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-teal-600 to-emerald-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(20,184,166,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">payments</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-teal-200 transition-colors flex items-center gap-1.5">
-                <span>Registrar Pagamento</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-teal-500/30 text-teal-300 border border-teal-400/30">
-                  Baixa
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Baixar parcelas em aberto e emitir comprovante
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-teal-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 4. Consultar Parcelas & Histórico */}
-          <div
-            onClick={() => {
-              playAppSound('click');
-              setIsMenuOpen(false);
-              onNavigate('parcelas');
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-indigo-500/50 hover:bg-indigo-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(99,102,241,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">receipt_long</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-indigo-200 transition-colors flex items-center gap-1.5">
-                <span>Consultar Parcelas</span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Visualizar planilha de parcelas pendentes e pagas
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-indigo-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 5. PDF (Central de Documentos: Extrato Total, Recibo Individual e Contrato Digital) */}
+          {/* 3. PDF (Central de Documentos: Extrato Total, Recibo Individual e Contrato Digital) */}
           <div
             onClick={() => {
               playAppSound('click');
@@ -233,93 +200,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </div>
 
-          {/* 6. Escanear com Gemini IA */}
-          {onOpenGeminiScanner && (
-            <div
-              onClick={() => {
-                playAppSound('click');
-                setIsMenuOpen(false);
-                onOpenGeminiScanner();
-              }}
-              className="w-full p-2.5 rounded-2xl bg-white/5 border border-cyan-500/30 hover:border-cyan-400 hover:bg-cyan-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-            >
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.4)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[20px]">document_scanner</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors flex items-center gap-1.5">
-                  <span>Leitor Inteligente Gemini IA</span>
-                  <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-cyan-500/30 text-cyan-200 border border-cyan-400/40">
-                    IA
-                  </span>
-                </div>
-                <div className="text-[11px] text-slate-400 truncate">
-                  Escanear carnês, contratos ou comprovantes com IA
-                </div>
-              </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all">
-                chevron_right
-              </span>
-            </div>
-          )}
-
-          {/* 7. Sistema ERP Corporativo (Botão ERP transferido do topo para o botão mais) */}
-          <div
-            onClick={() => {
-              playAppSound('click');
-              setIsMenuOpen(false);
-              onNavigate(currentTab === 'erp-legacy' ? 'dashboard' : 'erp-legacy');
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-500/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 to-amber-500 text-slate-950 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.4)] group-hover:scale-105 transition-transform font-bold">
-              <span className="material-symbols-outlined text-[20px] text-slate-950">desktop_windows</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
-                <span>{currentTab === 'erp-legacy' ? 'Sair do Modo ERP' : 'Sistema ERP Corporativo'}</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 font-mono shadow-xs">
-                  ERP PRO
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Lançamentos em massa, formulário desktop e cadastros
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 8. Notificações & Alertas Financeiros (Sininho transferido para dentro de ações rápidas) */}
-          <div
-            onClick={() => {
-              playAppSound('click');
-              setIsMenuOpen(false);
-              onNavigate('detalhe-atraso');
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-amber-400/40 hover:bg-amber-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="relative w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-500 to-orange-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(245,158,11,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">notifications</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-amber-200 transition-colors flex items-center gap-1.5">
-                <span>Radar &amp; Alertas Financeiros</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-amber-500/30 text-amber-200 border border-amber-400/40">
-                  Radar
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Acompanhar vencimentos e cobranças prioritárias
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-amber-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 5. Meu Gerenciamento Pessoal (Exclusivo Tiago Dias) */}
+          {/* 4. Meu Gerenciamento Pessoal (Exclusivo Tiago Dias) */}
           <div
             onClick={() => {
               setIsMenuOpen(false);
@@ -346,7 +227,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </div>
 
-          {/* 6. Verificar Autenticação Digital */}
+          {/* 5. Verificar Autenticação Digital */}
           {onOpenAuthLookup && (
             <button
               type="button"
@@ -372,138 +253,6 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 chevron_right
               </span>
             </button>
-          )}
-
-          {/* 7. Configurações do Sistema (Carenagem com todas as informações e acessos rápidos transferidos) */}
-          <div
-            onClick={() => setIsSettingsOpen(!isSettingsOpen)}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-500/10 flex items-center gap-3 transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">settings</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors flex items-center gap-1.5">
-                <span>Configurações do Sistema (Carenagem)</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-cyan-500/30 text-cyan-200 border border-cyan-400/40">
-                  Central
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Perfil, conta, relacionados, credor e devedores
-              </div>
-            </div>
-            <span className={`material-symbols-outlined text-slate-500 text-[18px] transition-transform duration-200 ${isSettingsOpen ? 'rotate-90 text-cyan-300' : ''}`}>
-              chevron_right
-            </span>
-          </div>
-
-          {/* Sub-menu expansível da Carenagem com todas as informações */}
-          {isSettingsOpen && (
-            <div className="ml-3 pl-3 flex flex-col gap-1.5 animate-in slide-in-from-top-2 duration-150 py-1.5 border-l-2 border-cyan-500/40">
-              {/* Botão de Destaque: Abrir Carenagem Completa */}
-              {onOpenControlPanel && (
-                <div
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onOpenControlPanel();
-                  }}
-                  className="p-2 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 border border-cyan-400/40 flex items-center justify-between cursor-pointer text-xs font-bold text-cyan-200 hover:text-white transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <span className="material-symbols-outlined text-[16px] text-cyan-300">tune</span>
-                    <span>Abrir Carenagem Completa</span>
-                  </div>
-                  <span className="material-symbols-outlined text-[14px]">open_in_new</span>
-                </div>
-              )}
-
-              {/* Meu perfil */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  if (onOpenUserSettings) onOpenUserSettings('profile');
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-cyan-400">badge</span>
-                <span>Meu Perfil &amp; Dados Cadastrais</span>
-              </div>
-
-              {/* Minha conta & PIX */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  if (onOpenUserSettings) onOpenUserSettings('pix');
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-emerald-400">security</span>
-                <span>Minha Conta &amp; Chave PIX</span>
-              </div>
-
-              {/* Editar Credor (Dados e Endereço Comercial) */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  if (onOpenControlPanel) onOpenControlPanel();
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-amber-400">storefront</span>
-                <span>Editar Credor (Dados Comerciais)</span>
-              </div>
-
-              {/* Meus Relacionados */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  if (onOpenControlPanel) onOpenControlPanel();
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-purple-400">groups</span>
-                <span>Meus Relacionados (Família, Amigos)</span>
-              </div>
-
-              {/* Gerenciar Devedores */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  onNavigate('devedores');
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-cyan-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-blue-400">person_search</span>
-                <span>Gerenciar / Editar Devedores</span>
-              </div>
-
-              {/* Lixeira */}
-              <div
-                onClick={() => {
-                  setIsMenuOpen(false);
-                  if (onOpenUserSettings) onOpenUserSettings('lixeira');
-                }}
-                className="p-2 rounded-xl bg-white/5 hover:bg-rose-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-              >
-                <span className="material-symbols-outlined text-[16px] text-rose-400">delete</span>
-                <span>Lixeira do Sistema</span>
-              </div>
-
-              {/* Restaurar Banco de Dados */}
-              {onRestoreAllData && (
-                <div
-                  onClick={() => {
-                    setIsMenuOpen(false);
-                    onRestoreAllData();
-                  }}
-                  className="p-2 rounded-xl bg-white/5 hover:bg-amber-500/10 border border-white/5 flex items-center gap-2 cursor-pointer text-xs font-semibold text-slate-200 hover:text-white transition-colors"
-                >
-                  <span className="material-symbols-outlined text-[16px] text-amber-400">restore</span>
-                  <span>Restaurar Banco de Dados</span>
-                </div>
-              )}
-            </div>
           )}
 
           {/* 6. Sair (Logout) */}

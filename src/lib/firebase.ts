@@ -1028,6 +1028,95 @@ export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]>
   }
 }
 
+// =========================================================================
+// USER TOMBSTONES FIRESTORE OPERATIONS (Isolamento Permanente de Exclusões)
+// Garante persistência em nuvem das exclusões no espaço estritamente privado do UID real
+// =========================================================================
+
+export async function saveTombstoneToFirestore(
+  userId: string,
+  debtorId: string
+): Promise<void> {
+  if (!userId || !debtorId) return;
+  if (isFirestoreQuotaExhausted()) return;
+
+  // Garante que apenas o usuário autenticado com seu UID real do Firebase Auth grava
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return; // Não utiliza ID sintético sem sessão de autenticação válida
+  }
+
+  const path = `users/${userId}/tombstones/${debtorId}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
+    await setDoc(
+      docRef,
+      cleanFirestoreObject({
+        debtorId,
+        userId,
+        deletedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn(`[Firestore:SAVE_TOMBSTONE] Aviso ao salvar tombstone ${debtorId}:`, err);
+  }
+}
+
+export async function removeTombstoneFromFirestore(
+  userId: string,
+  debtorId: string
+): Promise<void> {
+  if (!userId || !debtorId) return;
+  if (isFirestoreQuotaExhausted()) return;
+
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn(`[Firestore:REMOVE_TOMBSTONE] Aviso ao remover tombstone ${debtorId}:`, err);
+  }
+}
+
+export async function getTombstonesFromFirestore(userId: string): Promise<string[]> {
+  if (!userId) return [];
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return [];
+  }
+
+  const path = `users/${userId}/tombstones`;
+  try {
+    const colRef = collection(db, 'users', userId, 'tombstones');
+    const snap = await getDocs(colRef);
+    if (snap.empty) return [];
+    return snap.docs.map((d) => d.id || d.data()?.debtorId).filter(Boolean);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return [];
+    }
+    console.warn(`[Firestore:GET_TOMBSTONES] Aviso ao ler tombstones em ${path}:`, err);
+    return [];
+  }
+}
+
 // USER PURCHASES FIRESTORE OPERATIONS
 export async function savePurchasesToFirestore(
   userId: string,
@@ -1382,87 +1471,6 @@ export async function getAllUsersForAdmin(): Promise<UserAccount[]> {
     console.warn('[Firebase Admin] Note reading all users from Firestore:', err);
   }
 
-  // If map only has Master, add demo/sample registered platform users for rich administrative experience
-  if (usersMap.size <= 1) {
-    const demoUsers: UserAccount[] = [
-      {
-        id: 'usr_jucelia_aizza',
-        name: 'Jucelia Aizza',
-        username: 'jucelia',
-        email: 'jucelia.aizza@gmail.com',
-        phoneWhatsapp: '(14) 99712-0484',
-        cpfCnpj: '219.832.108-99',
-        companyName: 'Boutique & Vendas Aizza',
-        city: 'Bariri',
-        state: 'SP',
-        role: 'Cliente Compradora',
-        authProvider: 'local',
-        createdAt: '2026-02-14T12:00:00.000Z',
-        plainPassword: 'jucelia@2026',
-        supportPin: '4120',
-        status: 'ativo',
-        isMasterAdmin: false,
-      },
-      {
-        id: 'usr_marcos_vinicius',
-        name: 'Marcos Vinicius',
-        username: 'marcosv',
-        email: 'marcos.v@gmail.com',
-        phoneWhatsapp: '(14) 99755-8865',
-        cpfCnpj: '445.190.328-12',
-        companyName: 'Oficina & Autopeças MV',
-        city: 'Jaú',
-        state: 'SP',
-        role: 'Usuário Gestor',
-        authProvider: 'local',
-        createdAt: '2026-03-01T09:30:00.000Z',
-        plainPassword: 'marcos#senha',
-        supportPin: '3150',
-        status: 'ativo',
-        isMasterAdmin: false,
-      },
-      {
-        id: 'usr_renata_silveira',
-        name: 'Renata Silveira',
-        username: 'renatasilveira',
-        email: 'renata.silveira@hotmail.com',
-        phoneWhatsapp: '(14) 99888-1122',
-        cpfCnpj: '390.871.228-45',
-        companyName: 'Consultoria Financeira',
-        city: 'Bauru',
-        state: 'SP',
-        role: 'Usuária Financeira',
-        authProvider: 'local',
-        createdAt: '2026-03-10T14:15:00.000Z',
-        plainPassword: 'renata!pass2026',
-        supportPin: '2880',
-        status: 'ativo',
-        isMasterAdmin: false,
-      },
-      {
-        id: 'usr_infrator_demo',
-        name: 'Usuário em Análise de Conduta',
-        username: 'conduta_teste',
-        email: 'usuario.irregular@email.com',
-        phoneWhatsapp: '(14) 99111-2233',
-        cpfCnpj: '111.222.333-44',
-        companyName: 'Empresa Desconhecida',
-        city: 'São Paulo',
-        state: 'SP',
-        role: 'Em Avaliação',
-        authProvider: 'local',
-        createdAt: '2026-04-01T10:00:00.000Z',
-        plainPassword: 'temp_password',
-        supportPin: '9900',
-        status: 'suspenso',
-        banReason: 'Violação de Termos: Tentativa de inserção de dados não autenticados.',
-        isMasterAdmin: false,
-      },
-    ];
-
-    demoUsers.forEach((u) => usersMap.set(u.id, u));
-  }
-
   return Array.from(usersMap.values());
 }
 
@@ -1634,32 +1642,32 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
   },
   {
     id: 'top-2',
-    authorId: 'usr_marcos_vinicius',
-    authorName: 'Marcos Vinicius',
-    authorEmail: 'marcos.v@gmail.com',
-    authorRole: 'Usuário Gestor',
+    authorId: 'DEMO-001',
+    authorName: 'Carlos Mendes (Demonstração)',
+    authorEmail: 'carlos.demo@recebiveispro.com',
+    authorRole: 'Usuário Demonstrativo',
     title: '💡 Sugestão: Notificação antecipada de fechamento de faturas bancárias',
-    content: 'Seria muito útil se o sistema emitisse um alerta sonoro ou aviso visual 3 dias antes da fatura do cartão Nubank e Itaú fechar para os clientes.',
+    content: 'Seria muito útil se o sistema emitisse um alerta sonoro ou aviso visual 3 dias antes da fatura do cartão fechar.',
     category: 'sugestao',
     status: 'em_desenvolvimento',
     createdAt: '2026-09-24T15:30:00.000Z',
     upvotes: 18,
-    devResponse: 'Excelente sugestão Marcos! Já implementei o alerta de 3 dias no cabeçalho e na aba de relatórios. — Tiago Dias',
+    devResponse: 'Excelente sugestão! Já implementei o alerta de 3 dias no cabeçalho e na aba de relatórios. — Tiago Dias',
     devResponseAt: '2026-09-24T18:00:00.000Z',
   },
   {
     id: 'top-3',
-    authorId: 'usr_renata_silveira',
-    authorName: 'Renata Silveira',
-    authorEmail: 'renata.silveira@hotmail.com',
-    authorRole: 'Usuária Financeira',
+    authorId: 'DEMO-002',
+    authorName: 'Mariana Oliveira (Demonstração)',
+    authorEmail: 'mariana.demo@recebiveispro.com',
+    authorRole: 'Usuária Demonstrativa',
     title: '🚀 Melhoria: Exportação de extrato completo em PDF com QR Code PIX',
     content: 'Gostaria de parabenizar pela logo no contrato e sugerir que a impressão de extrato total também venha com o QR Code PIX em alta definição.',
     category: 'melhoria',
     status: 'concluido',
     createdAt: '2026-09-23T11:20:00.000Z',
     upvotes: 25,
-    devResponse: 'Concluído! A impressão direta e captura de print com QR Code e logo ampliada já estão 100% operacionais no Extrato Total e Contratos. — Tiago Dias',
+    devResponse: 'Concluído! A impressão direta e visualização com QR Code e logo já estão 100% operacionais no Extrato Total e Contratos. — Tiago Dias',
     devResponseAt: '2026-09-23T14:40:00.000Z',
   },
 ];

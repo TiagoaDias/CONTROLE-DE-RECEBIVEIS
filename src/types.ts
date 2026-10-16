@@ -134,6 +134,7 @@ export interface Purchase {
   attachmentsCount: number;
   purchaseDate?: string;
   firstDueDate?: string;
+  notes?: string;
 }
 
 export interface Installment {

@@ -26,17 +26,11 @@ export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): str
     // silent
   }
 
-  // 2. Fallback por nome caso não haja foto salva
+  // 2. Fallback por nome para os dois devedores de demonstração
   const n = (name || '').toLowerCase();
-  if (n.includes('jucelia')) return APP_IMAGES.jucelia;
-  if (n.includes('marcos')) return APP_IMAGES.marcos;
-  if (n.includes('renata')) return APP_IMAGES.renata;
-  if (n.includes('jubileu')) return APP_IMAGES.jubileu;
-  if (n.includes('joão') || n.includes('joao')) return APP_IMAGES.joao;
-  if (n.includes('maria')) return APP_IMAGES.maria;
-  if (n.includes('fátima') || n.includes('fatima')) return APP_IMAGES.fatima;
+  if (n.includes('mariana') || n.includes('maria')) return APP_IMAGES.maria;
   if (n.includes('carlos')) return APP_IMAGES.carlos;
-  return APP_IMAGES.marcos;
+  return APP_IMAGES.carlos;
 };
 
 interface DebtorsMasterSpreadsheetProps {

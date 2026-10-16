@@ -58,11 +58,10 @@ export const GeminiContractScannerModal: React.FC<GeminiContractScannerModalProp
   const [distributionResult, setDistributionResult] = useState<GeminiParsedPaymentDistribution | null>(null);
   const [aiSource, setAiSource] = useState<string>('');
 
-  // Define devedor inicial se não houver selecionado (prioriza Renata Silveira)
+  // Define devedor inicial se não houver selecionado
   useEffect(() => {
     if (!selectedDebtorId && debtors.length > 0) {
-      const renata = debtors.find((d) => d.name.toLowerCase().includes('renata'));
-      setSelectedDebtorId(renata ? renata.id : debtors[0].id);
+      setSelectedDebtorId(debtors[0].id);
     }
   }, [debtors, selectedDebtorId]);
 
@@ -121,18 +120,18 @@ export const GeminiContractScannerModal: React.FC<GeminiContractScannerModalProp
 
   if (!isOpen) return null;
 
-  // Carrega Preset 1: Renata pagou R$ 600,00 (Quita as 3 compras de R$ 200: Celular, TV e 624)
+  // Carrega Preset 1: Carlos pagou R$ 600,00 (Quita as 3 compras de R$ 200: Celular, TV e 624)
   const handleLoadPreset1 = () => {
-    const renata = debtors.find((d) => d.name.toLowerCase().includes('renata'));
-    if (renata) setSelectedDebtorId(renata.id);
+    const demoDebtor = debtors.find((d) => d.id === 'DEMO-001') || debtors[0];
+    if (demoDebtor) setSelectedDebtorId(demoDebtor.id);
 
     setActiveTab('text');
     setInputText(`COMPROVANTE DE TRANSFERÊNCIA PIX - NUBANK
 Instituição de Origem: Nu Pagamentos S.A.
-Nome do Pagador: Renata Silveira
+Nome do Pagador: Carlos Mendes (Demonstração)
 CPF: ***.412.088-**
-Chave Pix Destino: (14) 99733-9863
-Nome do Favorecido: Tiago Augusto Dias (HASPAHO TI)
+Chave Pix Destino: carlos.demo@recebiveispro.com
+Nome do Favorecido: HASPAHO Gestão Financeira
 VALOR PAGO: R$ 600,00 (Seiscentos reais)
 Data e Hora: 10/10/2026 às 14:28:15
 ID da Transação / Autenticação: E18236120202610101428NUB982341HAS
@@ -140,45 +139,45 @@ Descrição: Quitação mensal das minhas 3 compras (Celular, Smart TV e 624)`);
     setImageBase64(null);
     setImageFileName('');
     setDistributionResult(null);
-    onToast('Exemplo 1 carregado: Renata Silveira pagou R$ 600,00 para as 3 compras.');
+    onToast('Exemplo 1 carregado: Carlos Mendes (Demonstração) pagou R$ 600,00 para as 3 compras.');
   };
 
-  // Carrega Preset 2: Renata pagou R$ 400,00 (Quita 2 compras de R$ 200 e deixa a 3ª em aberto)
+  // Carrega Preset 2: Carlos pagou R$ 400,00 (Quita 2 compras de R$ 200 e deixa a 3ª em aberto)
   const handleLoadPreset2 = () => {
-    const renata = debtors.find((d) => d.name.toLowerCase().includes('renata'));
-    if (renata) setSelectedDebtorId(renata.id);
+    const demoDebtor = debtors.find((d) => d.id === 'DEMO-001') || debtors[0];
+    if (demoDebtor) setSelectedDebtorId(demoDebtor.id);
 
     setActiveTab('text');
     setInputText(`COMPROVANTE PIX - BANCO INTER
-Pagador: Renata Silveira
+Pagador: Carlos Mendes (Demonstração)
 Valor Recebido: R$ 400,00
-Beneficiário: Tiago Dias (HASPAHO TI)
+Beneficiário: HASPAHO Gestão Financeira
 Data: 10/10/2026
 Autenticação: INTER-829104-PIX-2026
 Mensagem: Oi Tiago, consegui pagar R$ 400 agora (celular e tv). A compra 624 pago semana que vem!`);
     setImageBase64(null);
     setImageFileName('');
     setDistributionResult(null);
-    onToast('Exemplo 2 carregado: Renata Silveira enviou R$ 400,00 (quitará 2 compras e deixará 1 aberta).');
+    onToast('Exemplo 2 carregado: Carlos Mendes (Demonstração) enviou R$ 400,00 (quitará 2 compras e deixará 1 aberta).');
   };
 
-  // Carrega Preset 3: Renata pagou R$ 602,00 (R$ 2 a mais de excedente que NÃO é computado)
+  // Carrega Preset 3: Carlos pagou R$ 602,00 (R$ 2 a mais de excedente que NÃO é computado)
   const handleLoadPreset3 = () => {
-    const renata = debtors.find((d) => d.name.toLowerCase().includes('renata'));
-    if (renata) setSelectedDebtorId(renata.id);
+    const demoDebtor = debtors.find((d) => d.id === 'DEMO-001') || debtors[0];
+    if (demoDebtor) setSelectedDebtorId(demoDebtor.id);
 
     setActiveTab('text');
     setInputText(`COMPROVANTE DE LIQUIDAÇÃO PIX
-Pagador: Renata Silveira
+Pagador: Carlos Mendes (Demonstração)
 Valor: R$ 602,00 (com taxa/ajuste de centavos de R$ 2,00 adicionados)
-Destinatário: Tiago Dias - HASPAHO TI
+Destinatário: HASPAHO Gestão Financeira
 Data: 10/10/2026
 ID: PIX-AUT-992384-HASPAHO
 Observação: Mandei 602 com 2 reais a mais.`);
     setImageBase64(null);
     setImageFileName('');
     setDistributionResult(null);
-    onToast('Exemplo 3 carregado: Renata pagou R$ 602,00 (R$ 2,00 excedente não computado).');
+    onToast('Exemplo 3 carregado: Carlos Mendes (Demonstração) pagou R$ 602,00 (R$ 2,00 excedente não computado).');
   };
 
   // Upload de Comprovante/Recibo
@@ -210,7 +209,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
       text: inputText,
       imageBase64,
       mimeType: 'image/png',
-      debtorName: currentDebtor?.name || 'Renata Silveira',
+      debtorName: currentDebtor?.name || 'Carlos Mendes (Demonstração)',
       activePurchases: activeDebtorPurchasesWithDue,
     };
 
@@ -287,7 +286,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
       const excessAmount = Math.max(0, Number((amount - allocatedTotal).toFixed(2)));
 
       setDistributionResult({
-        payerName: currentDebtor?.name || 'Renata Silveira',
+        payerName: currentDebtor?.name || 'Carlos Mendes (Demonstração)',
         totalPaidInProof: amount,
         paymentDate: new Date().toLocaleDateString('pt-BR'),
         paymentMethod: 'PIX / Asaas',
@@ -465,7 +464,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
                           </span>
                         </div>
                         <div>
-                          <h5 className="font-black text-xs text-white">Renata pagou R$ 600,00</h5>
+                          <h5 className="font-black text-xs text-white">Carlos pagou R$ 600,00</h5>
                           <p className="text-[10.5px] text-slate-300">Celular (200) + TV (200) + 624 (200)</p>
                         </div>
                         <div className="text-[11px] text-emerald-300 font-bold pt-1.5 border-t border-emerald-500/20 flex justify-between">
@@ -489,7 +488,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
                           </span>
                         </div>
                         <div>
-                          <h5 className="font-black text-xs text-white">Renata pagou R$ 400,00</h5>
+                          <h5 className="font-black text-xs text-white">Carlos pagou R$ 400,00</h5>
                           <p className="text-[10.5px] text-slate-300">Celular (200) + TV (200). 624 aberta.</p>
                         </div>
                         <div className="text-[11px] text-amber-300 font-bold pt-1.5 border-t border-amber-500/20 flex justify-between">
@@ -513,7 +512,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
                           </span>
                         </div>
                         <div>
-                          <h5 className="font-black text-xs text-white">Renata pagou R$ 602,00</h5>
+                          <h5 className="font-black text-xs text-white">Carlos pagou R$ 602,00</h5>
                           <p className="text-[10.5px] text-slate-300">R$ 2 a mais desconsiderado pelo sistema</p>
                         </div>
                         <div className="text-[11px] text-cyan-300 font-bold pt-1.5 border-t border-cyan-500/20 flex justify-between">
@@ -535,7 +534,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
                       rows={6}
                       value={inputText}
                       onChange={(e) => setInputText(e.target.value)}
-                      placeholder="Ex: Renata Silveira pagou R$ 600,00 via Pix chave nubank... ID de autenticação E182361202..."
+                      placeholder="Ex: Carlos Mendes (Demonstração) pagou R$ 600,00 via Pix chave nubank... ID de autenticação E182361202..."
                       className="w-full p-3 bg-slate-950/90 border border-slate-700 focus:border-cyan-400 rounded-xl font-mono text-xs text-slate-100 placeholder-slate-500 outline-none leading-relaxed transition-all"
                     />
                   </div>
@@ -765,7 +764,7 @@ Observação: Mandei 602 com 2 reais a mais.`);
                   </span>
                 </div>
 
-                {/* ATALHOS RÁPIDOS DE COMPRADORES (RENATA, CARLOS, JULIANA, JOÃO) */}
+                {/* ATALHOS RÁPIDOS DE COMPRADORES CADASTRADOS */}
                 <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
                   {debtors.slice(0, 4).map((d) => {
                     const isSelected = d.id === selectedDebtorId;

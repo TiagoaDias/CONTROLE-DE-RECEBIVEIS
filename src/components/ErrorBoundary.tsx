@@ -4,6 +4,7 @@ interface Props {
   children: ReactNode;
   fallbackTitle?: string;
   onReset?: () => void;
+  onError?: (error: Error, errorInfo: ErrorInfo) => void;
 }
 
 interface State {
@@ -23,6 +24,13 @@ export class ErrorBoundary extends Component<Props, State> {
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
     console.error('[HASPAHO ErrorBoundary] Uncaught rendering error:', error, errorInfo);
+    if (this.props.onError) {
+      try {
+        this.props.onError(error, errorInfo);
+      } catch (err) {
+        console.error('Error calling onError callback:', err);
+      }
+    }
   }
 
   public handleReset = () => {

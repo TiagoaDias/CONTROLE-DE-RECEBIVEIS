@@ -12,13 +12,10 @@ export const AssetInspectorModal: React.FC<AssetInspectorModalProps> = ({ isOpen
   if (!isOpen) return null;
 
   const assetsList = [
-    { key: 'logo', name: 'Logotipo do App (Recebíveis Pay)', url: APP_IMAGES.logo, desc: 'Ícone azul com janela e visto verde' },
-    { key: 'currentUser', name: 'Perfil: Thiago Dias', url: APP_IMAGES.currentUser, desc: 'Foto de perfil do gestor da conta (HASPAHO TI)' },
-    { key: 'jucelia', name: 'Devedora: Jucelia Aizza', url: APP_IMAGES.jucelia, desc: 'Foto de perfil / avatar em alta resolução' },
-    { key: 'maria', name: 'Devedora: Maria Silveira / Oliveira', url: APP_IMAGES.maria, desc: 'Foto de perfil / avatar' },
-    { key: 'joao', name: 'Devedor: João Pedro Silva', url: APP_IMAGES.joao, desc: 'Foto de perfil / avatar' },
-    { key: 'fatima', name: 'Devedora: Fátima Santos', url: APP_IMAGES.fatima, desc: 'Foto de perfil / avatar' },
-    { key: 'carlos', name: 'Devedor: Carlos Eduardo', url: APP_IMAGES.carlos, desc: 'Foto de perfil / avatar' },
+    { key: 'logo', name: 'Logotipo do App (Recebíveis PRO)', url: APP_IMAGES.logo, desc: 'Logotipo oficial aprovado com ícone azul e visto' },
+    { key: 'currentUser', name: 'Perfil: Tiago Dias', url: APP_IMAGES.currentUser, desc: 'Foto de perfil do administrador gestor' },
+    { key: 'carlos', name: 'Demonstração 1: Carlos Mendes', url: APP_IMAGES.carlos, desc: 'Avatar do devedor demonstrativo autorizado 1' },
+    { key: 'maria', name: 'Demonstração 2: Mariana Oliveira', url: APP_IMAGES.maria, desc: 'Avatar da devedora demonstrativa autorizada 2' },
   ];
 
   const handleCopy = (key: string, url: string) => {
