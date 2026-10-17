@@ -86,7 +86,7 @@ import { GeminiParsedContract } from './types';
 const DEFAULT_USER: UserAccount = TIAGO_DIAS_USER;
 
 // =========================================================================
-// ISOLAMENTO PERMANENTE DE DADOS DEMONSTRATIVOS E LIXEIRA (REGRA ATUALIZAÇÃO 88)
+// ISOLAMENTO PERMANENTE DE DADOS DEMONSTRATIVOS E LIXEIRA (REGRA ATUALIZAÇÃO 89)
 // Garante que registros de demonstração excluídos JAMAIS reapareçam em novos logins,
 // atualizações ou sincronizações de versão.
 // =========================================================================
