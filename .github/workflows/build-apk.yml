@@ -39,6 +39,12 @@ jobs:
           cp -r dist/* android/app/src/main/assets/public/
           chmod +x android/gradlew
 
+      - name: Aceitar licencas do Android SDK
+        run: |
+          mkdir -p "$ANDROID_HOME/licenses" || true
+          printf "\n24333f8a63b1d79a304379883533763dd7f527df\n8933bad161af4178b1185d1a37fbf41ea5269c55\nd56f5187479edd1809707b99a53e8ec6b257b146\n" > "$ANDROID_HOME/licenses/android-sdk-license"
+          printf "\n84831b9409646a918e30573bab4c9c91346d8abd\n" > "$ANDROID_HOME/licenses/android-sdk-preview-license"
+
       - name: Gerar APK
         run: |
           cd android
