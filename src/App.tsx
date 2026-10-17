@@ -175,8 +175,12 @@ export default function App() {
     });
   };
 
+  // Authentication & Welcome States - restore valid session from localStorage if present
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
+      if (localStorage.getItem('haspaho_explicit_logout') === 'true') {
+        return null;
+      }
       const saved = localStorage.getItem('haspaho_auth_user');
       if (saved) {
         const parsed = JSON.parse(saved);
@@ -474,7 +478,9 @@ export default function App() {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fbUser) => {
-      if (isExplicitLogoutRef.current) {
+      if (isExplicitLogoutRef.current || localStorage.getItem('haspaho_explicit_logout') === 'true') {
+        console.log('[Auth] Explicit logout flag detected. Keeping logged out.');
+        setCurrentUser(null);
         return;
       }
       if (fbUser) {
@@ -789,7 +795,7 @@ export default function App() {
       amount: initialPurchaseData ? initialPurchaseData.totalAmount : 0,
       details: initialPurchaseData
         ? `Cadastrado com compra inicial (${initialPurchaseData.product})`
-        : 'Cadastrado sem compras vincularas',
+        : 'Cadastrado sem compras vinculadas',
     });
 
     showToast(`Cliente/Devedor "${newDebtor.name}" cadastrado com sucesso!`);
@@ -995,12 +1001,28 @@ export default function App() {
     setContractDebtor(debtor);
   };
 
-  const handleLoginSuccess = (user: UserAccount, isNewAccount?: boolean) => {
+  // User Authentication Handlers
+  const handleLoginSuccess = async (user: UserAccount, isNewAccount = false) => {
     isExplicitLogoutRef.current = false;
-    setCurrentUser(user);
     try {
-      localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
-      saveUserToFirestore(user).catch(() => {});
+      localStorage.removeItem('haspaho_explicit_logout');
+    } catch {}
+    setCurrentUser(user);
+    localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
+    setIsAuthOpen(false);
+
+    const completedLocally = localStorage.getItem(`haspaho_welcome_completed_${user.id}`) === 'true';
+    const completedRemotely = user.hasSeenWelcome === true;
+    const isFirstAccess = (isNewAccount || user.isFirstLogin === true) && !completedLocally && !completedRemotely;
+
+    if (isFirstAccess) {
+      setIsWelcomeOpen(true);
+    } else {
+      setIsWelcomeOpen(false);
+    }
+
+    try {
+      await saveUserToFirestore(user);
     } catch (err) {
       console.error('Failed to sync user to Firestore:', err);
     }
@@ -1010,6 +1032,8 @@ export default function App() {
   const handleLogout = async () => {
     isExplicitLogoutRef.current = true;
     try {
+      localStorage.setItem('haspaho_explicit_logout', 'true');
+      localStorage.removeItem('haspaho_auth_user');
       await logoutSession();
     } catch (e) {
       console.warn('Logout session error:', e);
@@ -1018,7 +1042,6 @@ export default function App() {
     setDebtors([]);
     setPurchases([]);
     setInstallments([]);
-    localStorage.removeItem('haspaho_auth_user');
     setCurrentTab('inicio');
     setIsAuthOpen(true);
     setIsUserSettingsOpen(false);
@@ -1489,4 +1512,4 @@ export default function App() {
       )}
     </div>
   );
-                                            }
+      }
