@@ -14,8 +14,8 @@
     "cap:open": "npx cap open android"
   },
   "dependencies": {
-    "@capacitor/android": "^8.5.3",
-    "@capacitor/core": "^8.5.3",
+    "@capacitor/android": "^6.2.0",
+    "@capacitor/core": "^6.2.0",
     "@google/genai": "^2.4.0",
     "@tailwindcss/vite": "^4.3.3",
     "@types/canvas-confetti": "^1.9.0",
@@ -38,7 +38,7 @@
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
-    "@capacitor/cli": "^8.5.3",
+    "@capacitor/cli": "^6.2.0",
     "@types/express": "^4.17.21",
     "@types/node": "^22.14.0",
     "@types/react": "^19.3.0",
