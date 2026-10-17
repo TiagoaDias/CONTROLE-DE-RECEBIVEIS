@@ -781,37 +781,7 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
 }
 
 export async function signInWithGoogleOAuth(): Promise<UserAccount> {
-  let masterUid = TIAGO_DIAS_USER.id;
-  try {
-    const fbCred = await signInWithEmailAndPassword(auth, 'tiagodias8888@gmail.com', 'haspaho2026');
-    masterUid = fbCred.user.uid;
-  } catch {
-    try {
-      const fbCred = await createUserWithEmailAndPassword(auth, 'tiagodias8888@gmail.com', 'haspaho2026');
-      masterUid = fbCred.user.uid;
-    } catch {}
-  }
-
-  try {
-    const remote = await getUserFromFirestore(masterUid).catch(() => null);
-    const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
-    const finalUser: UserAccount = {
-      ...TIAGO_DIAS_USER,
-      ...remote,
-      id: masterUid,
-      email: 'tiagodias8888@gmail.com',
-      authProvider: 'gmail',
-      isMasterAdmin: true,
-      isFullStackDev: true,
-      hasSeenWelcome: hasSeen,
-      isFirstLogin: false,
-    };
-    await saveUserToFirestore(finalUser);
-    return finalUser;
-  } catch {
-    await saveUserToFirestore(TIAGO_DIAS_USER);
-    return TIAGO_DIAS_USER;
-  }
+  return await loginWithRealCredentials('tiagodias8888@gmail.com', 'haspaho2026');
 }
 
 export async function logoutSession(): Promise<void> {
@@ -1319,4 +1289,4 @@ export async function deleteForumTopic(topicId: string): Promise<ForumTopic[]> {
     } catch {}
   }
   return updated;
-      }
+    }
