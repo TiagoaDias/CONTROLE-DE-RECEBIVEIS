@@ -32,11 +32,11 @@ jobs:
       - name: Compilar aplicação web
         run: npm run build:client
 
-      - name: Dar permissao de execucao ao Gradle
-        run: chmod +x android/gradlew
-
-      - name: Sincronizar Capacitor
-        run: npx cap sync android
+      - name: Sincronizar arquivos web para o Android
+        run: |
+          mkdir -p android/app/src/main/assets/public
+          cp -r dist/* android/app/src/main/assets/public/
+          chmod +x android/gradlew
 
       - name: Aceitar licencas do Android SDK
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
