@@ -18,6 +18,7 @@ interface BottomNavProps {
   onOpenUserSettings?: (tab?: 'profile' | 'address' | 'pix' | 'security' | 'lixeira') => void;
   onOpenControlPanel?: () => void;
   onRestoreAllData?: () => void;
+  onOpenLogin: () => void;
 }
 
 export const BottomNav: React.FC<BottomNavProps> = ({
@@ -36,6 +37,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
   onOpenUserSettings,
   onOpenControlPanel,
   onRestoreAllData,
+  onOpenLogin,
 }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
@@ -255,29 +257,47 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </button>
           )}
 
-          {/* 6. Sair (Logout) */}
-          <div
+          {/* 6. Trocar Usuário */}
+          <button
+            onClick={() => {
+              setIsMenuOpen(false);
+              onOpenLogin();
+            }}
+            className="w-full p-3 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-900/50 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+          >
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.4)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px]">switch_account</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="text-sm font-bold text-white group-hover:text-cyan-100 transition-colors">
+                Trocar Usuário
+              </div>
+              <div className="text-xs text-cyan-200/60 truncate">
+                Alterar para outra conta cadastrada
+              </div>
+            </div>
+          </button>
+
+          {/* 7. Sair (Logout) */}
+          <button
             onClick={() => {
               setIsMenuOpen(false);
               if (onLogout) onLogout();
             }}
-            className="w-full p-2.5 rounded-2xl bg-red-950/20 border border-red-500/20 hover:border-red-500/50 hover:bg-red-500/10 flex items-center gap-3 transition-all cursor-pointer group"
+            className="w-full p-3 rounded-2xl bg-red-950/40 border border-red-500/30 hover:border-red-500/60 hover:bg-red-900/50 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
           >
             <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.4)] group-hover:scale-105 transition-transform">
               <span className="material-symbols-outlined text-[20px]">logout</span>
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-red-200 group-hover:text-red-100 transition-colors">
-                Sair do Sistema
+              <div className="text-sm font-bold text-red-100 group-hover:text-white transition-colors">
+                Sair Definitivamente
               </div>
-              <div className="text-[11px] text-red-300/60 truncate">
+              <div className="text-xs text-red-200/60 truncate">
                 Encerrar a sessão com segurança
               </div>
             </div>
-            <span className="material-symbols-outlined text-red-500/50 text-[18px] group-hover:text-red-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
+          </button>
 
 
         </div>

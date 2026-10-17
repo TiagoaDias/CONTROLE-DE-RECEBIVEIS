@@ -2860,6 +2860,7 @@ export default function App() {
             setIsUserSettingsOpen(true);
           }}
           onLogout={handleLogout}
+          onOpenLogin={() => setIsAuthOpen(true)}
         />
       )}
 
