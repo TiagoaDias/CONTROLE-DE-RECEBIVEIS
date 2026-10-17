@@ -777,6 +777,14 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
   if (isMaster) {
     const remote = await getUserFromFirestore(userId).catch(() => null);
     const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
+export async function processFirebaseUserResult(fbUser: any): Promise<UserAccount> {
+  const email = (fbUser.email || '').toLowerCase();
+  const isMaster = email === 'tiagodias8888@gmail.com';
+  const userId = fbUser.uid || 'user-google-' + Date.now();
+
+  if (isMaster) {
+    const remote = await getUserFromFirestore(userId).catch(() => null);
+    const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
     const user: UserAccount = {
       ...TIAGO_DIAS_USER,
       ...remote,
@@ -795,7 +803,7 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
     return user;
   }
 
-  const existingUser = await getUserFromFirestore(userId);
+  const existingUser = await getUserFromFirestore(userId).catch(() => null);
   if (existingUser) {
     return {
       ...existingUser,
@@ -807,9 +815,9 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
 
   const newUser: UserAccount = {
     id: userId,
-    name: fbUser.displayName || email.split('@')[0],
-    username: email.split('@')[0],
-    email,
+    name: fbUser.displayName || email.split('@')[0] || 'Usuário Google',
+    username: email.split('@')[0] || 'usuario',
+    email: email || 'usuario.google@exemplo.com',
     phoneWhatsapp: fbUser.phoneNumber || '',
     authProvider: 'gmail',
     avatar: fbUser.photoURL || undefined,
@@ -858,6 +866,8 @@ export async function signInWithGoogleOAuth(): Promise<UserAccount> {
   } catch {
     await saveUserToFirestore(TIAGO_DIAS_USER);
     return TIAGO_DIAS_USER;
+  }
+}
   }
 }
   const isNative = typeof window !== 'undefined' && ((window as any).Capacitor?.isNativePlatform() || window.location.protocol === 'capacitor:' || window.location.protocol === 'file:' || /Android/i.test(navigator.userAgent));
