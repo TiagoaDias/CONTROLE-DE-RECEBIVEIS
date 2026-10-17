@@ -322,8 +322,18 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               </div>
             </div>
           ) : (
-            <div className="mt-8 pt-4 border-t border-white/10 text-[11px] text-slate-400 text-center">
-              HASPAHO Tecnologia da Informação • Versão 2.5 PRO
+            <div className="mt-8 pt-4 border-t border-white/10 flex flex-col items-center gap-2">
+              <button
+                type="button"
+                onClick={onEnterDashboard}
+                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
+              >
+                <span className="material-symbols-outlined text-[16px]">dashboard</span>
+                <span>Acessar Painel Oficial (Tiago Dias)</span>
+              </button>
+              <div className="text-[11px] text-slate-400 text-center">
+                HASPAHO Tecnologia da Informação • Atualização 89 PRO
+              </div>
             </div>
           )}
         </div>
@@ -337,9 +347,20 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             </div>
 
             {/* Header Titles */}
-            <div className="mb-4">
-              <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
-              <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Entre na sua conta</h3>
+            <div className="mb-4 flex items-center justify-between flex-wrap gap-2">
+              <div>
+                <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
+                <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Entre na sua conta</h3>
+              </div>
+              <button
+                type="button"
+                onClick={onEnterDashboard}
+                className="md:hidden px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
+                title="Acessar Painel como Gestor"
+              >
+                <span className="material-symbols-outlined text-[15px]">dashboard</span>
+                <span>Painel Direto</span>
+              </button>
             </div>
 
             {/* Tabs */}
@@ -390,8 +411,19 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
             {/* Domain Authorization Helper Card */}
             {(unauthorizedDomain || errorMessage.includes('Domínio não autorizado')) && (
-              <div className="mb-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs shadow-sm animate-in fade-in duration-200">
-                <div className="flex items-start gap-2.5 mb-2.5">
+              <div className="mb-4 p-4 rounded-2xl bg-amber-50 border-2 border-amber-300 text-amber-950 text-xs shadow-sm animate-in fade-in duration-200 relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setUnauthorizedDomain(null);
+                    setErrorMessage('');
+                  }}
+                  className="absolute top-3 right-3 text-amber-700 hover:text-amber-950 text-xs font-bold p-1 rounded-full hover:bg-amber-100 cursor-pointer"
+                  title="Fechar aviso"
+                >
+                  ✕
+                </button>
+                <div className="flex items-start gap-2.5 mb-2.5 pr-6">
                   <span className="material-symbols-outlined text-amber-600 text-xl shrink-0 mt-0.5">domain_verification</span>
                   <div>
                     <h4 className="font-extrabold text-amber-900 text-sm">Domínio Não Autorizado no Firebase</h4>

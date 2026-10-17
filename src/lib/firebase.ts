@@ -220,6 +220,23 @@ export function setFirestoreQuotaExhausted(val: boolean): void {
   } catch {}
 }
 
+export function isOfflineOrNetworkError(error: unknown): boolean {
+  if (!error) return false;
+  const msg = error instanceof Error ? error.message : String(error);
+  const code = (error as any)?.code;
+  return (
+    code === 'unavailable' ||
+    code === 'failed-precondition' ||
+    code === 'deadline-exceeded' ||
+    msg.includes('client is offline') ||
+    msg.includes('offline') ||
+    msg.includes('Could not reach Cloud Firestore') ||
+    msg.includes('The operation could not be completed') ||
+    msg.includes('network-request-failed') ||
+    msg.includes('Failed to get document because the client is offline')
+  );
+}
+
 export function handleFirestoreError(
   error: unknown,
   operationType: OperationType,
@@ -228,6 +245,11 @@ export function handleFirestoreError(
   if (isQuotaError(error)) {
     setFirestoreQuotaExhausted(true);
     console.warn(`[Firestore:QUOTA_CIRCUIT_BREAKER] Quota diária de escrita do Firestore no plano gratuito atingida. Operação '${operationType}' em '${path}' foi mitigada com segurança via LocalStorage.`);
+    return;
+  }
+
+  if (isOfflineOrNetworkError(error)) {
+    console.warn(`[Firestore:OFFLINE_MODE] Operação '${operationType}' em '${path}' mitigada em modo offline:`, error instanceof Error ? error.message : String(error));
     return;
   }
 
@@ -839,9 +861,9 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
     await setDoc(userRef, cleaned, { merge: true });
     console.log(`[Firestore:SAVE_USER] Success: User ${user.id} persisted to Firestore.`);
   } catch (err) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:SAVE_USER] Quota limite diária atingida. Perfil mantido seguro no LocalStorage.`);
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_USER] Quota atingida ou modo offline. Perfil mantido seguro no LocalStorage.`);
       return;
     }
     console.error(`[Firestore:SAVE_USER_ERROR] Failed to save user ${user.id}:`, err);
@@ -894,8 +916,9 @@ export async function getUserFromFirestore(userId: string): Promise<UserAccount 
     console.log(`[Firestore:GET_USER] User ${userId} does not exist in Firestore.`);
     return null;
   } catch (err) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExhausted(true);
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_USER] Operando em modo offline para ${userId}. Usando dados locais.`);
       return null;
     }
     console.error(`[Firestore:GET_USER_ERROR] Failed reading user ${userId}:`, err);
@@ -1017,9 +1040,9 @@ export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]>
     console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors from Firestore.`);
     return result;
   } catch (err) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_DEBTORS] Quota limite diária atingida. Usando devedores do cache LocalStorage.`);
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_DEBTORS] Quota limite diária ou modo offline. Usando devedores do cache LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors at ${path}:`, err);
@@ -1197,9 +1220,9 @@ export async function getPurchasesFromFirestore(userId: string): Promise<Purchas
     console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases from Firestore.`);
     return result;
   } catch (err) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_PURCHASES] Quota limite diária atingida. Usando compras do LocalStorage.`);
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_PURCHASES] Quota limite diária ou modo offline. Usando compras do LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases at ${path}:`, err);
@@ -1288,9 +1311,9 @@ export async function getInstallmentsFromFirestore(userId: string): Promise<Inst
     console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments from Firestore.`);
     return result;
   } catch (err) {
-    if (isQuotaError(err)) {
-      setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_INSTALLMENTS] Quota limite diária atingida. Usando parcelas do LocalStorage.`);
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_INSTALLMENTS] Quota limite diária ou modo offline. Usando parcelas do LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments at ${path}:`, err);

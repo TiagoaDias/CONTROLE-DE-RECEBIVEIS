@@ -189,7 +189,7 @@ export default function App() {
         }
       }
     } catch {}
-    return null;
+    return DEFAULT_USER;
   });
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   // A apresentação inicia sempre como fechada no carregamento para nunca reaparecer em reload
@@ -662,7 +662,7 @@ export default function App() {
           }
         }
       } catch (err) {
-        console.error('[Firestore:LOAD_DATA_ERROR]:', err);
+        console.warn('[Firestore:LOAD_DATA_OFFLINE]: Operando com cache local enquanto Firestore reconecta:', err);
       } finally {
         if (isMounted) {
           isInitialLoadRef.current = false;
