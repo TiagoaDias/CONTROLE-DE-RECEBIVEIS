@@ -487,16 +487,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             {/* TAB 1: LOGIN */}
             {activeTab === 'login' && (
               <div className="space-y-3.5 relative z-10 pointer-events-auto">
-                {/* 0. Instant Auto-Login Button for Master User */}
-                <button
-                  type="button"
-                  onClick={handleMasterDirectLogin}
-                  disabled={isLoading}
-                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer relative z-20 active:scale-98 border border-cyan-400/30"
-                >
-                  <span className="material-symbols-outlined text-lg text-cyan-300">bolt</span>
-                  <span className="tracking-wide">ENTRAR COMO TIAGO DIAS (ACESSO DIRETO)</span>
-                </button>
 
                 {/* 1. Google Button */}
                 <button
