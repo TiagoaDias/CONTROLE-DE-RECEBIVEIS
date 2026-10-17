@@ -200,8 +200,8 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[120] bg-slate-950/85 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
-      <div className="w-full max-w-2xl bg-gradient-to-b from-slate-900 via-[#0d172a] to-slate-950 border border-cyan-500/30 rounded-2xl sm:rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.8)] flex flex-col max-h-[88dvh] sm:max-h-[90vh] overflow-hidden text-white my-auto animate-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-[120] bg-slate-950 flex items-center justify-center animate-in fade-in duration-200">
+      <div className="w-full h-full sm:h-[95vh] sm:max-w-4xl bg-gradient-to-b from-slate-900 via-[#0d172a] to-slate-950 border border-cyan-500/30 sm:rounded-3xl shadow-[0_25px_70px_-15px_rgba(0,0,0,0.8)] flex flex-col overflow-hidden text-white sm:my-auto animate-in zoom-in-95 duration-150">
         
         {/* ============================================================ */}
         {/* 1. CABEÇALHO MODERNO                                         */}

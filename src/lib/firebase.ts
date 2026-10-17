@@ -190,6 +190,7 @@ export function removeSafeLocalStorage(key: string): void {
   } catch {}
 }
 
+// Inicia como false para permitir sincronização e salvamento em nuvem
 let firestoreQuotaExhausted = false;
 try {
   const raw = getSafeLocalStorage(QUOTA_STORAGE_KEY);
@@ -275,6 +276,7 @@ export function handleFirestoreError(
   throw new Error(JSON.stringify(errInfo));
 }
 
+// Startup connection verification as mandated by guidelines
 export async function testConnection(): Promise<boolean> {
   try {
     await getDocFromServer(doc(db, 'test', 'connection'));
@@ -295,7 +297,12 @@ export async function testConnection(): Promise<boolean> {
   }
 }
 
+// Automatically test connection on module load
 testConnection().catch(() => {});
+
+// =========================================================================
+// REAL AUTHENTICATION & CREDENTIAL VALIDATION
+// =========================================================================
 
 export interface RegisteredCredential {
   email: string;
@@ -305,6 +312,7 @@ export interface RegisteredCredential {
   user: UserAccount;
 }
 
+// Official Tiago Dias Master Profile
 export const TIAGO_DIAS_USER: UserAccount = {
   id: 'usr_thiago_dias',
   name: 'Tiago Augusto Dias',
@@ -335,6 +343,7 @@ export const TIAGO_DIAS_USER: UserAccount = {
   complianceAgreed: true,
 };
 
+// Helper: Read local registered credentials
 export function getLocalRegisteredCredentials(): Record<string, RegisteredCredential> {
   try {
     const raw = getSafeLocalStorage('haspaho_registered_credentials');
@@ -352,6 +361,12 @@ export function saveLocalRegisteredCredentials(creds: Record<string, RegisteredC
   }
 }
 
+/**
+ * Real login with email/username/cpf/phone and password.
+ * REJECTS nonexistent accounts.
+ * REJECTS wrong passwords.
+ * Resilient to Firebase Console email/password disabled (auth/operation-not-allowed) via Firestore persistence.
+ */
 export async function loginWithRealCredentials(
   identifier: string,
   rawPassword: string
@@ -367,6 +382,7 @@ export async function loginWithRealCredentials(
     throw new Error('Informe sua senha de acesso.');
   }
 
+  // 1. Check Master Tiago Dias Account
   const isMasterId =
     cleanId === 'tiagodias8888@gmail.com' ||
     cleanId === 'tiagodias' ||
@@ -428,10 +444,12 @@ export async function loginWithRealCredentials(
     }
   }
 
+  // 2. Resolve Target Email and Lookup Registered Credentials
   let targetEmail = cleanId;
   let targetUsername = cleanId;
   let cachedCred: RegisteredCredential | null = null;
 
+  // Check local registry first
   const localRegistry = getLocalRegisteredCredentials();
   if (localRegistry[cleanId]) {
     cachedCred = localRegistry[cleanId];
@@ -448,6 +466,7 @@ export async function loginWithRealCredentials(
     }
   }
 
+  // Check Firestore registered_credentials if not found locally
   if (!cachedCred) {
     const safeKey = cleanId.replace(/[^a-zA-Z0-9_-]/g, '_');
     try {
@@ -460,6 +479,7 @@ export async function loginWithRealCredentials(
     } catch {}
   }
 
+  // Attempt real Firebase Auth signIn
   let authUid = '';
   let fbUserSuccess = false;
 
@@ -469,6 +489,9 @@ export async function loginWithRealCredentials(
       authUid = fbCred.user.uid;
       fbUserSuccess = true;
     } catch (fbErr: any) {
+      console.warn('[Firebase Auth] signInWithEmailAndPassword result:', fbErr.code);
+
+      // Verify against Firestore/local credentials when Firebase Auth cannot verify
       const verifyOfflineOrFallback = async () => {
         let credToVerify = cachedCred;
         if (!credToVerify) {
@@ -503,6 +526,7 @@ export async function loginWithRealCredentials(
       if (fbErr.code === 'auth/wrong-password') {
         throw new Error('Senha incorreta. Verifique os dados digitados ou use "Esqueci minha senha".');
       } else if (fbErr.code === 'auth/operation-not-allowed') {
+        // Email/Password provider disabled in Firebase Console
         const matched = await verifyOfflineOrFallback();
         if (!matched) {
           throw new Error('Usuário não cadastrado. Caso ainda não tenha uma conta, acesse a aba "Cadastrar Nova Conta".');
@@ -526,6 +550,7 @@ export async function loginWithRealCredentials(
       }
     }
   } else {
+    // If still not an email, try checking credentials directly
     if (cachedCred) {
       const incomingHash = btoa(cleanPass);
       if (cachedCred.passwordHash === incomingHash || cachedCred.passwordHash === cleanPass) {
@@ -543,6 +568,7 @@ export async function loginWithRealCredentials(
     throw new Error('Falha na autenticação. Verifique suas credenciais.');
   }
 
+  // Load user profile from Firestore or build from account info
   let userProfile: UserAccount | null = null;
   try {
     userProfile = await getUserFromFirestore(authUid);
@@ -560,6 +586,7 @@ export async function loginWithRealCredentials(
     return finalUser;
   }
 
+  // Check local registry for any custom profile data
   const finalCred = cachedCred || localRegistry[targetEmail] || localRegistry[targetUsername];
   if (finalCred && finalCred.user) {
     const finalUser: UserAccount = {
@@ -574,6 +601,7 @@ export async function loginWithRealCredentials(
     return finalUser;
   }
 
+  // Create clean user profile
   const newUser: UserAccount = {
     id: authUid,
     name: auth.currentUser?.displayName || targetUsername || targetEmail.split('@')[0],
@@ -596,6 +624,11 @@ export async function loginWithRealCredentials(
   return newUser;
 }
 
+/**
+ * Real user registration.
+ * Creates an isolated user account with Firebase Auth UID or secure Firestore record.
+ * Resilient to Firebase Console email/password disabled (auth/operation-not-allowed).
+ */
 export async function registerRealUser(
   userData: Partial<UserAccount>,
   rawPassword: string
@@ -618,6 +651,7 @@ export async function registerRealUser(
     throw new Error('Este e-mail pertence à conta de Administrador Mestre.');
   }
 
+  // Check if user already exists in Firestore or local registry
   const safeDocKey = email.replace(/[^a-zA-Z0-9_-]/g, '_');
   try {
     const existingDoc = await getDoc(doc(db, 'registered_credentials', safeDocKey));
@@ -635,6 +669,7 @@ export async function registerRealUser(
     const fbCred = await createUserWithEmailAndPassword(auth, email, rawPassword.trim());
     authUid = fbCred.user.uid;
   } catch (err: any) {
+    console.warn('[Firebase Auth] Registration notice:', err.code);
     if (err.code === 'auth/email-already-in-use') {
       throw new Error('Este e-mail já está cadastrado no sistema. Faça login na aba "Entrar" ou recupere sua senha.');
     } else if (err.code === 'auth/weak-password') {
@@ -642,8 +677,11 @@ export async function registerRealUser(
     } else if (err.code === 'auth/invalid-email') {
       throw new Error('O formato do e-mail é inválido.');
     } else if (err.code === 'auth/operation-not-allowed') {
+      // Email/password is disabled in Firebase Console - create user in Firestore safely
+      console.info('[Firebase Auth] Provedor Email/Senha desativado no console. Gravando credenciais no Firestore com segurança.');
       authUid = `usr_${email.replace(/[^a-zA-Z0-9]/g, '_')}`;
     } else {
+      // Fallback: try sign in if already exists
       try {
         const fbCred = await signInWithEmailAndPassword(auth, email, rawPassword.trim());
         authUid = fbCred.user.uid;
@@ -696,13 +734,18 @@ export async function registerRealUser(
       if (isQuotaError(err)) {
         setFirestoreQuotaExhausted(true);
       }
+      console.warn('[Firebase] Registered credentials write note:', err);
     }
   }
 
   setSafeLocalStorage('haspaho_auth_user', JSON.stringify(newUser));
+
   return newUser;
 }
 
+/**
+ * Official Firebase Password Reset Email
+ */
 export async function sendFirebasePasswordReset(email: string): Promise<void> {
   const cleanEmail = email.trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@')) {
@@ -711,6 +754,7 @@ export async function sendFirebasePasswordReset(email: string): Promise<void> {
   try {
     await sendPasswordResetEmail(auth, cleanEmail);
   } catch (err: any) {
+    console.warn('[Firebase Auth] Password reset error:', err.code);
     if (err.code === 'auth/user-not-found') {
       throw new Error('Nenhum usuário cadastrado com este e-mail no Firebase.');
     } else if (err.code === 'auth/invalid-email') {
@@ -722,6 +766,9 @@ export async function sendFirebasePasswordReset(email: string): Promise<void> {
   }
 }
 
+/**
+ * Real Google OAuth authentication via Firebase Popup
+ */
 export async function processFirebaseUserResult(fbUser: any): Promise<UserAccount> {
   const email = (fbUser.email || '').toLowerCase();
   const isMaster = email === 'tiagodias8888@gmail.com';
@@ -780,21 +827,82 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
   return newUser;
 }
 
-export async function signInWithGoogleOAuth(): Promise<UserAccount> {
-  return await loginWithRealCredentials('tiagodias8888@gmail.com', 'haspaho2026');
+/**
+ * Real Google OAuth authentication via Firebase Popup or Redirect
+ */
+export async function signInWithGoogleOAuth(customEmail?: string): Promise<UserAccount> {
+  const cleanEmail = (customEmail || '').trim().toLowerCase();
+
+  // Always use real Google OAuth with prompt: 'select_account'
+  const freshGoogleProvider = new GoogleAuthProvider();
+  freshGoogleProvider.setCustomParameters({
+    prompt: 'select_account',
+    ...(cleanEmail && cleanEmail.includes('@') ? { login_hint: cleanEmail } : {}),
+  });
+
+  try {
+    // Clear explicit logout flag when initiating login
+    removeSafeLocalStorage('haspaho_explicit_logout');
+    // Ensure previous session is detached so Google always shows the account selector
+    await signOut(auth).catch(() => {});
+
+    const result = await signInWithPopup(auth, freshGoogleProvider);
+    if (result && result.user) {
+      const user = await processFirebaseUserResult(result.user);
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(user));
+      removeSafeLocalStorage('haspaho_explicit_logout');
+      return user;
+    }
+  } catch (err: any) {
+    console.warn('[Google OAuth] signInWithPopup notice/error:', err);
+
+    if (err.code === 'auth/popup-closed-by-user' || err.message?.includes('popup-closed')) {
+      throw new Error('Autenticação cancelada. Selecione uma conta para entrar.');
+    }
+
+    // Try signInWithRedirect if popup is blocked by WebView
+    try {
+      freshGoogleProvider.setCustomParameters({ prompt: 'select_account' });
+      await signInWithRedirect(auth, freshGoogleProvider);
+    } catch (redirectErr) {
+      console.warn('[Google OAuth] signInWithRedirect notice:', redirectErr);
+    }
+
+    throw err;
+  }
+
+  throw new Error('Não foi possível selecionar uma conta Google.');
 }
 
+/**
+ * Session termination
+ */
 export async function logoutSession(): Promise<void> {
   try {
+    removeSafeLocalStorage('haspaho_auth_user');
+    setSafeLocalStorage('haspaho_explicit_logout', 'true');
     await signOut(auth);
   } catch (e) {
     console.warn('Sign out warning:', e);
   }
 }
 
+// =========================================================================
+// USER PROFILE FIRESTORE OPERATIONS
+// =========================================================================
+
 export async function saveUserToFirestore(user: UserAccount): Promise<void> {
-  if (!user || !user.id) return;
-  if (isFirestoreQuotaExhausted()) return;
+  if (!user || !user.id) {
+    console.warn('[Firestore:SAVE_USER] Aborted: user or user.id is invalid.', user);
+    return;
+  }
+  if (!auth.currentUser) {
+    console.log('[Firestore:SAVE_USER] Nenhuma sessão ativa do Firebase Auth. Perfil persistido localmente.');
+    return;
+  }
+  if (isFirestoreQuotaExhausted()) {
+    return;
+  }
   const path = `users/${user.id}`;
   try {
     const userRef = doc(db, 'users', user.id);
@@ -802,18 +910,33 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
       ...user,
       updatedAt: new Date().toISOString(),
     });
+    console.log(`[Firestore:SAVE_USER] Sending user profile to ${path}:`, { id: user.id, email: user.email, name: user.name });
     await setDoc(userRef, cleaned, { merge: true });
-  } catch (err) {
-    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
-      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+    console.log(`[Firestore:SAVE_USER] Success: User ${user.id} persisted to Firestore.`);
+  } catch (err: any) {
+    if (err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
+      console.warn(`[Firestore:SAVE_USER] Permissão negada ao salvar ${path}. Perfil mantido localmente.`);
       return;
     }
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_USER] Quota atingida ou modo offline. Perfil mantido seguro no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_USER_ERROR] Failed to save user ${user.id}:`, err);
     handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
+/**
+ * Marks the welcome presentation as completed for the authenticated user in Firebase Firestore.
+ * Ensures the presentation is never displayed again on subsequent logins or page refreshes.
+ */
 export async function markWelcomeCompletedInFirestore(userId: string): Promise<void> {
-  if (!userId || isFirestoreQuotaExhausted()) return;
+  if (!userId) return;
+  if (!auth.currentUser) return;
+  if (isFirestoreQuotaExhausted()) return;
+  const path = `users/${userId}`;
   try {
     const userRef = doc(db, 'users', userId);
     await setDoc(
@@ -826,35 +949,58 @@ export async function markWelcomeCompletedInFirestore(userId: string): Promise<v
       }),
       { merge: true }
     );
+    console.log(`[Firestore:MARK_WELCOME] User ${userId} successfully marked as completed welcome presentation.`);
   } catch (err) {
-    if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn(`[Firestore:MARK_WELCOME] Note marking welcome for ${userId}:`, err);
   }
 }
 
 export async function getUserFromFirestore(userId: string): Promise<UserAccount | null> {
   if (!userId) return null;
+  // If there is no active Firebase Auth session, skip remote Firestore read to prevent permission errors
+  if (!auth.currentUser) {
+    console.log(`[Firestore:GET_USER] Sem sessão ativa do Firebase Auth para ${userId}. Operando com dados locais.`);
+    return null;
+  }
   const path = `users/${userId}`;
   try {
     const userRef = doc(db, 'users', userId);
+    console.log(`[Firestore:GET_USER] Reading user profile from ${path}...`);
     const snap = await getDoc(userRef);
     if (snap.exists()) {
-      return snap.data() as UserAccount;
+      const data = snap.data() as UserAccount;
+      console.log(`[Firestore:GET_USER] Found user ${userId}:`, data.name || data.email);
+      return data;
     }
+    console.log(`[Firestore:GET_USER] User ${userId} does not exist in Firestore.`);
     return null;
-  } catch (err) {
-    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
-      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+  } catch (err: any) {
+    if (err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
+      console.warn(`[Firestore:GET_USER] Permissão não concedida para ler ${path}. Usando perfil local com segurança.`);
       return null;
     }
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_USER] Operando em modo offline para ${userId}. Usando dados locais.`);
+      return null;
+    }
+    console.error(`[Firestore:GET_USER_ERROR] Failed reading user ${userId}:`, err);
     handleFirestoreError(err, OperationType.GET, path);
     return null;
   }
 }
 
+// Deep clean function: Strips undefined and functions, serializes Dates, handles nested structures cleanly
 export function cleanFirestoreObject<T>(obj: T): T {
   if (obj === null || obj === undefined) return obj;
   if (typeof obj === 'function') return undefined as unknown as T;
-  if (obj instanceof Date) return obj.toISOString() as unknown as T;
+  if (obj instanceof Date) {
+    return obj.toISOString() as unknown as T;
+  }
   if (Array.isArray(obj)) {
     return obj.map(cleanFirestoreObject).filter((item) => item !== undefined) as unknown as T;
   }
@@ -863,7 +1009,9 @@ export function cleanFirestoreObject<T>(obj: T): T {
     for (const [key, value] of Object.entries(obj as Record<string, any>)) {
       if (value !== undefined && typeof value !== 'function') {
         const cleanedVal = cleanFirestoreObject(value);
-        if (cleanedVal !== undefined) res[key] = cleanedVal;
+        if (cleanedVal !== undefined) {
+          res[key] = cleanedVal;
+        }
       }
     }
     return res as T;
@@ -871,40 +1019,88 @@ export function cleanFirestoreObject<T>(obj: T): T {
   return obj;
 }
 
+// USER DEBTORS FIRESTORE OPERATIONS (Isolated per userId)
 export async function saveDebtorsToFirestore(userId: string, debtors: Debtor[]): Promise<void> {
-  if (!userId || isFirestoreQuotaExhausted()) return;
-  const safeDebtors = Array.isArray(debtors) ? debtors : [];
-  if (safeDebtors.length === 0) return;
-  const chunks: Debtor[][] = [];
-  for (let i = 0; i < safeDebtors.length; i += 400) {
-    chunks.push(safeDebtors.slice(i, i + 400));
+  if (!userId) {
+    console.warn('[Firestore:SAVE_DEBTORS] Aborted: userId is empty.');
+    return;
   }
-  for (const chunk of chunks) {
-    const batch = writeBatch(db);
-    for (const d of chunk) {
-      if (!d || !d.id) continue;
-      const docRef = doc(db, 'users', userId, 'debtors', d.id);
-      const cleaned = cleanFirestoreObject({ ...d, userId, updatedAt: new Date().toISOString() });
-      batch.set(docRef, cleaned, { merge: true });
+  if (isFirestoreQuotaExhausted()) {
+    return;
+  }
+  if (!auth.currentUser) {
+    console.log('[Firestore:SAVE_DEBTORS] Nenhuma sessão ativa do Firebase Auth. Dados persistidos localmente.');
+    return;
+  }
+  const path = `users/${userId}/debtors`;
+  console.log(`[Firestore:SAVE_DEBTORS] Received ${debtors?.length || 0} debtors for path: ${path}`);
+  try {
+    const safeDebtors = Array.isArray(debtors) ? debtors : [];
+    if (safeDebtors.length === 0) {
+      console.log(`[Firestore:SAVE_DEBTORS] Debtors array is empty. 0 operations to commit.`);
+      return;
     }
-    await batch.commit();
+    const chunks: Debtor[][] = [];
+    for (let i = 0; i < safeDebtors.length; i += 400) {
+      chunks.push(safeDebtors.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const d of chunk) {
+        if (!d || !d.id) continue;
+        const docRef = doc(db, 'users', userId, 'debtors', d.id);
+        const cleaned = cleanFirestoreObject({ ...d, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
+      }
+      await batch.commit();
+    }
+    console.log(`[Firestore:SAVE_DEBTORS] Successfully committed ${safeDebtors.length} debtors to Firestore at ${path}!`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_DEBTORS] Quota limite diária atingida. Dados devedores mantidos no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_DEBTORS_ERROR] Failed committing debtors for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function saveSingleDebtorToFirestore(userId: string, debtor: Debtor): Promise<void> {
-  if (!userId || !debtor || !debtor.id || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'debtors', debtor.id);
-  const cleaned = cleanFirestoreObject({ ...debtor, userId, updatedAt: new Date().toISOString() });
-  await setDoc(docRef, cleaned, { merge: true });
+  if (!userId || !debtor || !debtor.id) return;
+  if (isFirestoreQuotaExhausted()) return;
+  if (!auth.currentUser) return;
+  const path = `users/${userId}/debtors/${debtor.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'debtors', debtor.id);
+    const cleaned = cleanFirestoreObject({ ...debtor, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Saving debtor "${debtor.name}" (${debtor.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Success: Debtor ${debtor.id} persisted to Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_SINGLE_DEBTOR] Quota atingida. Devedor ${debtor.id} mantido no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_SINGLE_DEBTOR_ERROR] Failed saving debtor ${debtor.id}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
 }
 
 export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]> {
   if (!userId) return [];
+  if (!auth.currentUser) return []; // Skip remote read if not authenticated
+  const path = `users/${userId}/debtors`;
+  console.log(`[Firestore:GET_DEBTORS] Fetching debtors collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'debtors');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => {
+    if (snap.empty) {
+      console.log(`[Firestore:GET_DEBTORS] Path ${path} is empty (0 debtors found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => {
       const data = d.data() as Debtor;
       return {
         ...data,
@@ -914,169 +1110,434 @@ export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]>
         overdueCount: typeof data.overdueCount === 'number' ? data.overdueCount : (Number(data.overdueCount) || 0),
       };
     });
-  } catch {
+    console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors from Firestore.`);
+    return result;
+  } catch (err) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_DEBTORS] Quota limite diária ou modo offline. Usando devedores do cache LocalStorage.`);
+      return [];
+    }
+    console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors at ${path}:`, err);
+    handleFirestoreError(err, OperationType.LIST, path);
     return [];
   }
 }
 
-export async function saveTombstoneToFirestore(userId: string, debtorId: string): Promise<void> {
-  if (!userId || !debtorId || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
-  await setDoc(
-    docRef,
-    cleanFirestoreObject({ debtorId, userId, deletedAt: new Date().toISOString() }),
-    { merge: true }
-  );
+// =========================================================================
+// USER TOMBSTONES FIRESTORE OPERATIONS (Isolamento Permanente de Exclusões)
+// Garante persistência em nuvem das exclusões no espaço estritamente privado do UID real
+// =========================================================================
+
+export async function saveTombstoneToFirestore(
+  userId: string,
+  debtorId: string
+): Promise<void> {
+  if (!userId || !debtorId) return;
+  if (isFirestoreQuotaExhausted()) return;
+
+  // Garante que apenas o usuário autenticado com seu UID real do Firebase Auth grava
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return; // Não utiliza ID sintético sem sessão de autenticação válida
+  }
+
+  const path = `users/${userId}/tombstones/${debtorId}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
+    await setDoc(
+      docRef,
+      cleanFirestoreObject({
+        debtorId,
+        userId,
+        deletedAt: new Date().toISOString(),
+      }),
+      { merge: true }
+    );
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn(`[Firestore:SAVE_TOMBSTONE] Aviso ao salvar tombstone ${debtorId}:`, err);
+  }
 }
 
-export async function removeTombstoneFromFirestore(userId: string, debtorId: string): Promise<void> {
-  if (!userId || !debtorId || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
-  await deleteDoc(docRef);
+export async function removeTombstoneFromFirestore(
+  userId: string,
+  debtorId: string
+): Promise<void> {
+  if (!userId || !debtorId) return;
+  if (isFirestoreQuotaExhausted()) return;
+
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return;
+  }
+
+  try {
+    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
+    await deleteDoc(docRef);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn(`[Firestore:REMOVE_TOMBSTONE] Aviso ao remover tombstone ${debtorId}:`, err);
+  }
 }
 
 export async function getTombstonesFromFirestore(userId: string): Promise<string[]> {
   if (!userId) return [];
+  const currentAuthUid = auth.currentUser?.uid;
+  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
+  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
+    return [];
+  }
+
+  const path = `users/${userId}/tombstones`;
   try {
     const colRef = collection(db, 'users', userId, 'tombstones');
     const snap = await getDocs(colRef);
     if (snap.empty) return [];
     return snap.docs.map((d) => d.id || d.data()?.debtorId).filter(Boolean);
-  } catch {
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return [];
+    }
+    console.warn(`[Firestore:GET_TOMBSTONES] Aviso ao ler tombstones em ${path}:`, err);
     return [];
   }
 }
 
-export async function savePurchasesToFirestore(userId: string, purchases: Purchase[]): Promise<void> {
-  if (!userId || isFirestoreQuotaExhausted()) return;
-  const safePurchases = Array.isArray(purchases) ? purchases : [];
-  if (safePurchases.length === 0) return;
-  const chunks: Purchase[][] = [];
-  for (let i = 0; i < safePurchases.length; i += 400) {
-    chunks.push(safePurchases.slice(i, i + 400));
+// USER PURCHASES FIRESTORE OPERATIONS
+export async function savePurchasesToFirestore(
+  userId: string,
+  purchases: Purchase[]
+): Promise<void> {
+  if (!userId) {
+    console.warn('[Firestore:SAVE_PURCHASES] Aborted: userId is empty.');
+    return;
   }
-  for (const chunk of chunks) {
-    const batch = writeBatch(db);
-    for (const p of chunk) {
-      if (!p || !p.id) continue;
-      const docRef = doc(db, 'users', userId, 'purchases', p.id);
-      const cleaned = cleanFirestoreObject({ ...p, userId, updatedAt: new Date().toISOString() });
-      batch.set(docRef, cleaned, { merge: true });
+  if (isFirestoreQuotaExhausted()) return;
+  if (!auth.currentUser) return;
+  const path = `users/${userId}/purchases`;
+  console.log(`[Firestore:SAVE_PURCHASES] Received ${purchases?.length || 0} purchases for path: ${path}`);
+  try {
+    const safePurchases = Array.isArray(purchases) ? purchases : [];
+    if (safePurchases.length === 0) {
+      console.log(`[Firestore:SAVE_PURCHASES] Purchases array is empty. 0 operations to commit.`);
+      return;
     }
-    await batch.commit();
+    const chunks: Purchase[][] = [];
+    for (let i = 0; i < safePurchases.length; i += 400) {
+      chunks.push(safePurchases.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const p of chunk) {
+        if (!p || !p.id) continue;
+        const docRef = doc(db, 'users', userId, 'purchases', p.id);
+        const cleaned = cleanFirestoreObject({ ...p, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
+      }
+      await batch.commit();
+    }
+    console.log(`[Firestore:SAVE_PURCHASES] Successfully committed ${safePurchases.length} purchases to Firestore at ${path}!`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_PURCHASES] Quota limite diária atingida. Compras mantidas no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_PURCHASES_ERROR] Failed committing purchases for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function saveSinglePurchaseToFirestore(userId: string, purchase: Purchase): Promise<void> {
-  if (!userId || !purchase || !purchase.id || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'purchases', purchase.id);
-  const cleaned = cleanFirestoreObject({ ...purchase, userId, updatedAt: new Date().toISOString() });
-  await setDoc(docRef, cleaned, { merge: true });
+  if (!userId || !purchase || !purchase.id) return;
+  if (isFirestoreQuotaExhausted()) return;
+  if (!auth.currentUser) return;
+  const path = `users/${userId}/purchases/${purchase.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'purchases', purchase.id);
+    const cleaned = cleanFirestoreObject({ ...purchase, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Saving purchase "${purchase.product}" (${purchase.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Success: Purchase ${purchase.id} persisted to Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_SINGLE_PURCHASE] Quota atingida. Compra mantida no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_SINGLE_PURCHASE_ERROR] Failed saving purchase ${purchase.id}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
 }
 
 export async function getPurchasesFromFirestore(userId: string): Promise<Purchase[]> {
   if (!userId) return [];
+  if (!auth.currentUser) return []; // Skip remote read if not authenticated
+  const path = `users/${userId}/purchases`;
+  console.log(`[Firestore:GET_PURCHASES] Fetching purchases collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'purchases');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data() as Purchase);
-  } catch {
+    if (snap.empty) {
+      console.log(`[Firestore:GET_PURCHASES] Path ${path} is empty (0 purchases found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => d.data() as Purchase);
+    console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases from Firestore.`);
+    return result;
+  } catch (err) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_PURCHASES] Quota limite diária ou modo offline. Usando compras do LocalStorage.`);
+      return [];
+    }
+    console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases at ${path}:`, err);
+    handleFirestoreError(err, OperationType.LIST, path);
     return [];
   }
 }
 
-export async function saveInstallmentsToFirestore(userId: string, installments: Installment[]): Promise<void> {
-  if (!userId || isFirestoreQuotaExhausted()) return;
-  const safeInsts = Array.isArray(installments) ? installments : [];
-  if (safeInsts.length === 0) return;
-  const chunks: Installment[][] = [];
-  for (let i = 0; i < safeInsts.length; i += 400) {
-    chunks.push(safeInsts.slice(i, i + 400));
+// USER INSTALLMENTS FIRESTORE OPERATIONS
+export async function saveInstallmentsToFirestore(
+  userId: string,
+  installments: Installment[]
+): Promise<void> {
+  if (!userId) {
+    console.warn('[Firestore:SAVE_INSTALLMENTS] Aborted: userId is empty.');
+    return;
   }
-  for (const chunk of chunks) {
-    const batch = writeBatch(db);
-    for (const inst of chunk) {
-      if (!inst || !inst.id) continue;
-      const docRef = doc(db, 'users', userId, 'installments', inst.id);
-      const cleaned = cleanFirestoreObject({ ...inst, userId, updatedAt: new Date().toISOString() });
-      batch.set(docRef, cleaned, { merge: true });
+  if (isFirestoreQuotaExhausted()) return;
+  if (!auth.currentUser) return;
+  const path = `users/${userId}/installments`;
+  console.log(`[Firestore:SAVE_INSTALLMENTS] Received ${installments?.length || 0} installments for path: ${path}`);
+  try {
+    const safeInsts = Array.isArray(installments) ? installments : [];
+    if (safeInsts.length === 0) {
+      console.log(`[Firestore:SAVE_INSTALLMENTS] Installments array is empty. 0 operations to commit.`);
+      return;
     }
-    await batch.commit();
+    const chunks: Installment[][] = [];
+    for (let i = 0; i < safeInsts.length; i += 400) {
+      chunks.push(safeInsts.slice(i, i + 400));
+    }
+    for (const chunk of chunks) {
+      const batch = writeBatch(db);
+      for (const inst of chunk) {
+        if (!inst || !inst.id) continue;
+        const docRef = doc(db, 'users', userId, 'installments', inst.id);
+        const cleaned = cleanFirestoreObject({ ...inst, userId, updatedAt: new Date().toISOString() });
+        batch.set(docRef, cleaned, { merge: true });
+      }
+      await batch.commit();
+    }
+    console.log(`[Firestore:SAVE_INSTALLMENTS] Successfully committed ${safeInsts.length} installments to Firestore at ${path}!`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_INSTALLMENTS] Quota limite diária atingida. Parcelas mantidas no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_INSTALLMENTS_ERROR] Failed committing installments for user ${userId}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function saveSingleInstallmentToFirestore(userId: string, installment: Installment): Promise<void> {
-  if (!userId || !installment || !installment.id || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'installments', installment.id);
-  const cleaned = cleanFirestoreObject({ ...installment, userId, updatedAt: new Date().toISOString() });
-  await setDoc(docRef, cleaned, { merge: true });
+  if (!userId || !installment || !installment.id) return;
+  if (isFirestoreQuotaExhausted()) return;
+  if (!auth.currentUser) return;
+  const path = `users/${userId}/installments/${installment.id}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'installments', installment.id);
+    const cleaned = cleanFirestoreObject({ ...installment, userId, updatedAt: new Date().toISOString() });
+    console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Saving installment #${installment.installmentNumber} (${installment.id}) to ${path}...`);
+    await setDoc(docRef, cleaned, { merge: true });
+    console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Success: Installment ${installment.id} persisted to Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:SAVE_SINGLE_INSTALLMENT] Quota atingida. Parcela mantida no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:SAVE_SINGLE_INSTALLMENT_ERROR] Failed saving installment ${installment.id}:`, err);
+    handleFirestoreError(err, OperationType.WRITE, path);
+  }
 }
 
 export async function getInstallmentsFromFirestore(userId: string): Promise<Installment[]> {
   if (!userId) return [];
+  if (!auth.currentUser) return []; // Skip remote read if not authenticated
+  const path = `users/${userId}/installments`;
+  console.log(`[Firestore:GET_INSTALLMENTS] Fetching installments collection from ${path}...`);
   try {
     const colRef = collection(db, 'users', userId, 'installments');
     const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.data() as Installment);
-  } catch {
+    if (snap.empty) {
+      console.log(`[Firestore:GET_INSTALLMENTS] Path ${path} is empty (0 installments found).`);
+      return [];
+    }
+    const result = snap.docs.map((d) => d.data() as Installment);
+    console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments from Firestore.`);
+    return result;
+  } catch (err) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+      if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:GET_INSTALLMENTS] Quota limite diária ou modo offline. Usando parcelas do LocalStorage.`);
+      return [];
+    }
+    console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments at ${path}:`, err);
+    handleFirestoreError(err, OperationType.LIST, path);
     return [];
   }
 }
 
+// DELETE INSTALLMENT FROM FIRESTORE
 export async function deleteInstallmentFromFirestore(userId: string, installmentId: string): Promise<void> {
-  if (!userId || !installmentId || isFirestoreQuotaExhausted()) return;
-  const docRef = doc(db, 'users', userId, 'installments', installmentId);
-  await deleteDoc(docRef);
+  if (!userId || !installmentId) return;
+  if (isFirestoreQuotaExhausted()) return;
+  const path = `users/${userId}/installments/${installmentId}`;
+  try {
+    console.log(`[Firestore:DELETE_INSTALLMENT] Deleting installment ${installmentId} from ${path}...`);
+    const docRef = doc(db, 'users', userId, 'installments', installmentId);
+    await deleteDoc(docRef);
+    console.log(`[Firestore:DELETE_INSTALLMENT] Success: Installment ${installmentId} deleted from Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:DELETE_INSTALLMENT] Quota atingida. Remoção registrada no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:DELETE_INSTALLMENT_ERROR] Failed deleting installment ${installmentId}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
 }
 
+// DELETE DEBTOR AND RELATED RECORDS FROM FIRESTORE
 export async function deleteDebtorFromFirestore(userId: string, debtorId: string): Promise<void> {
-  if (!userId || !debtorId || isFirestoreQuotaExhausted()) return;
-  const batch = writeBatch(db);
-  batch.delete(doc(db, 'users', userId, 'debtors', debtorId));
+  if (!userId || !debtorId) return;
+  if (isFirestoreQuotaExhausted()) return;
+  const path = `users/${userId}/debtors/${debtorId}`;
+  console.log(`[Firestore:DELETE_DEBTOR] Initiating cascade delete for debtor ${debtorId} from ${path}...`);
   try {
-    const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
-    purchasesSnap.docs.forEach((p) => {
-      if (p.data()?.debtorId === debtorId) batch.delete(p.ref);
-    });
-  } catch {}
-  try {
-    const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
-    installmentsSnap.docs.forEach((inst) => {
-      if (inst.data()?.debtorId === debtorId) batch.delete(inst.ref);
-    });
-  } catch {}
-  await batch.commit();
+    const batch = writeBatch(db);
+    batch.delete(doc(db, 'users', userId, 'debtors', debtorId));
+    
+    // Also delete associated purchases from Firestore
+    try {
+      const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
+      purchasesSnap.docs.forEach((p) => {
+        if (p.data()?.debtorId === debtorId) {
+          batch.delete(p.ref);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not read purchases for cascade delete:', e);
+    }
+
+    // Also delete associated installments from Firestore
+    try {
+      const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
+      installmentsSnap.docs.forEach((inst) => {
+        if (inst.data()?.debtorId === debtorId) {
+          batch.delete(inst.ref);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not read installments for cascade delete:', e);
+    }
+
+    await batch.commit();
+    console.log(`[Firestore:DELETE_DEBTOR] Success: Debtor ${debtorId} and sub-records deleted from Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:DELETE_DEBTOR] Quota atingida. Exclusão mantida no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:DELETE_DEBTOR_ERROR] Failed deleting debtor ${debtorId}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
 }
 
+// CLEAR ALL USER DEBTORS, PURCHASES, INSTALLMENTS FROM FIRESTORE
 export async function clearAllUserDataFromFirestore(userId: string): Promise<void> {
   if (!userId || isFirestoreQuotaExhausted()) return;
+  const basePath = `users/${userId}`;
   try {
     const debtorsSnap = await getDocs(collection(db, 'users', userId, 'debtors'));
     const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
     const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
+
     const batch = writeBatch(db);
     debtorsSnap.docs.forEach((d) => batch.delete(d.ref));
     purchasesSnap.docs.forEach((d) => batch.delete(d.ref));
     installmentsSnap.docs.forEach((d) => batch.delete(d.ref));
+
     await batch.commit();
-  } catch {}
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    handleFirestoreError(err, OperationType.DELETE, basePath);
+  }
 }
 
+// SAVE DIGITAL AUTHENTICATION KEYS TO FIRESTORE
 export async function saveAuthRecordToFirestore(
   userId: string,
-  record: { auth: string; [key: string]: any }
+  record: {
+    auth: string;
+    type?: string;
+    payer?: string;
+    amount?: string;
+    date?: string;
+    bank?: string;
+    pixKey?: string;
+    item?: string;
+    destination?: string;
+    status?: string;
+    documentId?: string;
+    timestamp?: number;
+  }
 ): Promise<void> {
-  if (!record.auth || !userId || isFirestoreQuotaExhausted()) return;
+  if (!record.auth || !userId) return;
+  if (isFirestoreQuotaExhausted()) return;
   const cleanKey = record.auth.replace(/[^a-zA-Z0-9_-]/g, '_');
-  const docRef = doc(db, 'users', userId, 'auth_records', cleanKey);
-  await setDoc(docRef, cleanFirestoreObject({ ...record, userId, registeredAt: new Date().toISOString() }), { merge: true });
+  const path = `users/${userId}/auth_records/${cleanKey}`;
+  try {
+    const docRef = doc(db, 'users', userId, 'auth_records', cleanKey);
+    await setDoc(docRef, cleanFirestoreObject({ ...record, userId, registeredAt: new Date().toISOString() }), { merge: true });
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      return;
+    }
+    console.warn('[Firebase] Erro ao salvar chave de autenticação digital no Firestore:', err);
+  }
 }
+
+// =========================================================================
+// ADMIN MASTER GOVERNANCE, USER DOMAIN & PASSWORD SUPPORT (Tiago Dias)
+// =========================================================================
 
 export async function getAllUsersForAdmin(): Promise<UserAccount[]> {
   const usersMap = new Map<string, UserAccount>();
+
+  // 1. Always include Master Developer
   usersMap.set(TIAGO_DIAS_USER.id, TIAGO_DIAS_USER);
+
+  // 2. Load Local Registered Credentials
   const localCreds = getLocalRegisteredCredentials();
   Object.values(localCreds).forEach((c) => {
     if (c.user && c.user.id) {
@@ -1093,6 +1554,8 @@ export async function getAllUsersForAdmin(): Promise<UserAccount[]> {
       });
     }
   });
+
+  // 3. Load from Firestore
   try {
     const usersSnap = await getDocs(collection(db, 'users'));
     usersSnap.docs.forEach((d) => {
@@ -1106,22 +1569,38 @@ export async function getAllUsersForAdmin(): Promise<UserAccount[]> {
         });
       }
     });
-  } catch {}
+  } catch (err) {
+    console.warn('[Firebase Admin] Note reading all users from Firestore:', err);
+  }
+
   return Array.from(usersMap.values());
 }
 
+/**
+ * Admin updates user profile and credentials
+ */
 export async function adminUpdateUser(
   userId: string,
   updates: Partial<UserAccount>
 ): Promise<UserAccount> {
+  // Update in Firestore
   if (!isFirestoreQuotaExhausted()) {
+    const path = `users/${userId}`;
     try {
       const userRef = doc(db, 'users', userId);
       await setDoc(userRef, cleanFirestoreObject({ ...updates, updatedAt: new Date().toISOString() }), {
         merge: true,
       });
-    } catch {}
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Admin] Note updating user in Firestore:', err);
+      }
+    }
   }
+
+  // Update in Local Registered Credentials
   const localCreds = getLocalRegisteredCredentials();
   let updatedCredKey: string | null = null;
   for (const [key, cred] of Object.entries(localCreds)) {
@@ -1133,17 +1612,26 @@ export async function adminUpdateUser(
       updatedCredKey = key;
     }
   }
-  if (updatedCredKey) saveLocalRegisteredCredentials(localCreds);
+  if (updatedCredKey) {
+    saveLocalRegisteredCredentials(localCreds);
+  }
+
   return { id: userId, ...updates } as UserAccount;
 }
 
+/**
+ * Admin resets user password and generates instant credentials
+ */
 export async function adminResetUserPassword(
   userId: string,
   newPassword: string
 ): Promise<{ newPassword: string; message: string }> {
   const cleanPass = newPassword.trim();
   if (!cleanPass) throw new Error('A nova senha não pode ser vazia.');
+
   const base64Hash = btoa(cleanPass);
+
+  // Update in Local Credentials
   const localCreds = getLocalRegisteredCredentials();
   for (const cred of Object.values(localCreds)) {
     if (cred.userId === userId) {
@@ -1153,6 +1641,8 @@ export async function adminResetUserPassword(
     }
   }
   saveLocalRegisteredCredentials(localCreds);
+
+  // Update in Firestore
   if (!isFirestoreQuotaExhausted()) {
     try {
       const userRef = doc(db, 'users', userId);
@@ -1165,14 +1655,24 @@ export async function adminResetUserPassword(
         },
         { merge: true }
       );
-    } catch {}
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Admin] Note updating password in Firestore:', err);
+      }
+    }
   }
+
   return {
     newPassword: cleanPass,
     message: `Senha redefinida com sucesso para o usuário!`,
   };
 }
 
+/**
+ * Admin applies arbitration: Ban or Suspend or Reactivate user
+ */
 export async function adminSetUserStatus(
   userId: string,
   status: 'ativo' | 'suspenso' | 'banido',
@@ -1182,25 +1682,45 @@ export async function adminSetUserStatus(
     status,
     banReason: reason || (status === 'banido' ? 'Violação das diretrizes da plataforma Haspaho' : ''),
   };
+
   await adminUpdateUser(userId, updates);
 }
 
+/**
+ * Admin permanently removes a user
+ */
 export async function adminDeleteUserAccount(userId: string): Promise<void> {
   if (userId === TIAGO_DIAS_USER.id) {
     throw new Error('A conta mestre do desenvolvedor Tiago Dias não pode ser removida.');
   }
+
+  // Delete from Firestore
   if (!isFirestoreQuotaExhausted()) {
     try {
       const userRef = doc(db, 'users', userId);
       await setDoc(userRef, { status: 'banido', deletedAt: new Date().toISOString() }, { merge: true });
-    } catch {}
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Admin] Note deleting user:', err);
+      }
+    }
   }
+
+  // Delete from Local Credentials
   const localCreds = getLocalRegisteredCredentials();
   for (const [key, cred] of Object.entries(localCreds)) {
-    if (cred.userId === userId) delete localCreds[key];
+    if (cred.userId === userId) {
+      delete localCreds[key];
+    }
   }
   saveLocalRegisteredCredentials(localCreds);
 }
+
+// =========================================================================
+// CLOSED COMMUNITY FORUM & FEEDBACK / SUGGESTIONS FOR DEVELOPER
+// =========================================================================
 
 import { ForumTopic } from '../types';
 
@@ -1222,6 +1742,36 @@ export const INITIAL_FORUM_TOPICS: ForumTopic[] = [
     devResponse: 'Canal oficial aberto para feedback e auditoria permanente. — Tiago Augusto Dias',
     devResponseAt: '2026-09-25T10:15:00.000Z',
   },
+  {
+    id: 'top-2',
+    authorId: 'DEMO-001',
+    authorName: 'Carlos Mendes (Demonstração)',
+    authorEmail: 'carlos.demo@recebiveispro.com',
+    authorRole: 'Usuário Demonstrativo',
+    title: '💡 Sugestão: Notificação antecipada de fechamento de faturas bancárias',
+    content: 'Seria muito útil se o sistema emitisse um alerta sonoro ou aviso visual 3 dias antes da fatura do cartão fechar.',
+    category: 'sugestao',
+    status: 'em_desenvolvimento',
+    createdAt: '2026-09-24T15:30:00.000Z',
+    upvotes: 18,
+    devResponse: 'Excelente sugestão! Já implementei o alerta de 3 dias no cabeçalho e na aba de relatórios. — Tiago Dias',
+    devResponseAt: '2026-09-24T18:00:00.000Z',
+  },
+  {
+    id: 'top-3',
+    authorId: 'DEMO-002',
+    authorName: 'Mariana Oliveira (Demonstração)',
+    authorEmail: 'mariana.demo@recebiveispro.com',
+    authorRole: 'Usuária Demonstrativa',
+    title: '🚀 Melhoria: Exportação de extrato completo em PDF com QR Code PIX',
+    content: 'Gostaria de parabenizar pela logo no contrato e sugerir que a impressão de extrato total também venha com o QR Code PIX em alta definição.',
+    category: 'melhoria',
+    status: 'concluido',
+    createdAt: '2026-09-23T11:20:00.000Z',
+    upvotes: 25,
+    devResponse: 'Concluído! A impressão direta e visualização com QR Code e logo já estão 100% operacionais no Extrato Total e Contratos. — Tiago Dias',
+    devResponseAt: '2026-09-23T14:40:00.000Z',
+  },
 ];
 
 export function getLocalForumTopics(): ForumTopic[] {
@@ -1231,14 +1781,18 @@ export function getLocalForumTopics(): ForumTopic[] {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) return parsed;
     }
-  } catch {}
+  } catch (e) {
+    console.error('Failed to parse forum topics:', e);
+  }
   return INITIAL_FORUM_TOPICS;
 }
 
 export function saveLocalForumTopics(topics: ForumTopic[]): void {
   try {
     localStorage.setItem('haspaho_forum_topics', JSON.stringify(topics));
-  } catch {}
+  } catch (e) {
+    console.error('Failed to save forum topics:', e);
+  }
 }
 
 export async function createForumTopic(
@@ -1251,14 +1805,24 @@ export async function createForumTopic(
     createdAt: new Date().toISOString(),
     upvotes: 1,
   };
+
   const topics = getLocalForumTopics();
   const updated = [newTopic, ...topics];
   saveLocalForumTopics(updated);
+
+  // Firestore sync
   if (!isFirestoreQuotaExhausted()) {
     try {
       await setDoc(doc(db, 'forum_topics', newTopic.id), cleanFirestoreObject(newTopic));
-    } catch {}
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Forum] Note writing forum topic to Firestore:', err);
+      }
+    }
   }
+
   return newTopic;
 }
 
@@ -1269,11 +1833,19 @@ export async function updateForumTopic(
   const topics = getLocalForumTopics();
   const updated = topics.map((t) => (t.id === topicId ? { ...t, ...updates } : t));
   saveLocalForumTopics(updated);
+
   if (!isFirestoreQuotaExhausted()) {
     try {
       await setDoc(doc(db, 'forum_topics', topicId), cleanFirestoreObject(updates), { merge: true });
-    } catch {}
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Forum] Note updating topic:', err);
+      }
+    }
   }
+
   return updated;
 }
 
@@ -1281,12 +1853,20 @@ export async function deleteForumTopic(topicId: string): Promise<ForumTopic[]> {
   const topics = getLocalForumTopics();
   const updated = topics.filter((t) => t.id !== topicId);
   saveLocalForumTopics(updated);
+
   if (!isFirestoreQuotaExhausted()) {
     try {
       const batch = writeBatch(db);
       batch.delete(doc(db, 'forum_topics', topicId));
       await batch.commit();
-    } catch {}
-  }
-  return updated;
+    } catch (err) {
+      if (isQuotaError(err)) {
+        setFirestoreQuotaExhausted(true);
+      } else {
+        console.warn('[Firebase Forum] Note deleting topic:', err);
+      }
     }
+  }
+
+  return updated;
+}

@@ -133,54 +133,16 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
   const handleGoogleDirect = async () => {
     setErrorMessage('');
     setUnauthorizedDomain(null);
-    setIsLoading(true);
-    try {
-      const user = await signInWithGoogleOAuth();
-      onLoginSuccess(user, false);
-      if (onClose) onClose();
-    } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('A janela de autenticação Google foi cancelada.');
-      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
-        const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
-        setUnauthorizedDomain(domain);
-        setErrorMessage(`Domínio não autorizado (${domain}). Adicione o domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
-      } else {
-        setErrorMessage(err.message || 'Erro no login com Google.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    openSocialAuth('gmail');
   };
 
   const handleFacebookDirect = async () => {
     setErrorMessage('');
     setUnauthorizedDomain(null);
-    setIsLoading(true);
-    try {
-      const user = await signInWithFacebook();
-      onLoginSuccess(user, false);
-      if (onClose) onClose();
-    } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('A janela de autenticação do Facebook foi cancelada.');
-      } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
-        const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
-        setUnauthorizedDomain(domain);
-        setErrorMessage(`Domínio não autorizado (${domain}). Adicione o domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
-      } else {
-        setErrorMessage(err.message || 'Erro no login com Facebook.');
-      }
-    } finally {
-      setIsLoading(false);
-    }
+    openSocialAuth('facebook');
   };
 
   const openSocialAuth = (provider: 'gmail' | 'facebook' | 'whatsapp') => {
-    if (provider === 'gmail') {
-      handleGoogleDirect();
-      return;
-    }
     setSocialProvider(provider);
     setSocialModalOpen(true);
   };

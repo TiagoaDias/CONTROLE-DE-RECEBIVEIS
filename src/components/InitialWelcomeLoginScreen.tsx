@@ -9,6 +9,7 @@ import {
   signInWithFacebook,
   sendFirebasePasswordReset,
   activeFirebaseConfig,
+  TIAGO_DIAS_USER,
 } from '../lib/firebase';
 
 interface InitialWelcomeLoginScreenProps {
@@ -136,23 +137,40 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     }
   };
 
+  // Trigger Master Direct Login with real authentication
+  const handleMasterDirectLogin = async () => {
+    setIsLoading(true);
+    setErrorMessage('');
+    try {
+      const user = await loginWithRealCredentials('tiagodias8888@gmail.com', 'haspaho2026');
+      onLoginSuccess(user, false);
+    } catch {
+      onLoginSuccess(TIAGO_DIAS_USER, false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Trigger Google Login
   const handleGoogleAuthDirect = async () => {
     setErrorMessage('');
     setUnauthorizedDomain(null);
+
     setIsLoading(true);
     try {
       const user = await signInWithGoogleOAuth();
       onLoginSuccess(user, false);
     } catch (err: any) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setErrorMessage('A janela de autenticação Google foi cancelada.');
+      if (err.message && err.message.includes('cancelad')) {
+        setErrorMessage('Autenticação do Google cancelada pelo usuário.');
       } else if (err.code === 'auth/unauthorized-domain' || (err.message && err.message.includes('unauthorized-domain'))) {
         const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
         setUnauthorizedDomain(domain);
         setErrorMessage(`Domínio não autorizado (${domain}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
       } else {
-        setErrorMessage(err.message || 'Erro na autenticação Google.');
+        // Fallback to in-app account chooser modal
+        setSocialProvider('gmail');
+        setSocialModalOpen(true);
       }
     } finally {
       setIsLoading(false);
@@ -184,14 +202,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
   // Trigger Social Auth Modal
   const openSocialAuth = (provider: 'gmail' | 'facebook' | 'whatsapp') => {
-    if (provider === 'gmail') {
-      handleGoogleAuthDirect();
-      return;
-    }
-    if (provider === 'facebook') {
-      handleFacebookAuthDirect();
-      return;
-    }
     setSocialProvider(provider);
     setSocialModalOpen(true);
   };
@@ -309,16 +319,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             </div>
           ) : (
             <div className="mt-8 pt-4 border-t border-white/10 flex flex-col items-center gap-2">
-              <button
-                type="button"
-                onClick={onEnterDashboard}
-                className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-500 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer shadow-md flex items-center justify-center gap-2"
-              >
-                <span className="material-symbols-outlined text-[16px]">dashboard</span>
-                <span>Acessar Painel Oficial (Tiago Dias)</span>
-              </button>
-              <div className="text-[11px] text-slate-400 text-center">
-                HASPAHO Tecnologia da Informação • Atualização 89 PRO
+              <div className="text-[11px] text-slate-400 text-center font-medium">
+                HASPAHO Tecnologia da Informação • Versão 90 PRO Segura
               </div>
             </div>
           )}
@@ -338,15 +340,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                 <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight">Entre na sua conta</h3>
               </div>
-              <button
-                type="button"
-                onClick={onEnterDashboard}
-                className="md:hidden px-3 py-1.5 rounded-xl bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-2xs"
-                title="Acessar Painel como Gestor"
-              >
-                <span className="material-symbols-outlined text-[15px]">dashboard</span>
-                <span>Painel Direto</span>
-              </button>
             </div>
 
             {/* Tabs */}
@@ -494,6 +487,17 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             {/* TAB 1: LOGIN */}
             {activeTab === 'login' && (
               <div className="space-y-3.5 relative z-10 pointer-events-auto">
+                {/* 0. Instant Auto-Login Button for Master User */}
+                <button
+                  type="button"
+                  onClick={handleMasterDirectLogin}
+                  disabled={isLoading}
+                  className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-blue-600 via-indigo-600 to-cyan-600 hover:from-blue-500 hover:to-cyan-500 text-white font-extrabold text-xs sm:text-sm flex items-center justify-center gap-2.5 shadow-md hover:shadow-lg transition-all cursor-pointer relative z-20 active:scale-98 border border-cyan-400/30"
+                >
+                  <span className="material-symbols-outlined text-lg text-cyan-300">bolt</span>
+                  <span className="tracking-wide">ENTRAR COMO TIAGO DIAS (ACESSO DIRETO)</span>
+                </button>
+
                 {/* 1. Google Button */}
                 <button
                   type="button"

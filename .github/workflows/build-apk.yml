@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions: write-all
 
     steps:
       - name: Baixar o projeto
@@ -56,3 +57,14 @@ jobs:
           name: Recebiveis-PRO-APK
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
+
+      - name: Publicar Release com APK Direto
+        uses: softprops/action-gh-release@v2
+        if: success()
+        with:
+          tag_name: v90.0
+          name: "Atualização 90 PRO - Seletor de Contas Google"
+          body: "Atualização 90 oficial com Seletor de Contas Google interativo para Android, troca limpa de usuários e correção de persistência."
+          files: android/app/build/outputs/apk/debug/app-debug.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
