@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
+import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
@@ -428,10 +429,14 @@ ${text ? `Texto do comprovante:\n"""\n${text}\n"""` : 'Analise o print ou foto d
   }
 });
 
-// Download direto da Atualização 88
+// Download direto da Atualização 88 (se disponível)
 app.get('/download-atualizacao-88', (req: Request, res: Response) => {
   const filePath = path.join(process.cwd(), 'public', 'atualizacao_88.zip');
-  res.download(filePath, 'haspaho-controle-recebiveis-atualizacao-88.zip');
+  if (fs.existsSync(filePath)) {
+    res.download(filePath, 'haspaho-controle-recebiveis-atualizacao-88.zip');
+  } else {
+    res.status(404).json({ error: 'Arquivo de backup da Atualização 88 não encontrado no servidor.' });
+  }
 });
 
 // Setup Vite middleware ou Static serving
