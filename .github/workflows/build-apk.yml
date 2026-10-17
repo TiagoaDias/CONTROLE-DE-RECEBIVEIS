@@ -38,9 +38,6 @@ jobs:
           cp -r dist/* android/app/src/main/assets/public/
           chmod +x android/gradlew
 
-      - name: Aceitar licencas do Android SDK
-        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses || true
-
       - name: Gerar APK
         run: |
           cd android
