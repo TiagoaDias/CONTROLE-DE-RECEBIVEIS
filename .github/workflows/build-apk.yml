@@ -34,6 +34,7 @@ jobs:
 
       - name: Sincronizar arquivos web para o Android
         run: |
+          rm -rf android/app/src/main/assets/public/*
           mkdir -p android/app/src/main/assets/public
           cp -r dist/* android/app/src/main/assets/public/
           chmod +x android/gradlew
