@@ -15,10 +15,7 @@ googleProvider.setCustomParameters({
 
 export async function loginWithGoogle(): Promise<User> {
   try {
-    // 1. Limpa qualquer sessão pendente localmente antes de iniciar
-    await signOut(auth);
-    
-    // 2. Tenta popup (padrão)
+    // Tenta popup imediatamente com prompt select_account
     try {
       const result = await signInWithPopup(auth, googleProvider);
       return result.user;
