@@ -73,7 +73,6 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
       <SocialAuthDialog
         isOpen={socialModalOpen}
-        provider={socialProvider}
         onClose={() => setSocialModalOpen(false)}
         onSuccess={(u) => {
           onLoginSuccess(u, false);

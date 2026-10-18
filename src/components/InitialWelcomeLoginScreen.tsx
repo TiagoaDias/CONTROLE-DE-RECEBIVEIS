@@ -26,7 +26,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   onLogout,
 }) => {
   const [socialModalOpen, setSocialModalOpen] = useState(false);
-  const [socialProvider, setSocialProvider] = useState<'gmail' | 'facebook' | 'whatsapp'>('gmail');
   const [errorMessage, setErrorMessage] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
@@ -42,7 +41,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       if (err.message && err.message.includes('cancelad')) {
         setErrorMessage('Autenticação do Google cancelada pelo usuário.');
       } else if (err.message !== 'REDIRECT_INITIATED') {
-        setSocialProvider('gmail');
         setSocialModalOpen(true);
       }
     } finally {
@@ -68,7 +66,6 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     <div className="w-full flex flex-col items-center justify-center py-6 px-3 sm:px-6 relative z-10 pointer-events-auto">
       <SocialAuthDialog
         isOpen={socialModalOpen}
-        provider={socialProvider}
         onClose={() => setSocialModalOpen(false)}
         onSuccess={(u) => onLoginSuccess(u, false)}
       />
