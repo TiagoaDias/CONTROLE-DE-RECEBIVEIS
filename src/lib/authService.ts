@@ -18,23 +18,13 @@ googleProvider.setCustomParameters({
  * Autenticação Google oficial via Pop-up com fallback para redirect
  */
 export async function loginWithGoogle(): Promise<User> {
-  const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-
-  if (isMobile) {
-    try {
-      await signInWithRedirect(auth, googleProvider);
-      throw new Error('REDIRECT_INITIATED');
-    } catch (err: any) {
-      console.warn('[AuthService] Redirect falhou:', err);
-      throw err;
-    }
-  }
-
+  // Always try popup first as it is more reliable in most WebView environments
   try {
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (popupError: any) {
-    console.warn('[AuthService] Popup falhou, tentando fallback redirect:', popupError);
+    console.warn('[AuthService] Popup falhou, tentando redirect como fallback:', popupError);
+    // Fallback to redirect only if popup fails
     try {
       await signInWithRedirect(auth, googleProvider);
       throw new Error('REDIRECT_INITIATED');
