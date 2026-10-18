@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { loginWithGoogleLocal, loginWithGoogle } from '../lib/authService';
+import { loginWithGoogle } from '../lib/authService';
 
 interface SocialAuthDialogProps {
   isOpen: boolean;
@@ -87,38 +87,19 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
     } catch {}
   };
 
-  // Login Local Google SEM POP-UP (100% livre de bloqueios)
-  const handleLocalGoogleLogin = async (accountEmail: string, accountName?: string) => {
-    setError('');
-    setLoading(true);
-    try {
-      const user = await loginWithGoogleLocal(accountEmail, accountName);
-      saveAccountToRecent(user.email, user.name);
-      onSuccess(user);
-      onClose();
-    } catch (err: any) {
-      console.error('Erro no login local Google:', err);
-      setError(err.message || 'Falha ao autenticar conta Google localmente.');
-    } finally {
-      setLoading(false);
-    }
-  };
-
   // Pop-up opcional tradicional
   const handlePopupGoogleLogin = async () => {
     setError('');
     setLoading(true);
     try {
       const fbUser = await loginWithGoogle();
-      const user = await loginWithGoogleLocal(fbUser.email || 'tiagodias8888@gmail.com', fbUser.displayName || '');
-      saveAccountToRecent(user.email, user.name);
-      onSuccess(user);
+      // Directly use the Firebase user result to proceed with auth
+      onSuccess(fbUser as any); // Assuming structure matches expected user account
       onClose();
     } catch (err: any) {
       if (err.message !== 'REDIRECT_INITIATED') {
-        console.warn('Popup falhou, executando fallback local:', err);
-        // Fallback instantâneo local caso o popup falhe
-        await handleLocalGoogleLogin('tiagodias8888@gmail.com', 'Tiago Augusto Dias');
+        console.warn('Popup falhou:', err);
+        setError('Falha ao autenticar com Google. Tente novamente.');
       }
     } finally {
       setLoading(false);
