@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { signInWithGoogleOAuth } from '../lib/firebase';
+import { processFirebaseUserResult } from '../lib/firebase';
+import { loginWithGoogle } from '../lib/authService';
 
 interface SocialAuthDialogProps {
   isOpen: boolean;
@@ -85,18 +86,20 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
     setLoading(true);
     try {
       // Explicit selection: only use an email if passed or typed
-      const targetEmail = emailToUse !== undefined ? emailToUse.trim() : customEmail.trim();
-      const user = await signInWithGoogleOAuth(targetEmail || undefined);
+      const fbUser = await loginWithGoogle();
+      const user = await processFirebaseUserResult(fbUser);
       if (user && user.email) {
         saveAccountToRecent(user.email, user.name);
       }
       onSuccess(user);
       onClose();
     } catch (err: any) {
-      console.error('Google Auth error:', err);
-      setError(err.message || 'Falha na autenticação Google. Escolha outra conta ou digite seu e-mail.');
+      if (err.message !== 'REDIRECT_INITIATED') {
+        console.error('Google Auth error:', err);
+        setError(err.message || 'Falha na autenticação Google. Escolha outra conta ou digite seu e-mail.');
+      }
     } finally {
-      setLoading(false);
+      if (error !== 'REDIRECT_INITIATED') setLoading(false);
     }
   };
 

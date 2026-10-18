@@ -827,63 +827,9 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
   return newUser;
 }
 
-/**
- * Real Google OAuth authentication via Firebase Popup or Redirect
- */
-export async function signInWithGoogleOAuth(customEmail?: string): Promise<UserAccount> {
-  const cleanEmail = (customEmail || '').trim().toLowerCase();
-
-  // Always use real Google OAuth with prompt: 'select_account'
-  const freshGoogleProvider = new GoogleAuthProvider();
-  freshGoogleProvider.setCustomParameters({
-    prompt: 'select_account',
-    ...(cleanEmail && cleanEmail.includes('@') ? { login_hint: cleanEmail } : {}),
-  });
-
-  try {
-    // Clear explicit logout flag when initiating login
-    removeSafeLocalStorage('haspaho_explicit_logout');
-
-    const result = await signInWithPopup(auth, freshGoogleProvider);
-    if (result && result.user) {
-      const user = await processFirebaseUserResult(result.user);
-      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(user));
-      removeSafeLocalStorage('haspaho_explicit_logout');
-      return user;
-    }
-  } catch (err: any) {
-    console.warn('[Google OAuth] signInWithPopup notice/error:', err);
-
-    if (err.code === 'auth/popup-closed-by-user' || err.message?.includes('popup-closed')) {
-      throw new Error('Autenticação cancelada. Selecione uma conta para entrar.');
-    }
-
-    // Try signInWithRedirect if popup is blocked by WebView
-    try {
-      freshGoogleProvider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithRedirect(auth, freshGoogleProvider);
-    } catch (redirectErr) {
-      console.warn('[Google OAuth] signInWithRedirect notice:', redirectErr);
-    }
-
-    throw err;
-  }
-
-  throw new Error('Não foi possível selecionar uma conta Google.');
-}
-
-/**
- * Session termination
- */
-export async function logoutSession(): Promise<void> {
-  try {
-    removeSafeLocalStorage('haspaho_auth_user');
-    setSafeLocalStorage('haspaho_explicit_logout', 'true');
-    await signOut(auth);
-  } catch (e) {
-    console.warn('Sign out warning:', e);
-  }
-}
+// =========================================================================
+// AUTHENTICATION & SECURITY (Centralized in authService.ts)
+// =========================================================================
 
 // =========================================================================
 // USER PROFILE FIRESTORE OPERATIONS

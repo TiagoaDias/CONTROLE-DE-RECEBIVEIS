@@ -5,12 +5,13 @@ import { SocialAuthDialog } from './SocialAuthDialog';
 import {
   loginWithRealCredentials,
   registerRealUser,
-  signInWithGoogleOAuth,
   signInWithFacebook,
   sendFirebasePasswordReset,
   activeFirebaseConfig,
   TIAGO_DIAS_USER,
+  processFirebaseUserResult,
 } from '../lib/firebase';
+import { loginWithGoogle } from '../lib/authService';
 
 interface InitialWelcomeLoginScreenProps {
   currentUser: UserAccount | null;
@@ -158,7 +159,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
     setIsLoading(true);
     try {
-      const user = await signInWithGoogleOAuth();
+      const fbUser = await loginWithGoogle();
+      const user = await processFirebaseUserResult(fbUser);
       onLoginSuccess(user, false);
     } catch (err: any) {
       if (err.message && err.message.includes('cancelad')) {
@@ -167,13 +169,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         const domain = window.location.hostname || 'controle-de-recebiveis.vercel.app';
         setUnauthorizedDomain(domain);
         setErrorMessage(`Domínio não autorizado (${domain}). Adicione este domínio no Firebase Console (Authentication > Configurações > Domínios autorizados).`);
-      } else {
-        // Fallback to in-app account chooser modal
+      } else if (err.message !== 'REDIRECT_INITIATED') {
+        // Fallback to in-app account chooser modal only if not initiating redirect
         setSocialProvider('gmail');
         setSocialModalOpen(true);
       }
     } finally {
-      setIsLoading(false);
+      if (errorMessage !== 'REDIRECT_INITIATED') setIsLoading(false);
     }
   };
 

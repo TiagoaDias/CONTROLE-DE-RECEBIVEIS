@@ -34,7 +34,6 @@ import {
   saveAuthRecordToFirestore,
   clearAllUserDataFromFirestore,
   markWelcomeCompletedInFirestore,
-  logoutSession,
   saveTombstoneToFirestore,
   removeTombstoneFromFirestore,
   getTombstonesFromFirestore,
@@ -43,6 +42,7 @@ import {
   isFirestoreQuotaExhausted,
   processFirebaseUserResult,
 } from './lib/firebase';
+import { logoutUser } from './lib/authService';
 import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 
 import { Header } from './components/Header';
@@ -2511,7 +2511,7 @@ export default function App() {
     try {
       localStorage.setItem('haspaho_explicit_logout', 'true');
       localStorage.removeItem('haspaho_auth_user');
-      await logoutSession();
+      await logoutUser();
       console.log('[App:LOGOUT] Session cleared successfully.');
     } catch (e) {
       console.warn('Logout session error:', e);
