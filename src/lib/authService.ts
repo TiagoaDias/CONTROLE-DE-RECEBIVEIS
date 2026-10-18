@@ -39,9 +39,9 @@ export async function loginWithGoogle(): Promise<User> {
 export async function logoutUser(): Promise<void> {
   try {
     await signOut(auth);
-    // Limpeza de cache local específica do app
+    // Limpeza de cache local específica do app e marcação de logout explícito
     localStorage.removeItem('haspaho_auth_user');
-    localStorage.removeItem('haspaho_explicit_logout');
+    localStorage.setItem('haspaho_explicit_logout', 'true');
   } catch (err) {
     console.error('[AuthService] Erro ao deslogar:', err);
   }
