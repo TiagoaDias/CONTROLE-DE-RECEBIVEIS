@@ -585,7 +585,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                     {isLoading ? (
                       <>
                         <span className="material-symbols-outlined animate-spin text-lg">progress_activity</span>
-                        <span>VALIDANDO CREDENCIAIS...</span>
+                        <span>{activeTab === 'login' ? 'VALIDANDO CREDENCIAIS...' : 'PROCESSANDO...'}</span>
                       </>
                     ) : (
                       <>
