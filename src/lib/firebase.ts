@@ -843,8 +843,6 @@ export async function signInWithGoogleOAuth(customEmail?: string): Promise<UserA
   try {
     // Clear explicit logout flag when initiating login
     removeSafeLocalStorage('haspaho_explicit_logout');
-    // Ensure previous session is detached so Google always shows the account selector
-    await signOut(auth).catch(() => {});
 
     const result = await signInWithPopup(auth, freshGoogleProvider);
     if (result && result.user) {
