@@ -1056,10 +1056,10 @@ export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]>
     });
     console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors from Firestore.`);
     return result;
-  } catch (err) {
-    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+  } catch (err: any) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_DEBTORS] Quota limite diária ou modo offline. Usando devedores do cache LocalStorage.`);
+      console.warn(`[Firestore:GET_DEBTORS] Acesso negado ou modo offline/quota. Usando devedores do cache LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors at ${path}:`, err);
@@ -1239,10 +1239,10 @@ export async function getPurchasesFromFirestore(userId: string): Promise<Purchas
     const result = snap.docs.map((d) => d.data() as Purchase);
     console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases from Firestore.`);
     return result;
-  } catch (err) {
-    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+  } catch (err: any) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_PURCHASES] Quota limite diária ou modo offline. Usando compras do LocalStorage.`);
+      console.warn(`[Firestore:GET_PURCHASES] Acesso negado ou modo offline/quota. Usando compras do LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases at ${path}:`, err);
@@ -1333,10 +1333,10 @@ export async function getInstallmentsFromFirestore(userId: string): Promise<Inst
     const result = snap.docs.map((d) => d.data() as Installment);
     console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments from Firestore.`);
     return result;
-  } catch (err) {
-    if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
+  } catch (err: any) {
+    if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_INSTALLMENTS] Quota limite diária ou modo offline. Usando parcelas do LocalStorage.`);
+      console.warn(`[Firestore:GET_INSTALLMENTS] Acesso negado ou modo offline/quota. Usando parcelas do LocalStorage.`);
       return [];
     }
     console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments at ${path}:`, err);

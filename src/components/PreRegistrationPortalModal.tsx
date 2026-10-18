@@ -45,10 +45,9 @@ export const PreRegistrationPortalModal: React.FC<PreRegistrationPortalModalProp
     }
   }, [isOpen]);
 
-  const [selectedAuthMethod, setSelectedAuthMethod] = useState<'gmail' | 'facebook' | 'whatsapp' | 'password'>('gmail');
+  const [selectedAuthMethod, setSelectedAuthMethod] = useState<'gmail' | 'whatsapp'>('gmail');
   const [verificationCode, setVerificationCode] = useState('');
   const [isCodeSent, setIsCodeSent] = useState(false);
-  const [userPassword, setUserPassword] = useState('');
 
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
@@ -199,12 +198,10 @@ export const PreRegistrationPortalModal: React.FC<PreRegistrationPortalModalProp
                 <span>Como você prefere autenticar seu acesso?</span>
               </label>
 
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5">
+              <div className="grid grid-cols-2 gap-2">
                 {[
                   { id: 'gmail', label: 'Google / Gmail', icon: 'mail', desc: 'Recomendado' },
-                  { id: 'facebook', label: 'Facebook', icon: 'public', desc: 'Rede Social' },
                   { id: 'whatsapp', label: 'Código WhatsApp', icon: 'chat', desc: 'SMS / Zap' },
-                  { id: 'password', label: 'Criar Senha', icon: 'key', desc: 'Personalizada' },
                 ].map((m) => (
                   <button
                     key={m.id}
@@ -270,19 +267,6 @@ export const PreRegistrationPortalModal: React.FC<PreRegistrationPortalModalProp
                     value={verificationCode}
                     onChange={(e) => setVerificationCode(e.target.value)}
                     className="w-full h-9 px-3 bg-white/10 border border-emerald-400/40 rounded-xl text-center font-mono font-bold tracking-widest text-white outline-none"
-                  />
-                </div>
-              )}
-
-              {selectedAuthMethod === 'password' && (
-                <div className="p-3 rounded-xl bg-purple-950/40 border border-purple-500/30 flex flex-col gap-1.5 text-xs">
-                  <label className="text-purple-300 font-bold text-[11px]">Defina sua Senha Pessoal de Acesso</label>
-                  <input
-                    type="password"
-                    placeholder="Sua senha secreta..."
-                    value={userPassword}
-                    onChange={(e) => setUserPassword(e.target.value)}
-                    className="w-full h-9 px-3 bg-white/10 border border-purple-400/40 rounded-xl text-white font-mono outline-none"
                   />
                 </div>
               )}
