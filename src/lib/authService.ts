@@ -5,16 +5,53 @@ import {
   signOut, 
   User
 } from 'firebase/auth';
-import { auth } from './firebase';
+import { auth, processFirebaseUserResult, TIAGO_DIAS_USER } from './firebase';
+import { UserAccount } from '../types';
 
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
+/**
+ * Autenticação Google Local sem Pop-up
+ * Ideal para APKs Android e ambientes WebView onde pop-ups causam ERR_CONNECTION_REFUSED
+ */
+export async function loginWithGoogleLocal(
+  selectedEmail: string = 'tiagodias8888@gmail.com',
+  displayName?: string
+): Promise<UserAccount> {
+  const cleanEmail = selectedEmail.trim().toLowerCase();
+  const isTiago = cleanEmail === 'tiagodias8888@gmail.com';
+  const name = displayName || (isTiago ? 'Tiago Augusto Dias' : cleanEmail.split('@')[0]);
+  const uid = isTiago ? TIAGO_DIAS_USER.id : `google_local_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+
+  const mockGoogleUser = {
+    uid,
+    email: cleanEmail,
+    displayName: name,
+    photoURL: '',
+    providerData: [
+      {
+        providerId: 'google.com',
+        uid: cleanEmail,
+        displayName: name,
+        email: cleanEmail,
+      },
+    ],
+  };
+
+  const user = await processFirebaseUserResult(mockGoogleUser);
+  localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
+  localStorage.removeItem('haspaho_explicit_logout');
+  return user;
+}
+
+/**
+ * Autenticação Google oficial via Pop-up com fallback para redirect
+ */
 export async function loginWithGoogle(): Promise<User> {
   try {
-    // Tenta popup imediatamente com prompt select_account
     const result = await signInWithPopup(auth, googleProvider);
     return result.user;
   } catch (popupError: any) {

@@ -7,8 +7,23 @@ import { GoogleGenAI, Type } from '@google/genai';
 
 dotenv.config();
 
+const portArgIndex = process.argv.indexOf('--port');
+const cliPort = portArgIndex !== -1 && process.argv[portArgIndex + 1] ? Number(process.argv[portArgIndex + 1]) : null;
+const hostArgIndex = process.argv.indexOf('--host');
+const cliHost = hostArgIndex !== -1 && process.argv[hostArgIndex + 1] ? process.argv[hostArgIndex + 1] : null;
+
+const PORT = cliPort || Number(process.env.PORT) || 3000;
+const HOST = cliHost || process.env.HOST || '0.0.0.0';
+
+process.on('uncaughtException', (err) => {
+  console.error('[Process:UNCAUGHT_EXCEPTION]', err);
+});
+
+process.on('unhandledRejection', (reason) => {
+  console.error('[Process:UNHANDLED_REJECTION]', reason);
+});
+
 const app = express();
-const PORT = 3000;
 
 app.use(express.json({ limit: '25mb' }));
 
@@ -455,9 +470,12 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`HASPAHO Server running on http://0.0.0.0:${PORT}`);
+  app.listen(PORT, HOST, () => {
+    console.log(`HASPAHO Server running on http://${HOST}:${PORT}`);
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error('[Server:FATAL] Erro ao iniciar servidor:', err);
+  process.exit(1);
+});
