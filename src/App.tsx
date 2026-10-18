@@ -2511,18 +2511,18 @@ export default function App() {
     try {
       localStorage.setItem('haspaho_explicit_logout', 'true');
       localStorage.removeItem('haspaho_auth_user');
+      setCurrentUser(null);
+      setDebtors([]);
+      setPurchases([]);
+      setInstallments([]);
+      setCurrentTab('inicio');
+      setIsAuthOpen(true);
+      setIsUserSettingsOpen(false);
       await logoutUser();
       console.log('[App:LOGOUT] Session cleared successfully.');
     } catch (e) {
       console.warn('Logout session error:', e);
     }
-    setCurrentUser(null);
-    setDebtors([]);
-    setPurchases([]);
-    setInstallments([]);
-    setCurrentTab('inicio');
-    setIsAuthOpen(true);
-    setIsUserSettingsOpen(false);
     showToast('Você encerrou a sessão com segurança.');
   };
 
