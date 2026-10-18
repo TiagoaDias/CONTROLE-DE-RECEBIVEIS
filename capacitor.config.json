@@ -1,5 +1,8 @@
 {
   "appId": "com.haspaho.recebiveispro",
   "appName": "Recebíveis e Parcelas",
-  "webDir": "dist"
+  "webDir": "dist",
+  "android": {
+    "allowMixedContent": true
+  }
 }
