@@ -32,11 +32,12 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       const user = await loginWithGoogle();
       onLoginSuccess(user, false);
     } catch (err: any) {
-      console.error('Falha no login Google:', err);
       const msg = err?.message || '';
-      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada')) {
+      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada') || err?.code === 'auth/popup-closed-by-user') {
+        console.info('Login Google cancelado pelo usuário.');
         setErrorMessage('Seleção de conta cancelada.');
       } else {
+        console.error('Falha no login Google:', err);
         setErrorMessage(msg || 'Não foi possível autenticar pelo navegador. Selecione ou digite sua conta Google abaixo:');
         setSocialModalOpen(true);
       }

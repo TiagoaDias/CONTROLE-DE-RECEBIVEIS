@@ -32,11 +32,12 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       onLoginSuccess(user, false);
       if (onClose) onClose();
     } catch (err: any) {
-      console.error('Falha no login Google:', err);
       const msg = err?.message || '';
-      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada')) {
+      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada') || err?.code === 'auth/popup-closed-by-user') {
+        console.info('Login Google cancelado pelo usuário.');
         setErrorMessage('Seleção de conta cancelada.');
       } else {
+        console.error('Falha no login Google:', err);
         setErrorMessage(msg || 'Falha ao autenticar com Google. Tente novamente.');
       }
     } finally {

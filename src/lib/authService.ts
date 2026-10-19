@@ -54,7 +54,11 @@ export async function loginWithGoogle(): Promise<UserAccount> {
     localStorage.removeItem('haspaho_explicit_logout');
     return userAccount;
   } catch (popupError: any) {
-    console.error('[AuthService] Erro no popup do Google:', popupError);
+    if (popupError?.code === 'auth/popup-closed-by-user' || popupError?.code === 'auth/cancelled-popup-request') {
+      console.info('[AuthService] Janela de login do Google fechada ou cancelada pelo usuário.');
+    } else {
+      console.error('[AuthService] Erro no popup do Google:', popupError);
+    }
     if (popupError?.code === 'auth/popup-blocked') {
       throw new Error('O navegador bloqueou a janela de autenticação. Por favor, permita pop-ups para este site e tente novamente.');
     }
