@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { UserAccount } from '../types';
-import { loginWithGoogle } from '../lib/authService';
+import { loginWithGoogle, loginWithDirectGoogleAccount } from '../lib/authService';
 
 interface SocialAuthDialogProps {
   isOpen: boolean;
@@ -56,9 +56,10 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
   const saveAccountToRecent = (email: string, name?: string) => {
     try {
       const cleanEmail = email.trim().toLowerCase();
-      const cleanName = name || cleanEmail.split('@')[0];
+      const cleanName = (name || cleanEmail.split('@')[0] || '').trim();
       const initials = cleanName
-        .split(' ')
+        .split(/\s+/)
+        .filter(Boolean)
         .map((p) => p[0])
         .slice(0, 2)
         .join('')
@@ -87,19 +88,36 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
     } catch {}
   };
 
+  // Login direto com qualquer conta Google (sem passar por popup ou redirect localhost)
+  const handleLocalGoogleLogin = async (accountEmail: string, accountName?: string) => {
+    setError('');
+    setLoading(true);
+    try {
+      const user = await loginWithDirectGoogleAccount(accountEmail, accountName);
+      saveAccountToRecent(accountEmail, accountName || user.name);
+      onSuccess(user);
+      onClose();
+    } catch (err: any) {
+      console.error('Falha ao autenticar conta Google:', err);
+      setError(err?.message || 'Falha ao autenticar com esta conta Google.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Pop-up opcional tradicional
   const handlePopupGoogleLogin = async () => {
     setError('');
     setLoading(true);
     try {
-      const fbUser = await loginWithGoogle();
-      // Directly use the Firebase user result to proceed with auth
-      onSuccess(fbUser as any); // Assuming structure matches expected user account
+      const user = await loginWithGoogle();
+      saveAccountToRecent(user.email, user.name);
+      onSuccess(user);
       onClose();
     } catch (err: any) {
       if (err.message !== 'REDIRECT_INITIATED') {
         console.warn('Popup falhou:', err);
-        setError('Falha ao autenticar com Google. Tente novamente.');
+        setError('Falha ao autenticar com Google. Tente novamente ou use a opção de entrar direto.');
       }
     } finally {
       setLoading(false);
@@ -171,7 +189,7 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
                         <div className="font-extrabold text-slate-900 text-sm truncate flex items-center gap-1.5">
                           <span>{account.name}</span>
                           {isTiago && (
-                            <span className="text-[9px] bg-blue-600 text-white font-mono font-bold px-1.5 py-0.2 rounded">
+                            <span className="text-[9px] bg-blue-600 text-white font-mono font-bold px-1.5 py-0.5 rounded">
                               MASTER
                             </span>
                           )}

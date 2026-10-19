@@ -1,0 +1,28 @@
+{
+  "short_name": "Recebíveis",
+  "name": "Recebíveis & Parcelas PRO",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "type": "image/png",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any"
+    }
+  ],
+  "start_url": "/",
+  "background_color": "#081b33",
+  "theme_color": "#081b33",
+  "display": "standalone",
+  "orientation": "portrait"
+}

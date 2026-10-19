@@ -4,5 +4,10 @@
 	"webDir": "dist",
 	"android": {
 		"allowMixedContent": true
+	},
+	"server": {
+		"allowNavigation": [
+			"*"
+		]
 	}
 }

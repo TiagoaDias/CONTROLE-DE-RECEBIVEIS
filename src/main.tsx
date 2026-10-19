@@ -5,9 +5,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import './index.css';
 
 createRoot(document.getElementById('root')!).render(
-  <StrictMode>
-    <ErrorBoundary fallbackTitle="Sistema HASPAHO • Recuperação Ativa">
-      <App />
-    </ErrorBoundary>
-  </StrictMode>,
+  <ErrorBoundary fallbackTitle="Sistema HASPAHO • Recuperação Ativa">
+    <App />
+  </ErrorBoundary>,
 );

@@ -4,10 +4,9 @@ import { HaspahoLogo } from './HaspahoLogo';
 import { SocialAuthDialog } from './SocialAuthDialog';
 import {
   TIAGO_DIAS_USER,
-  processFirebaseUserResult,
   loginWithRealCredentials,
 } from '../lib/firebase';
-import { loginWithGoogleLocal, loginWithGoogle } from '../lib/authService';
+import { loginWithGoogle } from '../lib/authService';
 
 interface InitialWelcomeLoginScreenProps {
   currentUser: UserAccount | null;
@@ -38,8 +37,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       onLoginSuccess(user, false);
     } catch (err: any) {
       console.error('Falha no login Google:', err);
-      if (err.message !== 'REDIRECT_INITIATED') {
-        setErrorMessage('Falha ao autenticar com Google. Tente novamente.');
+      if (err?.message !== 'REDIRECT_INITIATED') {
+        setErrorMessage('Não foi possível autenticar pelo navegador. Selecione ou digite sua conta Google abaixo:');
+        setSocialModalOpen(true);
       }
     } finally {
       setIsGoogleLoading(false);
@@ -105,11 +105,11 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
             <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs">
-                  {currentUser.name.charAt(0)}
+                  {(currentUser.name || currentUser.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-bold text-white truncate max-w-[130px]">{currentUser.name}</div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[130px]">{currentUser.email}</div>
+                  <div className="text-xs font-bold text-white truncate max-w-[130px]">{currentUser.name || currentUser.email || 'Usuário'}</div>
+                  <div className="text-[10px] text-slate-400 truncate max-w-[130px]">{currentUser.email || ''}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -163,14 +163,15 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               </div>
             )}
 
-            <div className="space-y-3.5 py-4 relative z-10 pointer-events-auto">
+            <div className="space-y-3 py-3 relative z-10 pointer-events-auto">
+              {/* Botão Oficial Google */}
               <button
                 type="button"
                 onClick={handleGoogleAuth}
                 disabled={isGoogleLoading}
-                className="w-full py-4 px-5 rounded-2xl border-2 border-blue-500 hover:border-blue-600 bg-white text-slate-900 font-bold text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                className="w-full py-3.5 px-4 rounded-2xl border-2 border-blue-500 hover:border-blue-600 bg-white text-slate-900 font-bold text-sm flex items-center justify-center gap-3 shadow-md hover:shadow-lg transition-all cursor-pointer"
               >
-                  <svg className="w-6 h-6 shrink-0" viewBox="0 0 24 24">
+                  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                     <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
                     <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
                     <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
@@ -179,12 +180,23 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                   ENTRAR COM CONTA GOOGLE
               </button>
 
+              {/* Botão Alternar / Entrar com Outra Conta Google (Ideal para Celular/APK) */}
+              <button
+                type="button"
+                onClick={() => setSocialModalOpen(true)}
+                disabled={isGoogleLoading}
+                className="w-full py-2.5 px-3 rounded-xl border-2 border-indigo-200 hover:border-indigo-400 bg-indigo-50/60 hover:bg-indigo-100/80 text-indigo-950 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs"
+              >
+                <span className="material-symbols-outlined text-indigo-600 text-[18px]">manage_accounts</span>
+                <span>Entrar com Outra Conta Google (@gmail.com)</span>
+              </button>
+
               {/* Master Developer Access Button */}
               <button
                 type="button"
                 onClick={handleMasterDirectLogin}
                 disabled={isGoogleLoading}
-                className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs"
+                className="w-full py-2 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-xs"
               >
                 <div className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-amber-600 text-[18px]">crown</span>
@@ -199,11 +211,18 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
           <div className="pt-4 border-t border-slate-100 text-center">
             <p className="text-[11px] text-slate-400">
-              HASPAHO Tecnologia da Information • Suporte WhatsApp: (14) 99733-9863
+              HASPAHO Tecnologia da Informação • Suporte WhatsApp: (14) 99733-9863
             </p>
           </div>
         </div>
       </div>
+
+      {/* Modal para Alternar Contas ou Digitar a 2ª Conta Google */}
+      <SocialAuthDialog
+        isOpen={socialModalOpen}
+        onClose={() => setSocialModalOpen(false)}
+        onSuccess={(user) => onLoginSuccess(user, false)}
+      />
     </div>
   );
 };

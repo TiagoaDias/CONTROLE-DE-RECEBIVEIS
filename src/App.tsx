@@ -179,7 +179,7 @@ export default function App() {
     });
   };
 
-  // Authentication & Welcome States - only restore verified local session, never auto-assume Google without confirmation
+  // Authentication & Welcome States - restore verified user session if not explicitly logged out
   const [currentUser, setCurrentUser] = useState<UserAccount | null>(() => {
     try {
       if (localStorage.getItem('haspaho_explicit_logout') === 'true') {
@@ -188,11 +188,7 @@ export default function App() {
       const saved = localStorage.getItem('haspaho_auth_user');
       if (saved) {
         const parsed = JSON.parse(saved);
-        // CRITICAL: Never restore Google sessions automatically from localStorage without Google authorization
-        if (parsed?.authProvider === 'gmail') {
-          return null;
-        }
-        if (parsed && parsed.authProvider === 'local' && (parsed.id || parsed.email)) {
+        if (parsed && (parsed.id || parsed.email)) {
           return parsed;
         }
       }
@@ -404,9 +400,8 @@ export default function App() {
           const saved = localStorage.getItem('haspaho_auth_user');
           if (saved) {
             const parsed = JSON.parse(saved);
-            // CRITICAL: Only restore local email/password sessions! Never restore Google sessions when Firebase Auth has no session
-            if (parsed && parsed.authProvider === 'local' && (parsed.id || parsed.email)) {
-              console.log('[Auth:LOCAL_SESSION] Restoring local user session:', parsed.name || parsed.email);
+            if (parsed && (parsed.id || parsed.email)) {
+              console.log('[Auth:SESSION_RESTORED] Restoring session for:', parsed.name || parsed.email);
               setCurrentUser(parsed);
               return;
             }
