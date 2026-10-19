@@ -209,10 +209,6 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && (parsed.id || parsed.email)) {
-          if (parsed.authProvider !== 'gmail') {
-             // Forçar re-login para usuários não-Google (remover acesso master direto)
-             return null;
-          }
           if (parsed.isMasterAdmin && parsed.email?.toLowerCase() !== 'tiagodias8888@gmail.com') {
              parsed.isMasterAdmin = false;
              parsed.isFullStackDev = false;

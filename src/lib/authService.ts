@@ -30,13 +30,42 @@ export async function loginWithGoogle(): Promise<UserAccount> {
     try {
       await initializeGoogleSignInNative();
       const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
-      const result = await GoogleSignIn.signIn();
-      if (result && (result.userId || result.email)) {
+      const result: any = await GoogleSignIn.signIn();
+      console.log('[AuthService] Native Google Sign-In result received:', result);
+
+      const userEmail = (
+        result?.email ||
+        result?.user?.email ||
+        result?.profile?.email ||
+        ''
+      ).toLowerCase();
+
+      const userId =
+        result?.userId ||
+        result?.user?.id ||
+        result?.id ||
+        result?.uid ||
+        (userEmail ? `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : '');
+
+      const displayName =
+        result?.displayName ||
+        result?.user?.displayName ||
+        result?.user?.givenName ||
+        result?.givenName ||
+        (userEmail ? userEmail.split('@')[0] : '');
+
+      const photoURL =
+        result?.imageUrl ||
+        result?.user?.imageUrl ||
+        result?.photoUrl ||
+        '';
+
+      if (userEmail || userId) {
         const userAccount = await processFirebaseUserResult({
-          uid: result.userId,
-          email: result.email || '',
-          displayName: result.displayName || '',
-          photoURL: result.imageUrl || ''
+          uid: userId || `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          email: userEmail,
+          displayName,
+          photoURL,
         });
         setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
         localStorage.removeItem('haspaho_explicit_logout');
