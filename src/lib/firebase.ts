@@ -1,4 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { Capacitor } from '@capacitor/core';
 import {
   getAuth,
   signInWithPopup,
@@ -65,6 +66,28 @@ export const db = activeFirebaseConfig.firestoreDatabaseId
 // Google OAuth Provider
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
+
+/**
+ * Inicializa e executa o login Google nativo no Android/iOS (via @capawesome/capacitor-google-sign-in)
+ * Força o uso da interface e do navegador do sistema para evitar o erro 'disallowed_useragent' em WebViews.
+ */
+export async function initializeGoogleSignInNative(): Promise<void> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
+      const clientId = activeFirebaseConfig.oAuthClientId || activeFirebaseConfig.apiKey;
+      if (clientId) {
+        await GoogleSignIn.initialize({
+          clientId,
+          scopes: ['profile', 'email'],
+        });
+        console.log('[Firebase:GoogleSignIn] Plugin nativo inicializado com sucesso para o ambiente mobile.');
+      }
+    } catch (e) {
+      console.warn('[Firebase:GoogleSignIn] Nota na inicialização do plugin nativo:', e);
+    }
+  }
+}
 
 // Facebook OAuth Provider
 const facebookProvider = new FacebookAuthProvider();

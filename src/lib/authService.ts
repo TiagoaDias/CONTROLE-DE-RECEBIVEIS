@@ -9,7 +9,8 @@ import {
   processFirebaseUserResult, 
   getUserFromFirestore, 
   saveUserToFirestore, 
-  setSafeLocalStorage
+  setSafeLocalStorage,
+  initializeGoogleSignInNative
 } from './firebase';
 import { UserAccount } from '../types';
 
@@ -27,6 +28,7 @@ export async function loginWithGoogle(): Promise<UserAccount> {
   // Se for aplicativo nativo instalado (Capacitor Android APK / iOS)
   if (Capacitor.isNativePlatform()) {
     try {
+      await initializeGoogleSignInNative();
       const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
       const result = await GoogleSignIn.signIn();
       if (result && (result.userId || result.email)) {
