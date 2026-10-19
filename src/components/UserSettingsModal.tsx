@@ -5,6 +5,12 @@ import { WhatsAppIcon } from './WhatsAppIcon';
 import { systemHealthSentinel, SystemHealthReport } from '../utils/systemHealthSentinel';
 import { capturePanelScreenshot } from '../utils/screenshotHelper';
 import { ImageCropperModal } from './ImageCropperModal';
+import {
+  getStoredAppIconTheme,
+  applyAppIconTheme,
+  APP_ICON_OPTIONS,
+  AppIconTheme,
+} from '../utils/appIconHelper';
 
 interface UserSettingsModalProps {
   isOpen: boolean;
@@ -63,6 +69,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [diagnosticReport, setDiagnosticReport] = useState<SystemHealthReport | null>(null);
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const [isCapturingSupportPrint, setIsCapturingSupportPrint] = useState(false);
+  const [iconTheme, setIconTheme] = useState<AppIconTheme>(getStoredAppIconTheme());
 
   // Sincroniza o formulário sempre que o modal abre ou o usuário ativo muda
   useEffect(() => {
@@ -371,6 +378,99 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+
+              {/* Ícone do Aplicativo no Celular & Tela Inicial */}
+              <div className="bg-gradient-to-r from-slate-50 via-white to-slate-50 border border-slate-200/90 rounded-2xl p-4 space-y-3 shadow-2xs">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <span className="w-8 h-8 rounded-xl bg-blue-100 text-blue-700 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-[19px]">app_shortcut</span>
+                    </span>
+                    <div>
+                      <h3 className="text-xs sm:text-sm font-extrabold text-slate-900 flex items-center gap-1.5">
+                        <span>Ícone do Aplicativo no Celular</span>
+                        <span className="text-[9px] font-black uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Personalizável
+                        </span>
+                      </h3>
+                      <p className="text-[11px] text-slate-500">
+                        Escolha como o ícone do aplicativo é exibido na tela inicial do seu smartphone:
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+                  {APP_ICON_OPTIONS.map((opt) => {
+                    const isSelected = iconTheme === opt.id;
+                    return (
+                      <div
+                        key={opt.id}
+                        role="button"
+                        tabIndex={0}
+                        onClick={() => {
+                          setIconTheme(opt.id);
+                          applyAppIconTheme(opt.id);
+                          onToast(`Ícone alterado para: ${opt.title}!`);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setIconTheme(opt.id);
+                            applyAppIconTheme(opt.id);
+                            onToast(`Ícone alterado para: ${opt.title}!`);
+                          }
+                        }}
+                        className={`p-3 rounded-2xl border-2 transition-all cursor-pointer flex flex-col justify-between text-left group active:scale-[0.98] ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 shadow-md ring-2 ring-blue-500/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-white hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-3 mb-2.5">
+                          {/* Miniatura do ícone com proporções fiéis */}
+                          <div className={`w-12 h-12 rounded-2xl shadow-md p-1 border overflow-hidden shrink-0 flex items-center justify-center transition-transform group-hover:scale-105 ${
+                            opt.id === 'white'
+                              ? 'bg-white border-slate-200'
+                              : opt.id === 'red'
+                              ? 'bg-rose-600 border-rose-500'
+                              : 'bg-slate-900 border-slate-700'
+                          }`}>
+                            <img
+                              src={opt.iconSrc}
+                              alt={opt.title}
+                              className="w-full h-full object-contain"
+                            />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-[9px] font-black uppercase text-blue-600 block tracking-wider">
+                              {opt.badge}
+                            </span>
+                            <h4 className="text-xs font-bold text-slate-900 truncate">
+                              {opt.title}
+                            </h4>
+                          </div>
+                        </div>
+
+                        <p className="text-[10.5px] text-slate-500 leading-tight mb-2">
+                          {opt.subtitle}
+                        </p>
+
+                        <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                          <span className={`text-[10px] font-extrabold flex items-center gap-1 ${
+                            isSelected ? 'text-blue-700' : 'text-slate-400 group-hover:text-slate-600'
+                          }`}>
+                            <span className="material-symbols-outlined text-[14px]">
+                              {isSelected ? 'check_circle' : 'radio_button_unchecked'}
+                            </span>
+                            <span>{isSelected ? 'Ícone Ativo' : 'Toque para Aplicar'}</span>
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 

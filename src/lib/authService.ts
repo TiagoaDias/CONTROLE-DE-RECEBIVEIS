@@ -1,15 +1,14 @@
 import { 
   signInWithPopup, 
-  signInWithRedirect, 
   GoogleAuthProvider, 
   signOut, 
 } from 'firebase/auth';
+import { Capacitor } from '@capacitor/core';
 import { 
   auth, 
   processFirebaseUserResult, 
   getUserFromFirestore, 
   saveUserToFirestore, 
-  TIAGO_DIAS_USER,
   setSafeLocalStorage
 } from './firebase';
 import { UserAccount } from '../types';
@@ -20,9 +19,34 @@ googleProvider.setCustomParameters({
 });
 
 /**
- * Autenticação Google oficial via Pop-up com conversão para UserAccount
+ * Autenticação Google oficial
+ * No Android/iOS empacotado nativamente com Capacitor usa o plugin nativo.
+ * No navegador Web (celular ou desktop) utiliza o popup oficial do Firebase com seletor de contas.
  */
 export async function loginWithGoogle(): Promise<UserAccount> {
+  // Se for aplicativo nativo instalado (Capacitor Android APK / iOS)
+  if (Capacitor.isNativePlatform()) {
+    try {
+      const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
+      const result = await GoogleSignIn.signIn();
+      if (result && (result.userId || result.email)) {
+        const userAccount = await processFirebaseUserResult({
+          uid: result.userId,
+          email: result.email || '',
+          displayName: result.displayName || '',
+          photoURL: result.imageUrl || ''
+        });
+        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+        localStorage.removeItem('haspaho_explicit_logout');
+        return userAccount;
+      }
+    } catch (err) {
+      console.warn('[AuthService] Tentativa de login nativo Capacitor falhou, tentando Firebase Web Auth:', err);
+      // Cai no fluxo padrão do Firebase abaixo
+    }
+  }
+
+  // Fluxo padrão para navegadores Web (Desktop, Smartphone Chrome, Safari, etc.)
   try {
     const result = await signInWithPopup(auth, googleProvider);
     const userAccount = await processFirebaseUserResult(result.user);
@@ -30,24 +54,23 @@ export async function loginWithGoogle(): Promise<UserAccount> {
     localStorage.removeItem('haspaho_explicit_logout');
     return userAccount;
   } catch (popupError: any) {
-    console.warn('[AuthService] Popup falhou:', popupError);
-    // Em WebView Android Capacitor, se o popup for bloqueado, tenta redirect
-    const isMobile = /Android|iPhone|iPad/i.test(navigator.userAgent);
-    if (!isMobile) {
-      try {
-        await signInWithRedirect(auth, googleProvider);
-        throw new Error('REDIRECT_INITIATED');
-      } catch (redirectError: any) {
-        throw redirectError;
-      }
+    console.error('[AuthService] Erro no popup do Google:', popupError);
+    if (popupError?.code === 'auth/popup-blocked') {
+      throw new Error('O navegador bloqueou a janela de autenticação. Por favor, permita pop-ups para este site e tente novamente.');
+    }
+    if (popupError?.code === 'auth/popup-closed-by-user') {
+      throw new Error('A janela de seleção de conta do Google foi fechada antes de concluir o login.');
+    }
+    if (popupError?.code === 'auth/cancelled-popup-request') {
+      throw new Error('Operação de login cancelada. Tente novamente.');
     }
     throw popupError;
   }
 }
 
 /**
- * Autenticação com qualquer Conta Google adicional (Sem travar em localhost)
- * Permite entrar com a 2ª ou 3ª conta Google do celular de forma instantânea e 100% isolada
+ * Autenticação por conta Google selecionada ou digitada pelo usuário
+ * Conecta com a conta Google de forma individual e cria/carrega o perfil seguro
  */
 export async function loginWithDirectGoogleAccount(
   email: string, 
@@ -55,17 +78,9 @@ export async function loginWithDirectGoogleAccount(
 ): Promise<UserAccount> {
   const cleanEmail = (email || '').trim().toLowerCase();
   if (!cleanEmail || !cleanEmail.includes('@')) {
-    throw new Error('Informe um e-mail do Google válido.');
+    throw new Error('Informe um e-mail do Google válido (ex: seu.email@gmail.com).');
   }
 
-  // Se for o Tiago Dias Master, entra com as credenciais oficiais de Admin
-  if (cleanEmail === 'tiagodias8888@gmail.com') {
-    setSafeLocalStorage('haspaho_auth_user', JSON.stringify(TIAGO_DIAS_USER));
-    localStorage.removeItem('haspaho_explicit_logout');
-    return TIAGO_DIAS_USER;
-  }
-
-  // Para qualquer outra conta Google pessoal ou profissional:
   const generatedUid = `usr_google_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
   
   // Tenta carregar perfil existente do Firestore se já houver
@@ -80,8 +95,8 @@ export async function loginWithDirectGoogleAccount(
     id: generatedUid,
     email: cleanEmail,
     authProvider: 'gmail',
-    isMasterAdmin: false,
-    isFullStackDev: false,
+    isMasterAdmin: cleanEmail === 'tiagodias8888@gmail.com',
+    isFullStackDev: cleanEmail === 'tiagodias8888@gmail.com',
     isFirstLogin: false,
     hasSeenWelcome: existing.hasSeenWelcome ?? true,
   } : {
@@ -94,13 +109,13 @@ export async function loginWithDirectGoogleAccount(
     companyName: 'Gestão Financeira Google',
     city: 'Brasil',
     state: 'BR',
-    role: 'Usuário Gestor',
+    role: cleanEmail === 'tiagodias8888@gmail.com' ? 'Administrador' : 'Usuário Gestor',
     pixKey: cleanEmail,
     createdAt: new Date().toISOString(),
     isFirstLogin: false,
     hasSeenWelcome: true,
-    isMasterAdmin: false,
-    isFullStackDev: false,
+    isMasterAdmin: cleanEmail === 'tiagodias8888@gmail.com',
+    isFullStackDev: cleanEmail === 'tiagodias8888@gmail.com',
     status: 'ativo',
   };
 
@@ -116,9 +131,9 @@ export async function loginWithDirectGoogleAccount(
 export async function logoutUser(): Promise<void> {
   try {
     await signOut(auth);
-    localStorage.removeItem('haspaho_auth_user');
-    localStorage.setItem('haspaho_explicit_logout', 'true');
   } catch (err) {
-    console.error('[AuthService] Erro ao deslogar:', err);
+    console.warn('[AuthService] Erro ao deslogar do Firebase:', err);
   }
+  localStorage.removeItem('haspaho_auth_user');
+  localStorage.setItem('haspaho_explicit_logout', 'true');
 }

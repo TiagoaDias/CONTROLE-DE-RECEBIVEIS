@@ -71,237 +71,324 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         />
       )}
 
-      {/* Menu Flutuante de Ações Rápidas (Speed Dial Popover) */}
+      {/* Menu Flutuante de Ações Rápidas Otimizado (Zero Scroll no Mobile & Grande/Intuitivo na Web) */}
       {isMenuOpen && (
         <div
           role="menu"
           aria-label="Menu de Ações Rápidas"
-          className="fixed bottom-22 left-1/2 -translate-x-1/2 z-[70] w-[310px] sm:w-[350px] max-h-[80vh] overflow-y-auto bg-slate-900/95 backdrop-blur-2xl text-white p-3 rounded-3xl border border-cyan-500/40 shadow-[0_20px_60px_rgba(0,0,0,0.8),0_0_35px_rgba(6,182,212,0.3)] flex flex-col gap-1.5 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200"
+          className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[calc(100vw-20px)] max-w-[380px] sm:max-w-[480px] md:max-w-[520px] max-h-[84vh] overflow-y-auto no-scrollbar bg-slate-950/95 sm:bg-slate-900/95 backdrop-blur-2xl text-white p-2 sm:p-4 rounded-3xl border border-cyan-500/40 shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_35px_rgba(6,182,212,0.3)] flex flex-col gap-1.5 sm:gap-2 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200 select-none"
         >
           {/* Header do Menu */}
-          <div className="flex items-center justify-between px-3 py-1.5 border-b border-white/10 mb-1">
-            <div className="flex items-center gap-1.5">
-              <span className="w-6 h-6 rounded-full bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-xs">
-                <span className="material-symbols-outlined text-[16px]">bolt</span>
+          <div className="flex items-center justify-between px-2 sm:px-3 py-1 border-b border-white/10 shrink-0">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[15px] sm:text-[18px]">bolt</span>
               </span>
-              <span className="text-xs font-black uppercase tracking-wider text-slate-100">
-                Ações Rápidas
-              </span>
+              <div>
+                <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-100 block leading-tight">
+                  Ações Rápidas
+                </span>
+                <span className="text-[9.5px] text-cyan-300/80 font-medium hidden sm:block">
+                  Atalhos essenciais para gestão rápida sem rolagem
+                </span>
+              </div>
             </div>
             <button
               type="button"
-              onClick={() => setIsMenuOpen(false)}
-              className="w-7 h-7 rounded-full hover:bg-white/10 text-slate-400 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              onClick={() => {
+                setIsMenuOpen(false);
+                try { playAppSound('whoosh'); } catch {}
+              }}
+              className="w-7 h-7 sm:w-8 sm:h-8 rounded-full hover:bg-white/10 active:scale-90 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
               aria-label="Fechar menu"
             >
-              <span className="material-symbols-outlined text-[18px]">close</span>
+              <span className="material-symbols-outlined text-[18px] sm:text-[20px]">close</span>
             </button>
           </div>
 
-          {/* 1. Novo Devedor / Comprador */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setIsMenuOpen(false);
-              if (onOpenNewDebtor) onOpenNewDebtor();
-              try { playAppSound('click'); } catch {}
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+          {/* Lista de Ações Rápidas: Um de baixo do outro (Formato Lista Vertical Otimizado) */}
+          <div className="flex flex-col gap-1 sm:gap-2">
+            {/* 1. Novo Comprador */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
                 setIsMenuOpen(false);
                 if (onOpenNewDebtor) onOpenNewDebtor();
                 try { playAppSound('click'); } catch {}
-              }
-            }}
-            className="w-full text-left p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/50 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">person_add</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors flex items-center gap-1.5">
-                <span>Novo Devedor</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 border border-emerald-400/30">
-                  Principal
-                </span>
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  if (onOpenNewDebtor) onOpenNewDebtor();
+                  try { playAppSound('click'); } catch {}
+                }
+              }}
+              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            >
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">person_add</span>
               </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Cadastrar comprador e nova compra integrados
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-200 transition-colors truncate">
+                    Novo Comprador
+                  </span>
+                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 shrink-0">
+                    Principal
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                  Cadastrar comprador e nova compra integrados
+                </div>
               </div>
+              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0">
+                chevron_right
+              </span>
             </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
 
-          {/* 2. Nova Compra Parcelada */}
-          <div
-            role="button"
-            tabIndex={0}
-            onClick={() => {
-              setIsMenuOpen(false);
-              if (onOpenNewPurchase) onOpenNewPurchase();
-              try { playAppSound('click'); } catch {}
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' || e.key === ' ') {
-                e.preventDefault();
+            {/* 2. Nova Compra */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
                 setIsMenuOpen(false);
                 if (onOpenNewPurchase) onOpenNewPurchase();
                 try { playAppSound('click'); } catch {}
-              }
-            }}
-            className="w-full text-left p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-blue-500/50 hover:bg-blue-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-blue-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(37,99,235,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">add_shopping_cart</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-blue-200 transition-colors flex items-center gap-1.5">
-                <span>Nova Compra</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-blue-500/30 text-blue-300 border border-blue-400/30">
-                  Frequente
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Lançar produto, valores e gerar parcelas automáticas
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-blue-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 3. PDF (Central de Documentos: Extrato Total, Recibo Individual e Contrato Digital) */}
-          <div
-            onClick={() => {
-              playAppSound('click');
-              setIsMenuOpen(false);
-              if (onOpenPdfHub) onOpenPdfHub();
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-rose-500/40 hover:bg-rose-500/10 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(225,29,72,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">picture_as_pdf</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors flex items-center gap-1.5">
-                <span>Gerar Comprovantes &amp; PDFs</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 border border-rose-400/40">
-                  Documentos
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Extrato Total, Recibos Individuais e Contrato
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-rose-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 4. Meu Gerenciamento Pessoal (Exclusivo Tiago Dias) */}
-          <div
-            onClick={() => {
-              setIsMenuOpen(false);
-              if (onOpenMeuGerenciamento) onOpenMeuGerenciamento();
-            }}
-            className="w-full p-2.5 rounded-2xl bg-white/5 border border-white/10 hover:border-emerald-500/40 hover:bg-emerald-500/10 flex items-center gap-3 transition-all cursor-pointer group"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">account_balance_wallet</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors flex items-center gap-1.5">
-                <span>Meu Gerenciamento Pessoal</span>
-                <span className="text-[9px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-200 border border-emerald-400/40">
-                  Exclusivo
-                </span>
-              </div>
-              <div className="text-[11px] text-slate-400 truncate">
-                Despesas fixas (CPFL, Água, Netflix), variáveis e diárias
-              </div>
-            </div>
-            <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all">
-              chevron_right
-            </span>
-          </div>
-
-          {/* 5. Verificar Autenticação Digital */}
-          {onOpenAuthLookup && (
-            <button
-              type="button"
-              role="menuitem"
-              onClick={() => {
-                setIsMenuOpen(false);
-                onOpenAuthLookup();
               }}
-              className="group w-full p-2.5 rounded-2xl bg-white/5 hover:bg-purple-600/30 border border-purple-400/30 hover:border-purple-400/60 flex items-center gap-3 transition-all cursor-pointer text-left active:scale-[0.98]"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  if (onOpenNewPurchase) onOpenNewPurchase();
+                  try { playAppSound('click'); } catch {}
+                }
+              }}
+              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-blue-500/10 border border-white/10 hover:border-blue-500/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
             >
-              <div className="w-10 h-10 rounded-xl bg-purple-100 border border-purple-300 text-purple-900 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[20px] text-purple-700 font-bold">verified</span>
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(37,99,235,0.35)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">add_shopping_cart</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="text-xs font-bold text-white group-hover:text-purple-200 transition-colors">
-                  Verificar Autenticação Digital
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-blue-200 transition-colors truncate">
+                    Nova Compra
+                  </span>
+                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-blue-500/30 text-blue-300 shrink-0">
+                    Frequente
+                  </span>
                 </div>
-                <div className="text-[11px] text-slate-400 truncate">
-                  Autenticar código oficial de recibo
+                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                  Lançar produto, valores e gerar parcelas automáticas
                 </div>
               </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] group-hover:text-purple-300 group-hover:translate-x-0.5 transition-all">
+              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-blue-300 group-hover:translate-x-0.5 transition-all shrink-0">
                 chevron_right
               </span>
+            </div>
+
+            {/* 3. Escanear com IA */}
+            {onOpenGeminiScanner && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenGeminiScanner();
+                  try { playAppSound('click'); } catch {}
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsMenuOpen(false);
+                    onOpenGeminiScanner();
+                    try { playAppSound('click'); } catch {}
+                  }
+                }}
+                className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              >
+                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.35)] group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[18px] sm:text-[22px]">document_scanner</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-200 transition-colors truncate">
+                      Escanear com IA
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-cyan-500/30 text-cyan-200 shrink-0">
+                      Gemini IA
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                    Importar contratos, cupons ou prints via IA
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all shrink-0">
+                  chevron_right
+                </span>
+              </div>
+            )}
+
+            {/* 4. Gerar PDFs & Comprovantes */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setIsMenuOpen(false);
+                if (onOpenPdfHub) onOpenPdfHub();
+                try { playAppSound('click'); } catch {}
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  if (onOpenPdfHub) onOpenPdfHub();
+                  try { playAppSound('click'); } catch {}
+                }
+              }}
+              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/40 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            >
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(225,29,72,0.35)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">picture_as_pdf</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-rose-200 transition-colors truncate">
+                    Gerar Comprovantes &amp; PDFs
+                  </span>
+                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 shrink-0">
+                    Documentos
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                  Extrato Total, Recibos Individuais e Contrato
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-rose-300 group-hover:translate-x-0.5 transition-all shrink-0">
+                chevron_right
+              </span>
+            </div>
+
+            {/* 5. Meu Gerenciamento Pessoal */}
+            <div
+              role="button"
+              tabIndex={0}
+              onClick={() => {
+                setIsMenuOpen(false);
+                if (onOpenMeuGerenciamento) onOpenMeuGerenciamento();
+                try { playAppSound('click'); } catch {}
+              }}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setIsMenuOpen(false);
+                  if (onOpenMeuGerenciamento) onOpenMeuGerenciamento();
+                  try { playAppSound('click'); } catch {}
+                }
+              }}
+              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/40 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+            >
+              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">account_balance_wallet</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-200 transition-colors truncate">
+                    Meu Gerenciamento Pessoal
+                  </span>
+                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-200 shrink-0">
+                    Finanças
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                  Controle de despesas fixas, variáveis e receitas
+                </div>
+              </div>
+              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0">
+                chevron_right
+              </span>
+            </div>
+
+            {/* 6. Verificar Autenticação Digital */}
+            {onOpenAuthLookup && (
+              <div
+                role="button"
+                tabIndex={0}
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenAuthLookup();
+                  try { playAppSound('click'); } catch {}
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    setIsMenuOpen(false);
+                    onOpenAuthLookup();
+                    try { playAppSound('click'); } catch {}
+                  }
+                }}
+                className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-400/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              >
+                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-purple-100 border border-purple-300 text-purple-900 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)] group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[18px] sm:text-[22px] text-purple-700 font-bold">verified</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-purple-200 transition-colors truncate">
+                      Verificar Autenticação Digital
+                    </span>
+                    <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-200 shrink-0">
+                      Oficial
+                    </span>
+                  </div>
+                  <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
+                    Consultar e autenticar código oficial de recibo
+                  </div>
+                </div>
+                <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-purple-300 group-hover:translate-x-0.5 transition-all shrink-0">
+                  chevron_right
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* Barra Inferior com Sair da Conta (e Atalho de Painel na Web) */}
+          <div className="flex items-center gap-2 pt-1 border-t border-white/10 shrink-0">
+            {onOpenControlPanel && (
+              <button
+                type="button"
+                onClick={() => {
+                  setIsMenuOpen(false);
+                  onOpenControlPanel();
+                  try { playAppSound('pop'); } catch {}
+                }}
+                className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                title="Abrir Centro de Controle e Configurações"
+              >
+                <span className="material-symbols-outlined text-[16px] text-cyan-400">tune</span>
+                <span className="truncate">Painel &amp; Ajustes</span>
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                setIsMenuOpen(false);
+                if (onLogout) onLogout();
+                try { playAppSound('whoosh'); } catch {}
+              }}
+              className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-200 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              title="Encerrar sessão com segurança"
+            >
+              <span className="material-symbols-outlined text-[16px] text-red-400">logout</span>
+              <span className="truncate">Sair da Conta</span>
             </button>
-          )}
-
-          {/* 6. Trocar Usuário */}
-          <button
-            onClick={() => {
-              setIsMenuOpen(false);
-              onOpenLogin();
-            }}
-            className="w-full p-3 rounded-2xl bg-cyan-950/40 border border-cyan-500/30 hover:border-cyan-500/60 hover:bg-cyan-900/50 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-cyan-600 to-blue-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">switch_account</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-white group-hover:text-cyan-100 transition-colors">
-                Trocar Usuário
-              </div>
-              <div className="text-xs text-cyan-200/60 truncate">
-                Alterar para outra conta cadastrada
-              </div>
-            </div>
-          </button>
-
-          {/* 7. Sair (Logout) */}
-          <button
-            onClick={() => {
-              setIsMenuOpen(false);
-              if (onLogout) onLogout();
-            }}
-            className="w-full p-3 rounded-2xl bg-red-950/40 border border-red-500/30 hover:border-red-500/60 hover:bg-red-900/50 flex items-center gap-3 transition-all cursor-pointer group active:scale-[0.98]"
-          >
-            <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-red-600 to-rose-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(239,68,68,0.4)] group-hover:scale-105 transition-transform">
-              <span className="material-symbols-outlined text-[20px]">logout</span>
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="text-sm font-bold text-red-100 group-hover:text-white transition-colors">
-                Sair Definitivamente
-              </div>
-              <div className="text-xs text-red-200/60 truncate">
-                Encerrar a sessão com segurança
-              </div>
-            </div>
-          </button>
-
-
+          </div>
         </div>
       )}
+
+      {/* Barra de Navegação Fixa Inferior */}
 
       <nav
         aria-label="Navegação Principal do Rodapé"

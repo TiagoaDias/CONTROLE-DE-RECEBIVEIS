@@ -1,0 +1,99 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <!-- Background: Vibrant luxury energetic crimson red -->
+    <linearGradient id="iconBgGradRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#f43f5e"/>
+      <stop offset="45%" stop-color="#e11d48"/>
+      <stop offset="100%" stop-color="#9f1239"/>
+    </linearGradient>
+
+    <linearGradient id="iconBorderGradRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#fda4af"/>
+      <stop offset="50%" stop-color="#fb7185"/>
+      <stop offset="100%" stop-color="#be123c"/>
+    </linearGradient>
+
+    <!-- Warm golden-amber center glow -->
+    <radialGradient id="centerGlowRed" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#fbbf24" stop-opacity="0.28"/>
+      <stop offset="60%" stop-color="#f43f5e" stop-opacity="0.10"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+
+    <filter id="logoShadowRed" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="12" stdDeviation="16" flood-color="#4c0519" flood-opacity="0.55"/>
+      <feDropShadow dx="0" dy="3" stdDeviation="5" flood-color="#000000" flood-opacity="0.35"/>
+    </filter>
+
+    <!-- Pillars with high contrast on red background -->
+    <linearGradient id="blueDarkFacetRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#0f2b4c" />
+      <stop offset="100%" stop-color="#09182d" />
+    </linearGradient>
+
+    <linearGradient id="blueLightFacetRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#38bdf8" />
+      <stop offset="50%" stop-color="#0284c7" />
+      <stop offset="100%" stop-color="#0369a1" />
+    </linearGradient>
+
+    <linearGradient id="cyanFacetRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#7dd3fc" />
+      <stop offset="50%" stop-color="#38bdf8" />
+      <stop offset="100%" stop-color="#0284c7" />
+    </linearGradient>
+
+    <!-- Glowing emerald green ribbon gradient with ultra contrast -->
+    <linearGradient id="greenRibbonGradRed" x1="10%" y1="90%" x2="90%" y2="10%">
+      <stop offset="0%" stop-color="#047857" />
+      <stop offset="35%" stop-color="#10b981" />
+      <stop offset="70%" stop-color="#34d399" />
+      <stop offset="100%" stop-color="#6ee7b7" />
+    </linearGradient>
+
+    <linearGradient id="greenHighlightGradRed" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="40%" stop-color="#a7f3d0" />
+      <stop offset="100%" stop-color="#10b981" />
+    </linearGradient>
+  </defs>
+
+  <!-- Energetic Red Squircle base -->
+  <rect x="12" y="12" width="488" height="488" rx="116" fill="url(#iconBgGradRed)" stroke="url(#iconBorderGradRed)" stroke-width="6"/>
+  <rect x="24" y="24" width="464" height="464" rx="104" fill="url(#centerGlowRed)"/>
+
+  <!-- Centered, EXTRA LARGE Official HASPAHO 3D Symbol with bold presence -->
+  <g transform="translate(68, 44) scale(3.14)" filter="url(#logoShadowRed)">
+    <path d="M22,25 L44,8 L52,15 L98,25 L98,88 L76,105 L68,112 L44,105 L22,88 Z" fill="#4c0519" opacity="0.45" transform="translate(0, 6)"/>
+
+    <polygon points="22,25 44,8 44,105 22,88" fill="url(#blueDarkFacetRed)"/>
+    <polygon points="44,8 52,15 52,112 44,105" fill="url(#blueLightFacetRed)"/>
+
+    <path d="M26,38 L38,48 L38,75 M30,55 L38,62 M28,80 L36,87" stroke="#67e8f9" stroke-width="2" stroke-linecap="round" stroke-opacity="0.95"/>
+    <circle cx="26" cy="38" r="2.5" fill="#a5f3fc" />
+    <circle cx="30" cy="55" r="2.2" fill="#a5f3fc" />
+    <circle cx="28" cy="80" r="2.2" fill="#a5f3fc" />
+
+    <polygon points="68,15 76,8 76,105 68,112" fill="url(#blueLightFacetRed)"/>
+    <polygon points="76,8 98,25 98,88 76,105" fill="url(#cyanFacetRed)"/>
+
+    <path d="M94,40 L82,50 L82,82 M90,62 L82,69 M92,82 L84,89" stroke="#bae6fd" stroke-width="2" stroke-linecap="round" stroke-opacity="0.95"/>
+    <circle cx="94" cy="40" r="2.5" fill="#ffffff" />
+    <circle cx="90" cy="62" r="2.2" fill="#ffffff" />
+    <circle cx="92" cy="82" r="2.2" fill="#ffffff" />
+
+    <polygon points="44,52 76,52 76,70 44,70" fill="#09182d" opacity="0.95"/>
+
+    <path d="M20,95 C36,92 48,76 60,63 C72,50 86,36 102,28 C100,38 90,52 78,65 C64,80 48,97 20,95 Z" fill="#064e3b" opacity="0.55"/>
+    <path d="M22,92 C38,88 50,72 61,59 C72,46 86,32 100,24 C100,33 90,46 79,60 C66,76 50,94 22,92 Z" fill="url(#greenRibbonGradRed)"/>
+    <path d="M26,88 C40,84 52,68 62,56 C74,42 88,29 98,25 C92,30 80,44 70,58 C58,74 44,87 26,88 Z" fill="url(#greenHighlightGradRed)" opacity="0.98"/>
+
+    <g transform="translate(98, 24)">
+      <circle cx="0" cy="0" r="3.2" fill="#ffffff" filter="drop-shadow(0 0 4px #fbbf24)"/>
+      <path d="M-6,0 L6,0 M0,-6 L0,6" stroke="#ffffff" stroke-width="1.4" stroke-linecap="round"/>
+    </g>
+    <g transform="translate(24, 91)">
+      <circle cx="0" cy="0" r="2.5" fill="#ffffff" filter="drop-shadow(0 0 3px #6ee7b7)"/>
+    </g>
+  </g>
+</svg>

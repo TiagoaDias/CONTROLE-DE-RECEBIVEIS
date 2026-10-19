@@ -42,15 +42,7 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
         }
       }
     } catch {}
-    // Default saved accounts list
-    setSavedAccounts([
-      {
-        email: 'tiagodias8888@gmail.com',
-        name: 'Tiago Augusto Dias',
-        initials: 'TD',
-        lastUsed: new Date().toISOString(),
-      },
-    ]);
+    setSavedAccounts([]);
   }, []);
 
   const saveAccountToRecent = (email: string, name?: string) => {
@@ -88,8 +80,8 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
     } catch {}
   };
 
-  // Login direto com qualquer conta Google (sem passar por popup ou redirect localhost)
-  const handleLocalGoogleLogin = async (accountEmail: string, accountName?: string) => {
+  // Login com a conta Google selecionada
+  const handleSelectAccount = async (accountEmail: string, accountName?: string) => {
     setError('');
     setLoading(true);
     try {
@@ -105,8 +97,8 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
     }
   };
 
-  // Pop-up opcional tradicional
-  const handlePopupGoogleLogin = async () => {
+  // Pop-up oficial do Google
+  const handleOfficialGoogleLogin = async () => {
     setError('');
     setLoading(true);
     try {
@@ -115,10 +107,8 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
       onSuccess(user);
       onClose();
     } catch (err: any) {
-      if (err.message !== 'REDIRECT_INITIATED') {
-        console.warn('Popup falhou:', err);
-        setError('Falha ao autenticar com Google. Tente novamente ou use a opção de entrar direto.');
-      }
+      console.warn('Erro ao autenticar:', err);
+      setError(err?.message || 'Falha na autenticação do Google. Tente novamente.');
     } finally {
       setLoading(false);
     }
@@ -136,7 +126,7 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
               <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
               <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
             </svg>
-            <h3 className="font-black text-slate-900 text-base">Contas Google Conectadas</h3>
+            <h3 className="font-black text-slate-900 text-base">Contas Google</h3>
           </div>
           <button
             onClick={onClose}
@@ -150,10 +140,9 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
         <div className="p-6">
           <div className="flex flex-col gap-3">
             <div className="text-left mb-1">
-              <h4 className="font-bold text-slate-900 text-sm">Toque na sua conta para entrar direto:</h4>
-              <p className="text-[11px] text-emerald-700 font-semibold mt-0.5 flex items-center gap-1">
-                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                Login local instantâneo • 100% sem pop-up
+              <h4 className="font-bold text-slate-900 text-sm">Selecione ou adicione sua conta Google:</h4>
+              <p className="text-[11px] text-slate-500 mt-0.5">
+                Cada conta possui seus próprios dados e relatórios isolados.
               </p>
             </div>
 
@@ -163,98 +152,99 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
               </div>
             )}
 
+            {/* Botão Oficial do Google */}
+            <button
+              type="button"
+              onClick={handleOfficialGoogleLogin}
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-2xl border-2 border-blue-500 hover:border-blue-600 bg-white text-slate-900 font-bold text-xs flex items-center justify-center gap-2.5 shadow-sm hover:shadow transition-all cursor-pointer"
+            >
+              <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
+                <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
+                <path fill="#34A853" d="M12 24c3.24 0 5.95-1.08 7.93-2.91l-3.88-3.05c-1.08.72-2.45 1.16-4.05 1.16-3.12 0-5.77-2.1-6.72-4.93H1.25v3.15C3.26 21.36 7.33 24 12 24z"/>
+                <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
+                <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
+              </svg>
+              <span>{loading ? 'Conectando...' : 'Abrir Seletor de Contas do Google'}</span>
+            </button>
+
             {/* List of Saved Accounts with 1-Click Login */}
-            <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
-              {savedAccounts.map((account) => {
-                const isTiago = account.email.toLowerCase() === 'tiagodias8888@gmail.com';
-                return (
+            {savedAccounts.length > 0 && (
+              <div className="space-y-2 max-h-56 overflow-y-auto pr-1 mt-2">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider">Contas recentes neste dispositivo:</div>
+                {savedAccounts.map((account) => (
                   <div
                     key={account.email}
-                    onClick={() => handleLocalGoogleLogin(account.email, account.name)}
-                    className={`w-full p-3.5 rounded-2xl border-2 transition-all cursor-pointer flex items-center justify-between shadow-xs active:scale-98 ${
-                      isTiago
-                        ? 'border-blue-500 bg-blue-50/70 hover:bg-blue-100/90'
-                        : 'border-slate-200 hover:border-blue-400 bg-white hover:bg-slate-50'
-                    }`}
+                    onClick={() => handleSelectAccount(account.email, account.name)}
+                    className="w-full p-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white hover:bg-slate-50 transition-all cursor-pointer flex items-center justify-between shadow-xs active:scale-98"
                   >
                     <div className="flex items-center gap-3 text-left overflow-hidden">
-                      <div
-                        className={`w-10 h-10 rounded-full font-bold flex items-center justify-center shrink-0 shadow-xs text-white ${
-                          isTiago ? 'bg-blue-600' : 'bg-indigo-600'
-                        }`}
-                      >
+                      <div className="w-9 h-9 rounded-full font-bold flex items-center justify-center shrink-0 shadow-xs text-white bg-blue-600 text-xs">
                         {account.initials || 'G'}
                       </div>
                       <div className="overflow-hidden">
-                        <div className="font-extrabold text-slate-900 text-sm truncate flex items-center gap-1.5">
-                          <span>{account.name}</span>
-                          {isTiago && (
-                            <span className="text-[9px] bg-blue-600 text-white font-mono font-bold px-1.5 py-0.5 rounded">
-                              MASTER
-                            </span>
-                          )}
+                        <div className="font-bold text-slate-900 text-xs truncate">
+                          {account.name}
                         </div>
-                        <div className="text-[11px] text-slate-600 truncate">
+                        <div className="text-[11px] text-slate-500 truncate">
                           {account.email}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-center gap-1 shrink-0 ml-2">
-                      {!isTiago && (
-                        <button
-                          type="button"
-                          title="Remover desta lista"
-                          onClick={(e) => removeAccountFromRecent(e, account.email)}
-                          className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-red-50 transition-colors"
-                        >
-                          <span className="material-symbols-outlined text-base">close</span>
-                        </button>
-                      )}
-                      <span className="material-symbols-outlined text-blue-600 text-lg font-bold">
+                      <button
+                        type="button"
+                        title="Remover desta lista"
+                        onClick={(e) => removeAccountFromRecent(e, account.email)}
+                        className="p-1 text-slate-400 hover:text-red-500 rounded-md hover:bg-red-50 transition-colors"
+                      >
+                        <span className="material-symbols-outlined text-base">close</span>
+                      </button>
+                      <span className="material-symbols-outlined text-blue-600 text-base font-bold">
                         arrow_forward
                       </span>
                     </div>
                   </div>
-                );
-              })}
-            </div>
+                ))}
+              </div>
+            )}
 
-            {/* Alternar / Adicionar outra conta Google sem popup */}
+            {/* Alternar / Digitar conta Google */}
             {!showAddOther ? (
               <button
                 type="button"
                 onClick={() => setShowAddOther(true)}
-                className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-600 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer"
+                className="w-full py-2.5 px-3 rounded-xl border border-dashed border-slate-300 hover:border-blue-500 hover:bg-blue-50/50 text-slate-600 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition-colors cursor-pointer mt-1"
               >
                 <span className="material-symbols-outlined text-base">add_circle</span>
-                <span>Usar outra conta Google (@gmail.com)</span>
+                <span>Digitar e-mail Google (@gmail.com)</span>
               </button>
             ) : (
-              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 animate-in fade-in duration-200">
+              <div className="p-3 rounded-2xl bg-slate-50 border border-slate-200 space-y-2.5 animate-in fade-in duration-200 mt-1">
                 <div className="text-xs font-bold text-slate-800">Digitar e-mail do Google:</div>
                 <input
                   type="email"
                   value={otherEmail}
                   onChange={(e) => setOtherEmail(e.target.value)}
-                  placeholder="seu.email@gmail.com"
+                  placeholder="exemplo@gmail.com"
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 outline-hidden font-medium"
                 />
                 <input
                   type="text"
                   value={otherName}
                   onChange={(e) => setOtherName(e.target.value)}
-                  placeholder="Seu nome completo (opcional)"
+                  placeholder="Seu nome (opcional)"
                   className="w-full px-3 py-2 rounded-xl border border-slate-300 bg-white text-xs text-slate-900 outline-hidden font-medium"
                 />
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
                     disabled={!otherEmail.trim() || loading}
-                    onClick={() => handleLocalGoogleLogin(otherEmail, otherName)}
+                    onClick={() => handleSelectAccount(otherEmail, otherName)}
                     className="flex-1 py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors disabled:opacity-50 cursor-pointer"
                   >
-                    Entrar Direto Sem Pop-up
+                    Entrar com esta Conta
                   </button>
                   <button
                     type="button"
@@ -266,18 +256,6 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
                 </div>
               </div>
             )}
-
-            {/* Subtle option for Desktop Chrome Pop-up */}
-            <div className="pt-2 text-center">
-              <button
-                type="button"
-                onClick={handlePopupGoogleLogin}
-                disabled={loading}
-                className="text-[11px] text-slate-400 hover:text-slate-600 underline cursor-pointer"
-              >
-                Tentar pop-up padrão do Google (Navegador Desktop)
-              </button>
-            </div>
           </div>
         </div>
       </div>

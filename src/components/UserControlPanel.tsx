@@ -3,6 +3,12 @@ import { Debtor, UserAccount, ScreenTab } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
 import { SafeDebtorAvatar } from './DebtorsMasterSpreadsheet';
 import { APP_IMAGES } from '../data/mockData';
+import {
+  APP_ICON_OPTIONS,
+  getStoredAppIconTheme,
+  applyAppIconThemeWithFeedback,
+  AppIconTheme,
+} from '../utils/appIconHelper';
 
 export type ControlPanelLayer =
   | 'root'
@@ -11,7 +17,6 @@ export type ControlPanelLayer =
   | 'devedores'
   | 'credor'
   | 'relacionados'
-  | 'confirm_trocar'
   | 'confirm_sair';
 
 interface UserControlPanelProps {
@@ -52,6 +57,8 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
   const [activeLayer, setActiveLayer] = useState<ControlPanelLayer>('root');
   const [debtorSearch, setDebtorSearch] = useState('');
   const [relationFilter, setRelationFilter] = useState<'all' | 'familia' | 'amigos' | 'trabalho' | 'servicos'>('all');
+  const [iconTheme, setIconTheme] = useState<AppIconTheme>(getStoredAppIconTheme());
+  const [iconToast, setIconToast] = useState<string | null>(null);
 
   // Filtered debtors for "Editar Devedores"
   const filteredDebtors = useMemo(() => {
@@ -87,17 +94,18 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
 
   if (!isOpen) return null;
 
-  const userName = currentUser?.name || 'Tiago Dias';
+  const isMaster = currentUser?.email?.toLowerCase() === 'tiagodias8888@gmail.com' && currentUser?.isMasterAdmin === true;
+  const userName = currentUser?.name || (isMaster ? 'Tiago Dias' : 'Usuário Gestor');
   const firstName = userName.split(' ')[0];
-  const userEmail = currentUser?.email || 'tiagodias8888@gmail.com';
+  const userEmail = currentUser?.email || (isMaster ? 'tiagodias8888@gmail.com' : 'usuario@gmail.com');
   const userAvatar = currentUser?.avatar || APP_IMAGES.currentUser;
-  const userRole = currentUser?.role || 'Desenvolvedor Full Stack & Administrador Master';
-  const userPhone = currentUser?.phoneWhatsapp || '(14) 99733-9863';
-  const userPix = currentUser?.pixKey || '(14) 99733-9863';
-  const userDoc = currentUser?.cpfCnpj || '368.497.448-01';
+  const userRole = currentUser?.role || (isMaster ? 'Administrador Master' : 'Gestor Financeiro');
+  const userPhone = currentUser?.phoneWhatsapp || '';
+  const userPix = currentUser?.pixKey || userEmail;
+  const userDoc = currentUser?.cpfCnpj || '';
   const userAddress = currentUser?.address
-    ? `${currentUser.address}, ${currentUser.addressNumber || 'S/N'} • ${currentUser.city || 'Mineiros do Tietê'}-${currentUser.state || 'SP'}`
-    : 'Mineiros do Tietê - SP';
+    ? `${currentUser.address}, ${currentUser.addressNumber || 'S/N'} • ${currentUser.city || ''}-${currentUser.state || ''}`
+    : (currentUser?.city ? `${currentUser.city} - ${currentUser.state || 'BR'}` : 'Brasil');
 
   const handleActionAndClose = (action: () => void) => {
     action();
@@ -182,7 +190,6 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                     {activeLayer === 'devedores' && 'Editar Devedores'}
                     {activeLayer === 'credor' && 'Dados do Credor'}
                     {activeLayer === 'relacionados' && 'Meus Relacionados'}
-                    {activeLayer === 'confirm_trocar' && 'Trocar Usuário'}
                     {activeLayer === 'confirm_sair' && 'Encerrar Sessão'}
                   </h3>
                 </div>
@@ -520,24 +527,15 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                 </div>
               </div>
 
-              {/* 4. Rodapé da Camada 1: Trocar Usuário & Sair */}
-              <div className="pt-2 border-t border-slate-200/80 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveLayer('confirm_trocar')}
-                  className="flex-1 py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
-                >
-                  <span className="material-symbols-outlined text-[17px] text-slate-600">switch_account</span>
-                  <span>Trocar usuário</span>
-                </button>
-
+              {/* 4. Rodapé da Camada 1: Sair da Conta */}
+              <div className="pt-2 border-t border-slate-200/80">
                 <button
                   type="button"
                   onClick={() => setActiveLayer('confirm_sair')}
-                  className="py-2 px-3 rounded-xl bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-red-200/60"
+                  className="w-full py-2.5 px-3 rounded-xl bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-red-200/60"
                 >
                   <span className="material-symbols-outlined text-[17px] text-red-600">logout</span>
-                  <span>Sair</span>
+                  <span>Sair da Conta</span>
                 </button>
               </div>
             </div>
@@ -656,6 +654,81 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                 </div>
               </div>
 
+              {/* Seletor Visual do Ícone do Aplicativo no Celular & Web */}
+              <div className="bg-white rounded-2xl border border-slate-200/90 p-3.5 space-y-2.5 shadow-2xs">
+                <div className="flex items-center gap-2">
+                  <span className="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center shrink-0">
+                    <span className="material-symbols-outlined text-[18px]">app_shortcut</span>
+                  </span>
+                  <div>
+                    <h5 className="font-extrabold text-xs text-slate-900 leading-tight">
+                      Ícone do Aplicativo no Celular &amp; Web
+                    </h5>
+                    <span className="text-[10px] text-slate-500">
+                      Fundo de destaque com ícone 3D grande (divertido e intuitivo):
+                    </span>
+                  </div>
+                </div>
+
+                {iconToast && (
+                  <div className="p-2 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-bold text-center animate-in fade-in zoom-in-95">
+                    {iconToast}
+                  </div>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {APP_ICON_OPTIONS.filter((o) => o.id === 'white' || o.id === 'red').map((opt) => {
+                    const isSelected = iconTheme === opt.id;
+                    return (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => {
+                          setIconTheme(opt.id);
+                          applyAppIconThemeWithFeedback(opt.id, (msg) => {
+                            setIconToast(msg);
+                            setTimeout(() => setIconToast(null), 3000);
+                          });
+                        }}
+                        className={`p-2.5 rounded-2xl border-2 transition-all cursor-pointer flex flex-col items-center text-center gap-1.5 active:scale-95 ${
+                          isSelected
+                            ? 'border-blue-600 bg-blue-50/70 shadow-md ring-2 ring-blue-500/20'
+                            : 'border-slate-200 hover:border-slate-300 bg-slate-50/60'
+                        }`}
+                      >
+                        <div
+                          className={`w-12 h-12 rounded-2xl shadow-md p-1 border overflow-hidden flex items-center justify-center transition-transform ${
+                            opt.id === 'white'
+                              ? 'bg-white border-slate-200 shadow-slate-300/60'
+                              : 'bg-rose-600 border-rose-500 shadow-rose-600/40'
+                          }`}
+                        >
+                          <img
+                            src={opt.iconSrc}
+                            alt={opt.title}
+                            className="w-full h-full object-contain"
+                          />
+                        </div>
+                        <div className="min-w-0">
+                          <span className="text-[11px] font-extrabold text-slate-900 block truncate leading-tight">
+                            {opt.id === 'white' ? 'Fundo Branco' : 'Fundo Vermelho'}
+                          </span>
+                          <span
+                            className={`text-[8.5px] font-black uppercase px-1.5 py-0.2 rounded-full inline-block mt-0.5 ${
+                              opt.id === 'white'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-rose-100 text-rose-700'
+                            }`}
+                          >
+                            {opt.id === 'white' ? 'Destaque PRO' : 'Divertido & Vibrante'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Ações da Conta */}
               <div className="space-y-2 pt-1">
                 {onOpenUserSettings && (
@@ -669,20 +742,11 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                   </button>
                 )}
 
-                <div className="grid grid-cols-2 gap-2 pt-1">
-                  <button
-                    type="button"
-                    onClick={() => setActiveLayer('confirm_trocar')}
-                    className="py-2 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">switch_account</span>
-                    <span>Trocar Conta</span>
-                  </button>
-
+                <div className="pt-1">
                   <button
                     type="button"
                     onClick={() => setActiveLayer('confirm_sair')}
-                    className="py-2 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer border border-red-200/50"
+                    className="w-full py-2 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 font-bold text-xs flex items-center justify-center gap-1 transition-all cursor-pointer border border-red-200/50"
                   >
                     <span className="material-symbols-outlined text-[16px]">logout</span>
                     <span>Encerrar Sessão</span>
@@ -998,45 +1062,7 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
             </div>
           )}
 
-          {/* ---------------------------------------------------------- */}
-          {/* CONFIRMAÇÃO: TROCAR USUÁRIO                                */}
-          {/* ---------------------------------------------------------- */}
-          {activeLayer === 'confirm_trocar' && (
-            <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200/90 text-center space-y-3 animate-in fade-in duration-150">
-              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center mx-auto shadow-2xs">
-                <span className="material-symbols-outlined text-2xl">switch_account</span>
-              </div>
 
-              <div className="space-y-1">
-                <h4 className="font-extrabold text-slate-900 text-sm sm:text-base">
-                  Deseja trocar de usuário?
-                </h4>
-                <p className="text-xs text-slate-600 max-w-xs mx-auto leading-relaxed">
-                  Você poderá entrar com outra conta cadastrada. Todos os dados desta conta permanecem intactos e seguros.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setActiveLayer('root')}
-                  className="py-2.5 px-3 rounded-xl bg-white hover:bg-slate-100 text-slate-700 font-bold text-xs border border-slate-200 transition-all cursor-pointer"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    onClose();
-                    if (onOpenLogin) onOpenLogin();
-                  }}
-                  className="py-2.5 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs transition-all cursor-pointer shadow-xs"
-                >
-                  Trocar usuário
-                </button>
-              </div>
-            </div>
-          )}
 
           {/* ---------------------------------------------------------- */}
           {/* CONFIRMAÇÃO: SAIR DA CONTA                                 */}

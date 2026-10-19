@@ -43,6 +43,7 @@ import {
   processFirebaseUserResult,
 } from './lib/firebase';
 import { logoutUser } from './lib/authService';
+import './utils/appIconHelper';
 import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
 
 import { Header } from './components/Header';
@@ -84,7 +85,26 @@ import { FuturisticCosmicBackground } from './components/FuturisticCosmicBackgro
 import { CredorScoreModal } from './components/CredorScoreModal';
 import { GeminiParsedContract } from './types';
 
-const DEFAULT_USER: UserAccount = TIAGO_DIAS_USER;
+const GUEST_EMPTY_USER: UserAccount = {
+  id: '',
+  name: 'Convidado',
+  username: 'convidado',
+  email: '',
+  phoneWhatsapp: '',
+  authProvider: 'local',
+  companyName: 'HASPAHO Gestão',
+  city: '',
+  state: '',
+  role: 'Usuário',
+  pixKey: '',
+  createdAt: new Date().toISOString(),
+  isFirstLogin: false,
+  hasSeenWelcome: true,
+  isMasterAdmin: false,
+  isFullStackDev: false,
+};
+
+const DEFAULT_USER: UserAccount = GUEST_EMPTY_USER;
 
 // =========================================================================
 // ISOLAMENTO PERMANENTE DE DADOS DEMONSTRATIVOS E LIXEIRA (REGRA ATUALIZAÇÃO 89)
@@ -189,6 +209,14 @@ export default function App() {
       if (saved) {
         const parsed = JSON.parse(saved);
         if (parsed && (parsed.id || parsed.email)) {
+          if (parsed.authProvider !== 'gmail') {
+             // Forçar re-login para usuários não-Google (remover acesso master direto)
+             return null;
+          }
+          if (parsed.isMasterAdmin && parsed.email?.toLowerCase() !== 'tiagodias8888@gmail.com') {
+             parsed.isMasterAdmin = false;
+             parsed.isFullStackDev = false;
+          }
           return parsed;
         }
       }
@@ -222,7 +250,8 @@ export default function App() {
   const [debtors, setDebtors] = useState<Debtor[]>(() => {
     try {
       const activeUser = currentUser || DEFAULT_USER;
-      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      if (!activeUser.id) return [];
+      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
       const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
       const deletedIds = new Set<string>();
       if (deletedSaved) {
@@ -266,7 +295,8 @@ export default function App() {
   const [purchases, setPurchases] = useState<Purchase[]>(() => {
     try {
       const activeUser = currentUser || DEFAULT_USER;
-      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      if (!activeUser.id) return [];
+      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
       const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
       const deletedIds = new Set<string>();
       if (deletedSaved) {
@@ -301,7 +331,8 @@ export default function App() {
   const [installments, setInstallments] = useState<Installment[]>(() => {
     try {
       const activeUser = currentUser || DEFAULT_USER;
-      const isMaster = activeUser.id === 'usr_thiago_dias' || activeUser.email === 'tiagodias8888@gmail.com';
+      if (!activeUser.id) return [];
+      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
       const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
       const deletedIds = new Set<string>();
       if (deletedSaved) {

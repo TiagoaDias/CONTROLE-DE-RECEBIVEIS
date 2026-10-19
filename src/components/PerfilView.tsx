@@ -174,15 +174,7 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
             <span>Boas-Vindas</span>
           </button>
 
-          <button
-            type="button"
-            onClick={onOpenLogin}
-            className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold flex items-center gap-1.5 transition-colors cursor-pointer"
-            title="Trocar usuário ou cadastrar nova conta"
-          >
-            <span className="material-symbols-outlined text-[16px]">switch_account</span>
-            <span>Trocar Conta</span>
-          </button>
+
 
           {onClearAllData && (
             <button

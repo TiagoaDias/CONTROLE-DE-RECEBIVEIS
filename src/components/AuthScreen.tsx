@@ -2,10 +2,6 @@ import React, { useState } from 'react';
 import { UserAccount } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
 import { SocialAuthDialog } from './SocialAuthDialog';
-import {
-  loginWithRealCredentials,
-  TIAGO_DIAS_USER,
-} from '../lib/firebase';
 import { loginWithGoogle } from '../lib/authService';
 
 interface AuthScreenProps {
@@ -37,27 +33,17 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       if (onClose) onClose();
     } catch (err: any) {
       console.error('Falha no login Google:', err);
-      if (err.message !== 'REDIRECT_INITIATED') {
-        setErrorMessage('Falha ao autenticar com Google. Tente novamente.');
+      const msg = err?.message || '';
+      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada')) {
+        setErrorMessage('Seleção de conta cancelada.');
+      } else {
+        setErrorMessage(msg || 'Falha ao autenticar com Google. Tente novamente.');
       }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleMasterDirect = async () => {
-    setIsLoading(true);
-    try {
-      const user = await loginWithRealCredentials('tiagodias8888@gmail.com', 'haspaho2026').catch(() => TIAGO_DIAS_USER);
-      onLoginSuccess(user, false);
-      if (onClose) onClose();
-    } catch {
-      onLoginSuccess(TIAGO_DIAS_USER, false);
-      if (onClose) onClose();
-    } finally {
-      setIsLoading(false);
-    }
-  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
@@ -105,7 +91,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               type="button"
               onClick={handleGoogleDirect}
               disabled={isLoading}
-              className="w-full py-3.5 px-4 rounded-xl border-2 border-blue-500 hover:border-blue-600 bg-white text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer"
+              className="w-full py-3.5 px-4 rounded-xl border-2 border-blue-500 hover:border-blue-600 bg-white hover:bg-blue-50/50 text-slate-900 font-bold text-xs sm:text-sm flex items-center justify-center gap-3 shadow-xs transition-colors cursor-pointer"
             >
               <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
                 <path fill="#4285F4" d="M23.745 12.27c0-.7-.06-1.4-.19-2.07H12v4.51h6.6c-.29 1.52-1.14 2.8-2.4 3.66v3.05h3.88c2.27-2.09 3.66-5.17 3.66-9.15z"/>
@@ -114,35 +100,22 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
               </svg>
               <div className="text-left">
-                <div className="font-extrabold text-xs">ENTRAR COM GOOGLE</div>
+                <div className="font-extrabold text-xs">{isLoading ? 'Conectando...' : 'ENTRAR COM GOOGLE'}</div>
               </div>
             </button>
 
-            {/* Alternar conta */}
+            
+            {/* Logout */}
             <button
               type="button"
-              onClick={() => setSocialModalOpen(true)}
-              disabled={isLoading}
-              className="w-full py-2 px-3 rounded-xl border border-slate-200 hover:border-blue-400 bg-white text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+              onClick={async () => {
+                await import('../lib/authService').then(m => m.logoutUser());
+                window.location.reload();
+              }}
+              className="w-full py-2 px-3 rounded-xl text-slate-500 hover:text-red-600 hover:bg-red-50 text-[10px] font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer mt-4"
             >
-              <span className="material-symbols-outlined text-blue-600 text-sm">manage_accounts</span>
-              <span>Escolher Outra Conta Google</span>
-            </button>
-
-            {/* Acesso Master */}
-            <button
-              type="button"
-              onClick={handleMasterDirect}
-              disabled={isLoading}
-              className="w-full py-2.5 px-3 rounded-xl bg-gradient-to-r from-amber-50 to-blue-50 border border-blue-200 hover:border-blue-400 text-slate-800 text-xs font-bold flex items-center justify-between transition-all cursor-pointer shadow-2xs"
-            >
-              <div className="flex items-center gap-1.5">
-                <span className="material-symbols-outlined text-amber-600 text-[16px]">crown</span>
-                <span>Acesso Master (Tiago Augusto Dias)</span>
-              </div>
-              <span className="text-[9px] bg-blue-600 text-white font-mono font-black px-1.5 py-0.5 rounded">
-                ADMIN
-              </span>
+              <span className="material-symbols-outlined text-[14px]">logout</span>
+              <span>Sair da conta atual</span>
             </button>
           </div>
         </div>
