@@ -1,5 +1,6 @@
 import { 
   signInWithPopup, 
+  signInWithCredential,
   GoogleAuthProvider, 
   signOut, 
 } from 'firebase/auth';
@@ -60,6 +61,23 @@ export async function loginWithGoogle(): Promise<UserAccount> {
         result?.photoUrl ||
         '';
 
+      const idToken = result?.idToken || result?.user?.idToken || result?.authentication?.idToken;
+
+      // 1. Tenta autenticar no Firebase Auth via Credential nativo se idToken estiver presente
+      if (idToken) {
+        try {
+          const credential = GoogleAuthProvider.credential(idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          const userAccount = await processFirebaseUserResult(userCredential.user);
+          setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+          localStorage.removeItem('haspaho_explicit_logout');
+          return userAccount;
+        } catch (credErr) {
+          console.warn('[AuthService] AVISO ao autenticar credential Firebase com idToken:', credErr);
+        }
+      }
+
+      // 2. Login direto com o perfil de usuário retornado pelo Google Play Services nativo
       if (userEmail || userId) {
         const userAccount = await processFirebaseUserResult({
           uid: userId || `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
@@ -71,9 +89,28 @@ export async function loginWithGoogle(): Promise<UserAccount> {
         localStorage.removeItem('haspaho_explicit_logout');
         return userAccount;
       }
-    } catch (err) {
-      console.warn('[AuthService] Tentativa de login nativo Capacitor falhou, tentando Firebase Web Auth:', err);
-      // Cai no fluxo padrão do Firebase abaixo
+
+      throw new Error('Nenhuma conta foi selecionada no seletor nativo.');
+    } catch (err: any) {
+      console.warn('[AuthService] AVISO / Erro no plugin nativo Google:', err);
+      const errMsg = err?.message || String(err || '');
+      const errCode = String(err?.code || '');
+
+      if (
+        errCode === '12501' ||
+        errCode === '10' ||
+        errMsg.includes('cancel') ||
+        errMsg.includes('closed') ||
+        errMsg.includes('12501')
+      ) {
+        console.info('[AuthService] Seleção de conta Google cancelada pelo usuário.');
+        throw new Error('A seleção de conta do Google foi cancelada.');
+      }
+
+      // CRÍTICO: No aplicativo nativo, NUNCA abre a página web externa de digitar e-mail (isentropic-tangent-sdtd0.firebaseapp.com)
+      throw new Error(
+        'Falha ao conectar com a conta Google nativa selecionada. Por favor, tente novamente.'
+      );
     }
   }
 

@@ -33,13 +33,17 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       onLoginSuccess(user, false);
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada') || err?.code === 'auth/popup-closed-by-user') {
+      if (
+        msg.includes('fechada') ||
+        msg.includes('cancelada') ||
+        msg.includes('cancel') ||
+        err?.code === 'auth/popup-closed-by-user'
+      ) {
         console.info('Login Google cancelado pelo usuário.');
         setErrorMessage('Seleção de conta cancelada.');
       } else {
         console.error('Falha no login Google:', err);
-        setErrorMessage(msg || 'Não foi possível autenticar pelo navegador. Selecione ou digite sua conta Google abaixo:');
-        setSocialModalOpen(true);
+        setErrorMessage(msg || 'Não foi possível autenticar com a conta selecionada. Tente novamente.');
       }
     } finally {
       setIsGoogleLoading(false);
