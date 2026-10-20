@@ -108,12 +108,17 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
       onClose();
     } catch (err: any) {
       const msg = err?.message || '';
-      if (msg.includes('fechada antes de concluir') || msg.includes('cancelada') || err?.code === 'auth/popup-closed-by-user') {
+      if (
+        msg === 'A seleção de conta do Google foi cancelada.' ||
+        msg.includes('fechada antes de concluir') ||
+        err?.code === 'auth/popup-closed-by-user'
+      ) {
         console.info('Login Google cancelado pelo usuário.');
         setError('Seleção de conta cancelada.');
       } else {
         console.warn('Erro ao autenticar:', err);
-        setError(msg || 'Falha na autenticação do Google. Tente novamente.');
+        setError(msg || 'Falha na autenticação do Google. Digite ou selecione seu e-mail abaixo.');
+        setShowAddOther(true);
       }
     } finally {
       setLoading(false);

@@ -34,9 +34,8 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
     } catch (err: any) {
       const msg = err?.message || '';
       if (
-        msg.includes('fechada') ||
-        msg.includes('cancelada') ||
-        msg.includes('cancel') ||
+        msg === 'A seleção de conta do Google foi cancelada.' ||
+        msg.includes('fechada pelo usuário') ||
         err?.code === 'auth/popup-closed-by-user'
       ) {
         console.info('Login Google cancelado pelo usuário.');

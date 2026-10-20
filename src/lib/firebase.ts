@@ -164,17 +164,22 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
     } catch (err: any) {
       console.warn('[Firebase:GoogleSignIn] Erro na autenticação nativa:', err);
       const msg = err?.message || String(err || '');
-      const code = String(err?.code || err?.message || '');
+      const code = String(err?.code || err?.statusCode || '');
 
+      // Código 12501 ou SIGN_IN_CANCELED = Cancelamento explícito pelo usuário ao fechar a janela
       if (
         code === 'SIGN_IN_CANCELED' ||
         code === '12501' ||
-        code === '10' ||
-        msg.includes('cancel') ||
-        msg.includes('closed') ||
-        msg.includes('12501')
+        msg.includes('12501') ||
+        msg.includes('popup-closed-by-user') ||
+        msg.includes('fechada pelo usuário')
       ) {
         throw new Error('A seleção de conta do Google foi cancelada.');
+      }
+
+      // Código 10 = DEVELOPER_ERROR no Android (discrepância de SHA-1/Keystore ou Play Services)
+      if (code === '10' || msg.includes('DEVELOPER_ERROR') || msg.includes('10:')) {
+        throw new Error('O seletor do dispositivo exige validação. Por favor, selecione ou digite seu e-mail do Google abaixo para continuar.');
       }
 
       if (code === 'NO_CREDENTIAL_AVAILABLE' || msg.includes('NO_CREDENTIAL_AVAILABLE')) {
@@ -186,7 +191,7 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
       }
 
       throw new Error(
-        'Falha ao conectar com a conta Google nativa selecionada. Use a opção de selecionar/digitar o e-mail abaixo.'
+        'Não foi possível concluir o login automático com a conta selecionada. Selecione ou digite seu e-mail abaixo.'
       );
     }
   }
