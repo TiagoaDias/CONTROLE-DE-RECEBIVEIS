@@ -928,7 +928,9 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
       isFirstLogin: false,
       welcomeCompletedAt: remote?.welcomeCompletedAt || '2026-01-10T10:00:00.000Z',
     };
-    await saveUserToFirestore(user);
+    await saveUserToFirestore(user).catch((e) =>
+      console.warn('[Firebase] Aviso ao salvar perfil no Firestore:', e)
+    );
     return user;
   }
 
@@ -960,7 +962,9 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
     hasSeenWelcome: false,
   };
 
-  await saveUserToFirestore(newUser);
+  await saveUserToFirestore(newUser).catch((e) =>
+    console.warn('[Firebase] Aviso ao salvar novo usuário no Firestore:', e)
+  );
   return newUser;
 }
 

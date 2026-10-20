@@ -43,7 +43,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
         setErrorMessage('Seleção de conta cancelada.');
       } else {
         console.error('Falha no login Google:', err);
-        setErrorMessage(msg || 'Não foi possível autenticar com a conta selecionada. Tente novamente.');
+        setErrorMessage(msg || 'Não foi possível autenticar com a conta selecionada.');
+        // Abre automaticamente a janela de seleção e digitação direta de e-mail Google para evitar bloqueio
+        setSocialModalOpen(true);
       }
     } finally {
       setIsGoogleLoading(false);
@@ -142,18 +144,28 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
               <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">Acesse com sua conta Google</h3>
               <p className="text-xs text-slate-500 mt-1">
-                Segurança avançada com seleção obrigatória de conta e sincronização em nuvem.
+                Segurança avançada com seleção de conta e sincronização em nuvem.
               </p>
             </div>
 
             {errorMessage && (
-              <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2 animate-in fade-in duration-200">
-                <span className="material-symbols-outlined text-[18px] shrink-0 text-red-600">error</span>
-                <span className="leading-snug">{errorMessage}</span>
+              <div className="mb-4 p-3.5 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2.5 animate-in fade-in duration-200">
+                <div className="flex items-start gap-2">
+                  <span className="material-symbols-outlined text-[18px] shrink-0 text-red-600">error</span>
+                  <span className="leading-snug">{errorMessage}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSocialModalOpen(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer shadow-xs active:scale-98"
+                >
+                  <span className="material-symbols-outlined text-base">account_circle</span>
+                  <span>SELECIONAR OU DIGITAR E-MAIL GOOGLE</span>
+                </button>
               </div>
             )}
 
-            <div className="space-y-3 py-3 relative z-10 pointer-events-auto">
+            <div className="space-y-3 py-2 relative z-10 pointer-events-auto">
               {/* Botão Oficial Google Único e Direto */}
               <button
                 type="button"
@@ -168,6 +180,16 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                   <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                 </svg>
                 <span>{isGoogleLoading ? 'Conectando ao Google...' : 'ENTRAR COM CONTA GOOGLE'}</span>
+              </button>
+
+              {/* Botão Alternativo de Seleção / Digitação Direta */}
+              <button
+                type="button"
+                onClick={() => setSocialModalOpen(true)}
+                className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-2 transition-all cursor-pointer border border-slate-200"
+              >
+                <span className="material-symbols-outlined text-base">manage_accounts</span>
+                <span>Selecionar ou Digitar E-mail Google (@gmail.com)</span>
               </button>
             </div>
           </div>

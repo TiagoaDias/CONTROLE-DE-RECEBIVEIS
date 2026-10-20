@@ -80,9 +80,19 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
           </div>
 
           {errorMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-start gap-2">
-              <span className="material-symbols-outlined text-[16px] shrink-0 text-red-600">error</span>
-              <span>{errorMessage}</span>
+            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2">
+              <div className="flex items-start gap-2">
+                <span className="material-symbols-outlined text-[16px] shrink-0 text-red-600">error</span>
+                <span>{errorMessage}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSocialModalOpen(true)}
+                className="w-full py-2 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-sm">account_circle</span>
+                <span>SELECIONAR OU DIGITAR CONTA GOOGLE</span>
+              </button>
             </div>
           )}
 
@@ -103,6 +113,15 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               <div className="text-left">
                 <div className="font-extrabold text-xs">{isLoading ? 'Conectando...' : 'ENTRAR COM GOOGLE'}</div>
               </div>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setSocialModalOpen(true)}
+              className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+            >
+              <span className="material-symbols-outlined text-base">manage_accounts</span>
+              <span>Alternar ou Digitar E-mail Google</span>
             </button>
 
             
