@@ -164,9 +164,10 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
     } catch (err: any) {
       console.warn('[Firebase:GoogleSignIn] Erro na autenticação nativa:', err);
       const msg = err?.message || String(err || '');
-      const code = String(err?.code || '');
+      const code = String(err?.code || err?.message || '');
 
       if (
+        code === 'SIGN_IN_CANCELED' ||
         code === '12501' ||
         code === '10' ||
         msg.includes('cancel') ||
@@ -176,8 +177,16 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
         throw new Error('A seleção de conta do Google foi cancelada.');
       }
 
+      if (code === 'NO_CREDENTIAL_AVAILABLE' || msg.includes('NO_CREDENTIAL_AVAILABLE')) {
+        throw new Error('Nenhuma conta Google ativa encontrada no dispositivo. Adicione sua conta nas configurações do Android ou selecione/digite seu e-mail abaixo.');
+      }
+
+      if (code === 'PROVIDER_CONFIGURATION_ERROR' || msg.includes('PROVIDER_CONFIGURATION_ERROR')) {
+        throw new Error('Validação de credenciais do provedor Google em processamento. Selecione ou digite seu e-mail do Google abaixo para conectar diretamente.');
+      }
+
       throw new Error(
-        'Falha ao conectar com a conta Google nativa selecionada. Por favor, tente novamente.'
+        'Falha ao conectar com a conta Google nativa selecionada. Use a opção de selecionar/digitar o e-mail abaixo.'
       );
     }
   }
