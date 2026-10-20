@@ -9,6 +9,7 @@ import { CosmicMoonRocket } from './CosmicMoonRocket';
 import { CardMeteor } from './CardMeteor';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { safeToFixed, safeFormatCurrency, safeToNumber } from '../utils/numberUtils';
+import { useProgressiveVirtualList } from './VirtualizedList';
 
 interface DevedoresViewProps {
   debtors: Debtor[];
@@ -118,6 +119,12 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
     });
   }, [debtors, searchQuery, localSearch, statusFilter]);
 
+  // Virtualização de lista progressiva para desempenho mobile a 60fps
+  const { visibleItems: visibleDebtors, sentinel: debtorSentinel } = useProgressiveVirtualList(
+    filteredDebtors,
+    20
+  );
+
   // Selected debtor for primary card
   const selectedPrimaryDebtor = useMemo(() => {
     if (activeDebtorId) {
@@ -184,7 +191,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
 
                 {/* Lista compacta sobreposta de seleção */}
                 <div className="flex flex-col gap-1 max-h-40 overflow-y-auto pr-0.5 custom-scrollbar">
-                  {filteredDebtors.map((d) => {
+                  {visibleDebtors.map((d) => {
                     const isSelected = selectedPrimaryDebtor?.id === d.id;
                     const dHasOverdue = (d.overdueCount || 0) > 0;
                     const dIsPaid = d.totalOwed <= 0;
@@ -928,7 +935,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
         /* MODO GRADE GERAL TRADICIONAL                                 */
         /* ============================================================ */
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {filteredDebtors.map((debtor, index) => {
+          {visibleDebtors.map((debtor, index) => {
             const debtorInstallments = installments.filter((i) => i.debtorId === debtor.id);
             const hasOverdue = (debtor.overdueCount || 0) > 0;
             const isPaidOff = debtor.totalOwed <= 0;
@@ -1119,6 +1126,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
         onOpenNewPurchaseForDebtor={onOpenNewPurchaseForDebtor}
         onOpenExtratoTotal={onOpenExtratoTotal}
       />
+      {debtorSentinel}
 
       {/* Modal de Opções de Edição ao clicar na foto do Devedor */}
       {debtorForEditOption && (

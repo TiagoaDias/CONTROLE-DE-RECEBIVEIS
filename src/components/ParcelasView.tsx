@@ -13,6 +13,7 @@ import { WhatsAppIcon } from './WhatsAppIcon';
 import { safeToNumber, safeToFixed, safeFormatCurrency } from '../utils/numberUtils';
 import { DebtorKpiDetailModal, DebtorKpiType } from './DebtorKpiDetailModal';
 import { playAppSound } from '../utils/soundUtils';
+import { useProgressiveVirtualList } from './VirtualizedList';
 
 // Configuração de Posicionamento Interativo dos Botões
 export interface ActionButtonsLayoutConfig {
@@ -693,6 +694,12 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
       return (a.installmentNumber || 1) - (b.installmentNumber || 1);
     });
   }, [debtorInstallments, searchQuery, localSearch, statusFilter, cardFilter, effectivePurchaseFilter, activeDebtorValidProducts, isCategoryFilter, activeCategoryKey]);
+
+  // Virtualização de lista progressiva para desempenho mobile a 60fps
+  const { visibleItems: visibleInstallments, sentinel: installmentSentinel } = useProgressiveVirtualList(
+    filteredInstallments,
+    25
+  );
 
   // Itens para o Dropdown "Nome do Devedor" (com opção Todos os Devedores e devedores individuais)
   const debtorDropdownItems = useMemo((): DropdownItem<string>[] => {
@@ -1502,8 +1509,8 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 font-sans">
-                {filteredInstallments.map((item, idx) => {
-                  const prevItem = idx > 0 ? filteredInstallments[idx - 1] : null;
+                {visibleInstallments.map((item, idx) => {
+                  const prevItem = idx > 0 ? visibleInstallments[idx - 1] : null;
                   const itemDebtorName = (item.debtorName || '').toLowerCase();
                   const prevDebtorName = (prevItem?.debtorName || '').toLowerCase();
                   const isNewDebtor = !prevItem || prevDebtorName !== itemDebtorName;
@@ -2057,8 +2064,8 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
         ) : (
           <div className="flex flex-col gap-3 w-full px-1.5 sm:px-0">
             <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5">
-            {filteredInstallments.map((item, idx) => {
-              const prevItem = idx > 0 ? filteredInstallments[idx - 1] : null;
+            {visibleInstallments.map((item, idx) => {
+              const prevItem = idx > 0 ? visibleInstallments[idx - 1] : null;
               const itemDebtorName = (item.debtorName || '').toLowerCase();
               const prevDebtorName = (prevItem?.debtorName || '').toLowerCase();
               const isNewDebtor = !prevItem || prevDebtorName !== itemDebtorName;
@@ -2370,6 +2377,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               <span>Abrir Extrato Total (PDF)</span>
             </button>
           </div>
+          {installmentSentinel}
         </div>
         )
       )}

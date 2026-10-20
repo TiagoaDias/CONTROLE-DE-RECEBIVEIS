@@ -231,6 +231,8 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
                 <div className="text-xs font-bold text-slate-800">Digitar e-mail do Google:</div>
                 <input
                   type="email"
+                  name="email"
+                  autoComplete="email username"
                   value={otherEmail}
                   onChange={(e) => setOtherEmail(e.target.value)}
                   placeholder="exemplo@gmail.com"
@@ -238,6 +240,8 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
                 />
                 <input
                   type="text"
+                  name="name"
+                  autoComplete="name"
                   value={otherName}
                   onChange={(e) => setOtherName(e.target.value)}
                   placeholder="Seu nome (opcional)"

@@ -795,6 +795,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                     </label>
                     <input
                       type="password"
+                      name="new-password"
+                      autoComplete="new-password"
                       value={newPassword}
                       onChange={(e) => setNewPassword(e.target.value)}
                       placeholder="Mínimo 4 caracteres"
@@ -807,6 +809,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                     </label>
                     <input
                       type="password"
+                      name="confirm-password"
+                      autoComplete="new-password"
                       value={confirmPassword}
                       onChange={(e) => setConfirmPassword(e.target.value)}
                       placeholder="Repita a nova senha"

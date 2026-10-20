@@ -4,6 +4,7 @@ import {
   getAuth,
   signInWithPopup,
   signInWithRedirect,
+  signInWithCredential,
   getRedirectResult,
   GoogleAuthProvider,
   FacebookAuthProvider,
@@ -68,24 +69,137 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 /**
- * Inicializa e executa o login Google nativo no Android/iOS (via @capawesome/capacitor-google-sign-in)
- * Força o uso da interface e do navegador do sistema para evitar o erro 'disallowed_useragent' em WebViews.
+ * Inicialização oficial do plugin @capawesome/capacitor-google-sign-in no Android/iOS.
+ * Força o uso das APIs do sistema e do navegador nativo do sistema operacional,
+ * evitando bloqueios por políticas de WebView (disallowed_useragent) e garantindo
+ * compatibilidade OAuth oficial do Google.
  */
 export async function initializeGoogleSignInNative(): Promise<void> {
   if (Capacitor.isNativePlatform()) {
     try {
       const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
-      const clientId = activeFirebaseConfig.oAuthClientId || activeFirebaseConfig.apiKey;
+      const clientId = activeFirebaseConfig.oAuthClientId || (firebaseConfig as any).oAuthClientId;
       if (clientId) {
         await GoogleSignIn.initialize({
           clientId,
           scopes: ['profile', 'email'],
         });
-        console.log('[Firebase:GoogleSignIn] Plugin nativo inicializado com sucesso para o ambiente mobile.');
+        console.log('[Firebase:GoogleSignIn] Plugin nativo @capawesome/capacitor-google-sign-in inicializado com clientId:', clientId);
       }
     } catch (e) {
-      console.warn('[Firebase:GoogleSignIn] Nota na inicialização do plugin nativo:', e);
+      console.warn('[Firebase:GoogleSignIn] Aviso ao inicializar plugin nativo:', e);
     }
+  }
+}
+
+/**
+ * Autenticação Google Nativa Oficial com suporte a Google Play Services / Sistema Android
+ */
+export async function signInWithGoogleNative(): Promise<UserAccount> {
+  if (Capacitor.isNativePlatform()) {
+    try {
+      await initializeGoogleSignInNative();
+      const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
+      const result: any = await GoogleSignIn.signIn();
+      console.log('[Firebase:GoogleSignIn] Resultado obtido do Google Sign-In nativo:', result);
+
+      const userEmail = (
+        result?.email ||
+        result?.user?.email ||
+        result?.profile?.email ||
+        ''
+      ).toLowerCase();
+
+      const userId =
+        result?.userId ||
+        result?.user?.id ||
+        result?.id ||
+        result?.uid ||
+        (userEmail ? `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : '');
+
+      const displayName =
+        result?.displayName ||
+        result?.user?.displayName ||
+        result?.user?.givenName ||
+        result?.givenName ||
+        (userEmail ? userEmail.split('@')[0] : '');
+
+      const photoURL =
+        result?.imageUrl ||
+        result?.user?.imageUrl ||
+        result?.photoUrl ||
+        '';
+
+      const idToken =
+        result?.idToken ||
+        result?.user?.idToken ||
+        result?.authentication?.idToken;
+
+      if (idToken) {
+        try {
+          const credential = GoogleAuthProvider.credential(idToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          const userAccount = await processFirebaseUserResult(userCredential.user);
+          setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+          localStorage.removeItem('haspaho_explicit_logout');
+          return userAccount;
+        } catch (credErr) {
+          console.warn('[Firebase:GoogleSignIn] Credencial nativa recebida, autenticando via dados de perfil:', credErr);
+        }
+      }
+
+      if (userEmail || userId) {
+        const userAccount = await processFirebaseUserResult({
+          uid: userId || `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
+          email: userEmail,
+          displayName,
+          photoURL,
+        });
+        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+        localStorage.removeItem('haspaho_explicit_logout');
+        return userAccount;
+      }
+
+      throw new Error('Nenhuma conta foi selecionada no seletor do dispositivo.');
+    } catch (err: any) {
+      console.warn('[Firebase:GoogleSignIn] Erro na autenticação nativa:', err);
+      const msg = err?.message || String(err || '');
+      const code = String(err?.code || '');
+
+      if (
+        code === '12501' ||
+        code === '10' ||
+        msg.includes('cancel') ||
+        msg.includes('closed') ||
+        msg.includes('12501')
+      ) {
+        throw new Error('A seleção de conta do Google foi cancelada.');
+      }
+
+      throw new Error(
+        'Falha ao conectar com a conta Google nativa selecionada. Por favor, tente novamente.'
+      );
+    }
+  }
+
+  // Web Browser Fallback: usa popup no desktop ou signInWithRedirect quando bloqueado
+  try {
+    const result = await signInWithPopup(auth, googleProvider);
+    const userAccount = await processFirebaseUserResult(result.user);
+    setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+    localStorage.removeItem('haspaho_explicit_logout');
+    return userAccount;
+  } catch (err: any) {
+    if (
+      err?.code === 'auth/popup-blocked' ||
+      err?.code === 'auth/popup-closed-by-user' ||
+      err?.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
+      console.info('[Firebase:GoogleSignIn] Popup bloqueado ou não suportado, redirecionando com signInWithRedirect...');
+      await signInWithRedirect(auth, googleProvider);
+      throw new Error('Redirecionando para autenticação com o Google...');
+    }
+    throw err;
   }
 }
 
