@@ -32,19 +32,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       const user = await loginWithGoogle();
       onLoginSuccess(user, false);
     } catch (err: any) {
-      const msg = err?.message || '';
-      if (
-        msg === 'A seleção de conta do Google foi cancelada.' ||
-        msg.includes('fechada pelo usuário') ||
-        err?.code === 'auth/popup-closed-by-user'
-      ) {
-        console.info('Login Google cancelado pelo usuário.');
-        setErrorMessage('Seleção de conta cancelada.');
-      } else {
-        console.error('Falha na verificação de autenticidade Google/Firebase:', err);
-        setErrorMessage(msg || 'Não foi possível autenticar com a conta selecionada. Tente novamente.');
-        setSocialModalOpen(true);
-      }
+      console.info('Solicitando confirmação/seleção de conta do Google ao usuário...', err);
+      setErrorMessage('Selecione ou confirme sua conta do Google abaixo para conectar:');
+      setSocialModalOpen(true);
     } finally {
       setIsGoogleLoading(false);
     }

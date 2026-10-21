@@ -160,39 +160,19 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
         return userAccount;
       }
 
-      throw new Error('Nenhuma conta foi selecionada no seletor do dispositivo.');
+      throw new Error('Nenhuma conta obtida no seletor do dispositivo.');
     } catch (err: any) {
-      console.warn('[Firebase:GoogleSignIn] Erro na autenticação nativa:', err);
-      const msg = err?.message || String(err || '');
-      const code = String(err?.code || err?.statusCode || '');
-
-      // Código 12501 ou SIGN_IN_CANCELED = Cancelamento explícito pelo usuário ao fechar a janela
-      if (
-        code === 'SIGN_IN_CANCELED' ||
-        code === '12501' ||
-        msg.includes('12501') ||
-        msg.includes('popup-closed-by-user') ||
-        msg.includes('fechada pelo usuário')
-      ) {
-        throw new Error('A seleção de conta do Google foi cancelada.');
+      console.warn('[Firebase:GoogleSignIn] Erro no plugin nativo, tentando fallback com Firebase Auth Popup...', err);
+      try {
+        const popupResult = await signInWithPopup(auth, googleProvider);
+        const userAccount = await processFirebaseUserResult(popupResult.user);
+        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+        localStorage.removeItem('haspaho_explicit_logout');
+        return userAccount;
+      } catch (popupErr) {
+        console.warn('[Firebase:GoogleSignIn] Fallback de popup indisponível ou bloqueado:', popupErr);
       }
-
-      // Código 10 = DEVELOPER_ERROR no Android (discrepância de SHA-1/Keystore ou Play Services)
-      if (code === '10' || msg.includes('DEVELOPER_ERROR') || msg.includes('10:')) {
-        throw new Error('O seletor do dispositivo exige validação. Por favor, selecione ou digite seu e-mail do Google abaixo para continuar.');
-      }
-
-      if (code === 'NO_CREDENTIAL_AVAILABLE' || msg.includes('NO_CREDENTIAL_AVAILABLE')) {
-        throw new Error('Nenhuma conta Google ativa encontrada no dispositivo. Adicione sua conta nas configurações do Android ou selecione/digite seu e-mail abaixo.');
-      }
-
-      if (code === 'PROVIDER_CONFIGURATION_ERROR' || msg.includes('PROVIDER_CONFIGURATION_ERROR')) {
-        throw new Error('Validação de credenciais do provedor Google em processamento. Selecione ou digite seu e-mail do Google abaixo para conectar diretamente.');
-      }
-
-      throw new Error(
-        'Não foi possível concluir o login automático com a conta selecionada. Selecione ou digite seu e-mail abaixo.'
-      );
+      throw new Error('NEEDS_ACCOUNT_PICKER');
     }
   }
 
