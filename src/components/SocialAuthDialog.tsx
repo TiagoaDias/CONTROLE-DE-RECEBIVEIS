@@ -42,7 +42,14 @@ export const SocialAuthDialog: React.FC<SocialAuthDialogProps> = ({
         }
       }
     } catch {}
-    setSavedAccounts([]);
+    setSavedAccounts([
+      {
+        email: 'tiagodias8888@gmail.com',
+        name: 'Tiago Dias (Administrador Mestre)',
+        initials: 'TD',
+        lastUsed: new Date().toISOString(),
+      },
+    ]);
   }, []);
 
   const saveAccountToRecent = (email: string, name?: string) => {

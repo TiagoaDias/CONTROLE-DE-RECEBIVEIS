@@ -5,6 +5,59 @@ import { HaspahoLogo } from './HaspahoLogo';
 import { PushNotificationManager } from './PushNotificationManager';
 import { testConnection } from '../lib/firebase';
 
+interface ThemeToggleProps {
+  isDarkMode?: boolean;
+  onToggleTheme?: () => void;
+  size?: 'sm' | 'md';
+}
+
+export const ThemeToggleCrossFade: React.FC<ThemeToggleProps> = ({
+  isDarkMode,
+  onToggleTheme,
+  size = 'md',
+}) => {
+  if (!onToggleTheme) return null;
+
+  const dimensions = size === 'sm' ? 'w-8 h-8' : 'w-9 h-9 sm:w-10 sm:h-10';
+  const iconSize = size === 'sm' ? 'text-[18px]' : 'text-[20px]';
+
+  return (
+    <button
+      type="button"
+      onClick={onToggleTheme}
+      aria-label={isDarkMode ? 'Alternar para Modo Claro' : 'Alternar para Modo Escuro'}
+      title={isDarkMode ? 'Modo Escuro Ativo — Clique para Modo Claro' : 'Modo Claro Ativo — Clique para Modo Escuro'}
+      className={`relative ${dimensions} rounded-xl flex items-center justify-center transition-all duration-300 cursor-pointer overflow-hidden group shadow-xs active:scale-95 shrink-0 ${
+        isDarkMode
+          ? 'bg-slate-800/90 hover:bg-slate-800 text-amber-300 border border-slate-700/80 hover:border-amber-400/40 hover:shadow-[0_0_15px_rgba(251,191,36,0.2)]'
+          : 'bg-slate-100 hover:bg-slate-200/80 text-amber-600 border border-slate-200 hover:border-amber-400/40 hover:shadow-[0_0_15px_rgba(245,158,11,0.2)]'
+      }`}
+    >
+      {/* Sun Icon for Light Mode */}
+      <span
+        className={`material-symbols-outlined ${iconSize} absolute transition-all duration-500 ease-out transform ${
+          isDarkMode
+            ? 'opacity-0 rotate-90 scale-50 pointer-events-none'
+            : 'opacity-100 rotate-0 scale-100 text-amber-500 font-bold'
+        }`}
+      >
+        light_mode
+      </span>
+
+      {/* Moon Icon for Dark Mode */}
+      <span
+        className={`material-symbols-outlined ${iconSize} absolute transition-all duration-500 ease-out transform ${
+          isDarkMode
+            ? 'opacity-100 rotate-0 scale-100 text-amber-300 font-bold'
+            : 'opacity-0 -rotate-90 scale-50 pointer-events-none'
+        }`}
+      >
+        dark_mode
+      </span>
+    </button>
+  );
+};
+
 interface HeaderProps {
   currentTab: ScreenTab;
   onNavigate: (tab: ScreenTab, targetId?: string, extraId?: string) => void;
@@ -146,6 +199,11 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <ThemeToggleCrossFade
+              isDarkMode={isDarkMode}
+              onToggleTheme={onToggleTheme}
+              size="sm"
+            />
             {/* Avatar do Usuário */}
             <button
               onClick={() => onNavigate('perfil')}
@@ -207,6 +265,12 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
+            <ThemeToggleCrossFade
+              isDarkMode={isDarkMode}
+              onToggleTheme={onToggleTheme}
+              size="md"
+            />
+
             <button
               onClick={() => onNavigate('perfil')}
               aria-label="Perfil do usuário"
@@ -259,6 +323,11 @@ export const Header: React.FC<HeaderProps> = ({
               onSettleInstallment={onSettleInstallment}
               onNudgeWhatsApp={onNudgeWhatsApp}
               isDarkMode={isDarkMode}
+            />
+            <ThemeToggleCrossFade
+              isDarkMode={isDarkMode}
+              onToggleTheme={onToggleTheme}
+              size="sm"
             />
             <button
               onClick={() => onNavigate('perfil')}
