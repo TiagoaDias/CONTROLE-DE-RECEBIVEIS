@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Debtor, Purchase, Installment } from '../types';
-import { downloadIndividualReceiptPdf } from '../utils/receiptPdfHelper';
+import { downloadIndividualReceiptPdf, downloadStatementPdfDirect } from '../utils/receiptPdfHelper';
 import { generateReceiptTxt, generateStatementTxt, downloadTxtFile } from '../utils/receiptTxtHelper';
 import { getCleanDebtorAvatar } from './DebtorsMasterSpreadsheet';
 import { getProductIcon } from '../utils/debtorItemsUtils';
@@ -37,39 +37,73 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
   onToast,
   initialDebtorId,
 }) => {
-  const [selectedDebtorId, setSelectedDebtorId] = useState<string>(() => initialDebtorId || debtors[0]?.id || '');
+  const [selectedDebtorId, setSelectedDebtorId] = useState<string>(() =>
+    initialDebtorId && initialDebtorId !== 'all' ? initialDebtorId : debtors[0]?.id || ''
+  );
 
   React.useEffect(() => {
-    if (initialDebtorId) {
+    if (initialDebtorId && initialDebtorId !== 'all') {
       setSelectedDebtorId(initialDebtorId);
+    } else if ((!selectedDebtorId || selectedDebtorId === 'all') && debtors.length > 0) {
+      setSelectedDebtorId(debtors[0].id);
     }
-  }, [initialDebtorId]);
+  }, [initialDebtorId, debtors, isOpen]);
+
   const [selectedProductId, setSelectedProductId] = useState<string>('all');
   const [activeDocType, setActiveDocType] = useState<'extrato' | 'recibo' | 'contrato' | 'txt'>('extrato');
   const [txtSubDocType, setTxtSubDocType] = useState<'recibo' | 'extrato'>('recibo');
   const [isDebtorPickerOpen, setIsDebtorPickerOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
+  const [isGeneratingPdf, setIsGeneratingPdf] = useState(false);
 
   // Parcela selecionada para emissão de recibo individual
   const [selectedInstallmentId, setSelectedInstallmentId] = useState<string>('');
 
-  const currentDebtor = useMemo(() => {
-    return debtors.find((d) => d.id === selectedDebtorId) || debtors[0] || null;
+  const currentDebtor = useMemo<Debtor>(() => {
+    const found = debtors.find((d) => d.id === selectedDebtorId) || debtors[0];
+    if (found) return found;
+    return {
+      id: 'fallback-debtor',
+      name: 'Cliente HASPAHO',
+      phone: '(14) 99733-9863',
+      relation: 'Cliente',
+      pixKey: '',
+      avatar: '',
+      totalOwed: 100,
+      totalPaid: 0,
+      overdueCount: 0,
+      score: 850,
+      scoreTier: 'excelente',
+      onTimePaymentsCount: 0,
+      justInTimePaymentsCount: 0,
+      latePaymentsCount: 0,
+      spendingAlert: false,
+    };
   }, [debtors, selectedDebtorId]);
 
-  // Parcelas do devedor selecionado
+  // Parcelas do devedor selecionado (por ID ou Nome normalizado)
   const debtorInstallments = useMemo(() => {
     if (!currentDebtor) return [];
+    const normDebtorName = (currentDebtor.name || '').trim().toLowerCase();
     return installments
-      .filter((i) => i.debtorId === currentDebtor.id)
-      .sort((a, b) => a.installmentNumber - b.installmentNumber);
+      .filter(
+        (i) =>
+          i.debtorId === currentDebtor.id ||
+          (normDebtorName.length > 0 && (i.debtorName || '').trim().toLowerCase() === normDebtorName)
+      )
+      .sort((a, b) => (Number(a.installmentNumber) || 0) - (Number(b.installmentNumber) || 0));
   }, [installments, currentDebtor]);
 
   // Lista de produtos/compras do devedor selecionado
   const debtorProductsList = useMemo(() => {
     if (!currentDebtor) return [];
 
-    const rawPurchases = purchases.filter((p) => p.debtorId === currentDebtor.id);
+    const normDebtorName = (currentDebtor.name || '').trim().toLowerCase();
+    const rawPurchases = purchases.filter(
+      (p) =>
+        p.debtorId === currentDebtor.id ||
+        (normDebtorName.length > 0 && (p.debtorName || '').trim().toLowerCase() === normDebtorName)
+    );
     const installmentProducts = Array.from(
       new Set(debtorInstallments.map((i) => i.product).filter(Boolean))
     );
@@ -81,10 +115,10 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
 
     rawPurchases.forEach((p) => {
       const pInsts = debtorInstallments.filter(
-        (i) => i.purchaseId === p.id || i.product.toLowerCase() === p.product.toLowerCase()
+        (i) => i.purchaseId === p.id || (i.product || '').toLowerCase() === (p.product || '').toLowerCase()
       );
       const totalAmount =
-        p.totalAmount || pInsts.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount), 0);
+        p.totalAmount || pInsts.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount || 0), 0);
       const paidCount = p.paidCount ?? pInsts.filter((i) => i.status === 'paid').length;
       productMap.set(p.id, {
         id: p.id,
@@ -100,8 +134,8 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         (v) => v.description.toLowerCase() === prodName.toLowerCase()
       );
       if (!exists) {
-        const pInsts = debtorInstallments.filter((i) => i.product.toLowerCase() === prodName.toLowerCase());
-        const totalAmount = pInsts.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount), 0);
+        const pInsts = debtorInstallments.filter((i) => (i.product || '').toLowerCase() === prodName.toLowerCase());
+        const totalAmount = pInsts.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount || 0), 0);
         const paidCount = pInsts.filter((i) => i.status === 'paid').length;
         productMap.set(prodName, {
           id: pInsts[0]?.purchaseId || prodName,
@@ -114,7 +148,10 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
     });
 
     const list = Array.from(productMap.values());
-    const allAmount = debtorInstallments.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount), 0);
+    const allAmount =
+      debtorInstallments.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount || 0), 0) ||
+      currentDebtor.totalOwed ||
+      0;
     const allPaidCount = debtorInstallments.filter((i) => i.status === 'paid').length;
 
     return [
@@ -122,7 +159,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         id: 'all',
         description: 'Todos os Produtos',
         totalAmount: allAmount,
-        totalInstallments: debtorInstallments.length,
+        totalInstallments: debtorInstallments.length || 1,
         paidCount: allPaidCount,
         isAll: true,
       },
@@ -134,27 +171,84 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
     return debtorProductsList.find((p) => p.id === selectedProductId) || debtorProductsList[0] || null;
   }, [debtorProductsList, selectedProductId]);
 
-  // Parcelas ativas filtradas de acordo com o produto
-  const activeInstallmentsList = useMemo(() => {
-    if (selectedProductId === 'all' || !activeProduct) return debtorInstallments;
-    return debtorInstallments.filter(
-      (i) => i.purchaseId === selectedProductId || i.product.toLowerCase() === activeProduct.description.toLowerCase()
-    );
-  }, [debtorInstallments, selectedProductId, activeProduct]);
+  // Parcelas ativas filtradas de acordo com o produto (com fallback garantido para nunca travar)
+  const activeInstallmentsList = useMemo<Installment[]>(() => {
+    let list = debtorInstallments;
+    if (selectedProductId !== 'all' && activeProduct) {
+      list = debtorInstallments.filter(
+        (i) =>
+          i.purchaseId === selectedProductId ||
+          (i.product || '').toLowerCase() === (activeProduct.description || '').toLowerCase()
+      );
+    }
+    if (list.length > 0) return list;
 
-  // Parcelas quitadas elegíveis para recibo individual
+    // Fallback sintético caso o devedor não tenha parcelas listadas individualmente
+    const fallbackAmount =
+      activeProduct && !activeProduct.isAll && activeProduct.totalAmount > 0
+        ? activeProduct.totalAmount
+        : currentDebtor.totalOwed > 0
+        ? currentDebtor.totalOwed
+        : currentDebtor.totalPaid > 0
+        ? currentDebtor.totalPaid
+        : 100;
+
+    return [
+      {
+        id: `synth-${currentDebtor.id}-1`,
+        purchaseId: selectedProductId !== 'all' ? selectedProductId : `p-${currentDebtor.id}`,
+        debtorId: currentDebtor.id,
+        debtorName: currentDebtor.name,
+        debtorAvatar: currentDebtor.avatar || '',
+        product: activeProduct && !activeProduct.isAll ? activeProduct.description : 'Parcelamento / Acordo HASPAHO',
+        cardName: 'PIX / Asaas',
+        installmentNumber: 1,
+        totalInstallments: activeProduct?.totalInstallments || 1,
+        amount: fallbackAmount,
+        originalAmount: fallbackAmount,
+        dueDate: new Date().toLocaleDateString('pt-BR'),
+        paidAt: currentDebtor.totalPaid > 0 ? new Date().toLocaleDateString('pt-BR') : undefined,
+        status: currentDebtor.totalPaid > 0 ? 'paid' : 'ontime',
+        authCode: `AUT-${currentDebtor.id.slice(-4).toUpperCase()}-01`,
+      },
+    ];
+  }, [debtorInstallments, selectedProductId, activeProduct, currentDebtor]);
+
+  // Parcelas quitadas
   const paidInstallments = useMemo(() => {
     return activeInstallmentsList.filter((i) => i.status === 'paid');
   }, [activeInstallmentsList]);
 
-  // Parcela ativa para emissão do recibo
-  const activePaidInstallment = useMemo(() => {
+  // Lista de parcelas elegíveis para emissão de recibo (prioriza pagas, mas permite qualquer parcela)
+  const receiptInstallmentsList = useMemo(() => {
+    if (paidInstallments.length > 0) {
+      const unpaid = activeInstallmentsList.filter((i) => i.status !== 'paid');
+      return [...paidInstallments, ...unpaid];
+    }
+    return activeInstallmentsList;
+  }, [paidInstallments, activeInstallmentsList]);
+
+  // Parcela ativa selecionada para emissão do recibo (sempre disponível)
+  const activeReceiptInstallment = useMemo(() => {
     if (selectedInstallmentId) {
-      const found = paidInstallments.find((i) => i.id === selectedInstallmentId);
+      const found = receiptInstallmentsList.find((i) => i.id === selectedInstallmentId);
       if (found) return found;
     }
-    return paidInstallments[0] || null;
-  }, [paidInstallments, selectedInstallmentId]);
+    return paidInstallments[0] || receiptInstallmentsList[0] || null;
+  }, [receiptInstallmentsList, paidInstallments, selectedInstallmentId]);
+
+  // Compra correspondente para o Extrato PDF
+  const matchedPurchase = useMemo(() => {
+    if (selectedProductId !== 'all') {
+      const found = purchases.find(
+        (p) =>
+          p.id === selectedProductId ||
+          (activeProduct && (p.product || '').toLowerCase() === (activeProduct.description || '').toLowerCase())
+      );
+      if (found) return found;
+    }
+    return purchases.find((p) => p.debtorId === currentDebtor.id);
+  }, [purchases, selectedProductId, activeProduct, currentDebtor]);
 
   const formatCleanPhone = (phone?: string) => {
     if (!phone) return '';
@@ -168,47 +262,76 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
     return phone.replace(/[()]/g, '').trim();
   };
 
-  if (!isOpen) return null;
+  // Download direto do Extrato Total em PDF
+  const handleDownloadStatementPdf = async () => {
+    if (!currentDebtor || isGeneratingPdf) return;
+    try {
+      setIsGeneratingPdf(true);
+      if (onToast) onToast(`📄 Gerando Extrato Total em PDF de ${currentDebtor.name}...`);
+      await downloadStatementPdfDirect(currentDebtor, activeInstallmentsList, matchedPurchase);
+      if (onToast) onToast(`✅ Extrato Total em PDF baixado com sucesso!`);
+    } catch (err) {
+      console.error('Erro ao baixar Extrato PDF:', err);
+      if (onToast) onToast('Erro ao gerar o PDF do extrato. Tente novamente.');
+    } finally {
+      setIsGeneratingPdf(false);
+    }
+  };
 
-  const handleDownloadReceiptDirect = () => {
-    if (!activePaidInstallment || !currentDebtor) {
-      if (onToast) onToast('Selecione uma parcela quitada para emitir o recibo.');
+  // Download direto do Recibo Individual em PDF
+  const handleDownloadReceiptDirect = async () => {
+    const targetInst = activeReceiptInstallment || activeInstallmentsList[0];
+    if (!targetInst || !currentDebtor) {
+      if (onToast) onToast('Selecione uma parcela para emitir o recibo.');
       return;
     }
 
-    const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
-    const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+    try {
+      setIsGeneratingPdf(true);
+      const finalAmount = targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0;
+      const auth = targetInst.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
 
-    downloadIndividualReceiptPdf({
-      payerName: currentDebtor.name,
-      payerPhone: currentDebtor.phone,
-      creditorName: 'Tiago Dias',
-      creditorCompany: 'HASPAHO Tecnologia da Informação',
-      creditorPix: '(14) 99733-9863',
-      productName: activePaidInstallment.product,
-      installmentNumber: activePaidInstallment.installmentNumber,
-      totalInstallments: activePaidInstallment.totalInstallments,
-      amount: finalAmount,
-      paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
-      paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
-      authCode: auth,
-    }).catch(console.warn);
+      if (onToast) {
+        onToast(
+          `📄 Baixando Recibo em PDF da Parcela #${targetInst.installmentNumber}/${targetInst.totalInstallments}...`
+        );
+      }
 
-    if (onToast) {
-      onToast(
-        `📄 Baixando Recibo Individual da Parcela #${activePaidInstallment.installmentNumber}/${activePaidInstallment.totalInstallments}...`
-      );
+      await downloadIndividualReceiptPdf({
+        payerName: currentDebtor.name,
+        payerPhone: currentDebtor.phone,
+        creditorName: 'Tiago Dias',
+        creditorCompany: 'HASPAHO Tecnologia da Informação',
+        creditorPix: '(14) 99733-9863',
+        productName: targetInst.product,
+        installmentNumber: targetInst.installmentNumber,
+        totalInstallments: targetInst.totalInstallments,
+        amount: finalAmount,
+        paymentDate: targetInst.paidAt || targetInst.dueDate || new Date().toLocaleDateString('pt-BR'),
+        paymentMethod: targetInst.paymentMethod || 'PIX / Asaas',
+        authCode: auth,
+      });
+
+      if (onToast) {
+        onToast(`✅ Recibo em PDF baixado com sucesso!`);
+      }
+    } catch (err) {
+      console.error('Erro ao gerar Recibo PDF:', err);
+      if (onToast) onToast('Erro ao baixar o recibo em PDF.');
+    } finally {
+      setIsGeneratingPdf(false);
     }
   };
 
   // Handler para download do recibo em formato TXT
   const handleDownloadReceiptTxt = () => {
-    if (!activePaidInstallment || !currentDebtor) {
-      if (onToast) onToast('Selecione uma parcela quitada para emitir o recibo em TXT.');
+    const targetInst = activeReceiptInstallment || activeInstallmentsList[0];
+    if (!targetInst || !currentDebtor) {
+      if (onToast) onToast('Selecione uma parcela para emitir o recibo em TXT.');
       return;
     }
-    const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
-    const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+    const finalAmount = targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0;
+    const auth = targetInst.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
     const txtContent = generateReceiptTxt({
       payerName: currentDebtor.name,
       payerPhone: currentDebtor.phone,
@@ -216,17 +339,17 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
       creditorName: 'Tiago Dias',
       creditorCompany: 'HASPAHO Tecnologia da Informação',
       creditorPix: '(14) 99733-9863',
-      productName: activePaidInstallment.product,
-      installmentNumber: activePaidInstallment.installmentNumber,
-      totalInstallments: activePaidInstallment.totalInstallments,
+      productName: targetInst.product,
+      installmentNumber: targetInst.installmentNumber,
+      totalInstallments: targetInst.totalInstallments,
       amount: finalAmount,
-      paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
-      paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+      paymentDate: targetInst.paidAt || targetInst.dueDate || new Date().toLocaleDateString('pt-BR'),
+      paymentMethod: targetInst.paymentMethod || 'PIX / Asaas',
       authCode: auth,
     });
     const safePayer = currentDebtor.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
-    downloadTxtFile(`recibo_${safePayer}_parc_${activePaidInstallment.installmentNumber}.txt`, txtContent);
-    if (onToast) onToast(`📝 Recibo TXT da Parcela #${activePaidInstallment.installmentNumber} baixado com sucesso!`);
+    downloadTxtFile(`recibo_${safePayer}_parc_${targetInst.installmentNumber}.txt`, txtContent);
+    if (onToast) onToast(`📝 Recibo TXT da Parcela #${targetInst.installmentNumber} baixado com sucesso!`);
   };
 
   // Handler para download do extrato em formato TXT
@@ -243,12 +366,13 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
     if (!currentDebtor) return;
     let txt = '';
     if (type === 'recibo') {
-      if (!activePaidInstallment) {
-        if (onToast) onToast('Selecione uma parcela quitada para copiar.');
+      const targetInst = activeReceiptInstallment || activeInstallmentsList[0];
+      if (!targetInst) {
+        if (onToast) onToast('Selecione uma parcela para copiar.');
         return;
       }
-      const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
-      const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+      const finalAmount = targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0;
+      const auth = targetInst.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
       txt = generateReceiptTxt({
         payerName: currentDebtor.name,
         payerPhone: currentDebtor.phone,
@@ -256,12 +380,12 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         creditorName: 'Tiago Dias',
         creditorCompany: 'HASPAHO Tecnologia da Informação',
         creditorPix: '(14) 99733-9863',
-        productName: activePaidInstallment.product,
-        installmentNumber: activePaidInstallment.installmentNumber,
-        totalInstallments: activePaidInstallment.totalInstallments,
+        productName: targetInst.product,
+        installmentNumber: targetInst.installmentNumber,
+        totalInstallments: targetInst.totalInstallments,
         amount: finalAmount,
-        paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
-        paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+        paymentDate: targetInst.paidAt || targetInst.dueDate || new Date().toLocaleDateString('pt-BR'),
+        paymentMethod: targetInst.paymentMethod || 'PIX / Asaas',
         authCode: auth,
       });
     } else {
@@ -277,11 +401,12 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
   const currentTxtPreview = useMemo(() => {
     if (!currentDebtor) return 'Nenhum devedor selecionado.';
     if (txtSubDocType === 'recibo') {
-      if (!activePaidInstallment) {
-        return 'Nenhuma parcela quitada selecionada para exibir o recibo TXT.';
+      const targetInst = activeReceiptInstallment || activeInstallmentsList[0];
+      if (!targetInst) {
+        return 'Nenhuma parcela disponível para exibir o recibo TXT.';
       }
-      const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
-      const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+      const finalAmount = targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0;
+      const auth = targetInst.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
       return generateReceiptTxt({
         payerName: currentDebtor.name,
         payerPhone: currentDebtor.phone,
@@ -289,18 +414,20 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         creditorName: 'Tiago Dias',
         creditorCompany: 'HASPAHO Tecnologia da Informação',
         creditorPix: '(14) 99733-9863',
-        productName: activePaidInstallment.product,
-        installmentNumber: activePaidInstallment.installmentNumber,
-        totalInstallments: activePaidInstallment.totalInstallments,
+        productName: targetInst.product,
+        installmentNumber: targetInst.installmentNumber,
+        totalInstallments: targetInst.totalInstallments,
         amount: finalAmount,
-        paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
-        paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+        paymentDate: targetInst.paidAt || targetInst.dueDate || new Date().toLocaleDateString('pt-BR'),
+        paymentMethod: targetInst.paymentMethod || 'PIX / Asaas',
         authCode: auth,
       });
     } else {
       return generateStatementTxt(currentDebtor, activeInstallmentsList, purchases);
     }
-  }, [currentDebtor, txtSubDocType, activePaidInstallment, activeInstallmentsList, purchases]);
+  }, [currentDebtor, txtSubDocType, activeReceiptInstallment, activeInstallmentsList, purchases]);
+
+  if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950 flex items-center justify-center animate-in fade-in duration-200">
@@ -324,7 +451,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-slate-400 mt-0.5 truncate">
-                Extrato Total, Recibos Individuais e Contrato Digital com validade jurídica
+                Extrato Total, Recibos Individuais, TXT e Contrato Digital com validade jurídica
               </p>
             </div>
           </div>
@@ -406,7 +533,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 </div>
               </button>
 
-              {/* Menu Suspenso Customizado com Avatares (Sem barra de busca) */}
+              {/* Menu Suspenso Customizado com Avatares */}
               {isDebtorPickerOpen && (
                 <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-50 bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 max-h-60 animate-in fade-in zoom-in-95 duration-150">
                   <div className="overflow-y-auto space-y-1 custom-scrollbar max-h-52 pr-1">
@@ -496,7 +623,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                       </div>
                       <span className="text-[11px] text-slate-400 font-mono block truncate mt-0.5">
                         {activeProduct.isAll
-                          ? `${debtorInstallments.length} parcelas consolidadas`
+                          ? `${activeInstallmentsList.length} parcelas consolidadas`
                           : `R$ ${activeProduct.totalAmount.toFixed(2).replace('.', ',')} • ${activeProduct.totalInstallments} parcelas`}
                       </span>
                     </div>
@@ -517,7 +644,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 </div>
               </button>
 
-              {/* Menu Suspenso Customizado de Produtos (Sem barra de busca) */}
+              {/* Menu Suspenso Customizado de Produtos */}
               {isProductPickerOpen && (
                 <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-50 bg-slate-900 border border-cyan-500/40 rounded-2xl shadow-2xl p-2 flex flex-col gap-1 max-h-60 animate-in fade-in zoom-in-95 duration-150">
                   <div className="overflow-y-auto space-y-1 custom-scrollbar max-h-52 pr-1">
@@ -548,7 +675,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                               <span className="font-bold text-xs block text-white truncate">{p.description}</span>
                               <span className="text-[10px] text-slate-400 font-mono">
                                 {p.isAll
-                                  ? `${debtorInstallments.length} parcelas`
+                                  ? `${activeInstallmentsList.length} parcelas`
                                   : `R$ ${p.totalAmount.toFixed(2).replace('.', ',')} (${p.paidCount}/${p.totalInstallments} pagas)`}
                               </span>
                             </div>
@@ -599,7 +726,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
             <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">download_done</span>
             <span className="truncate">Recibo</span>
             <span className="text-[9px] px-1 py-0.1 rounded-full bg-emerald-950 text-emerald-300 border border-emerald-400/30 shrink-0">
-              {paidInstallments.length}
+              {receiptInstallmentsList.length}
             </span>
           </button>
 
@@ -628,7 +755,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
             <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">text_snippet</span>
             <span className="truncate">Formato TxT</span>
             <span className="text-[8.5px] px-1 py-0.1 rounded bg-purple-950 text-purple-300 border border-purple-400/30 font-bold shrink-0 hidden xs:inline">
-              NOVO
+              .TXT
             </span>
           </button>
         </div>
@@ -670,24 +797,22 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                   <span className="font-mono font-black text-emerald-300 text-sm">
                     R${' '}
                     {paidInstallments
-                      .reduce((acc, curr) => acc + (curr.amount || curr.originalAmount), 0)
+                      .reduce((acc, curr) => acc + (curr.paidAmount || curr.amount || curr.originalAmount || 0), 0)
                       .toFixed(2)
                       .replace('.', ',')}
                   </span>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                 <button
                   type="button"
-                  onClick={() => {
-                    onClose();
-                    onOpenExtratoTotal(selectedProductId !== 'all' ? selectedProductId : undefined, currentDebtor?.id);
-                  }}
-                  className="h-11 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
+                  disabled={isGeneratingPdf}
+                  onClick={handleDownloadStatementPdf}
+                  className="h-11 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 transition-all cursor-pointer disabled:opacity-60"
                 >
-                  <span className="material-symbols-outlined text-[18px]">visibility</span>
-                  <span>Baixar Extrato (PDF)</span>
+                  <span className="material-symbols-outlined text-[18px]">download</span>
+                  <span>{isGeneratingPdf ? 'Gerando PDF...' : 'Baixar Extrato (PDF)'}</span>
                 </button>
 
                 <button
@@ -697,6 +822,21 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 >
                   <span className="material-symbols-outlined text-[18px]">text_snippet</span>
                   <span>Baixar Extrato (.TXT)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenExtratoTotal(
+                      matchedPurchase?.id || (selectedProductId !== 'all' ? selectedProductId : undefined),
+                      currentDebtor?.id
+                    );
+                  }}
+                  className="h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                  <span>Visualizar Extrato</span>
                 </button>
               </div>
             </div>
@@ -714,119 +854,120 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                     Recibo de Pagamento Individual
                   </h4>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
-                    Comprovante exclusivo de quitação de uma parcela específica com autenticidade digital (Art. 320 CC).
+                    Comprovante exclusivo de parcela com autenticidade digital e QR Code PIX (Art. 320 CC).
                   </p>
                 </div>
               </div>
 
-              {paidInstallments.length === 0 ? (
-                <div className="p-6 text-center bg-slate-900/60 border border-white/10 rounded-2xl">
-                  <span className="material-symbols-outlined text-3xl text-slate-500 block mb-1">info</span>
-                  <p className="text-xs text-slate-300 font-bold">
-                    Nenhuma parcela quitada para {currentDebtor?.name}
-                    {activeProduct && !activeProduct.isAll ? ` no item "${activeProduct.description}"` : ''}.
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-1">
-                    Recibos individuais só podem ser gerados para parcelas com pagamento confirmado.
-                  </p>
-                </div>
-              ) : (
-                <div className="space-y-3">
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
                   <span className="text-xs font-bold text-slate-300 block">
-                    Selecione a Parcela Paga:
+                    Selecione a Parcela para o Recibo:
                   </span>
+                  <span className="text-[10.5px] text-emerald-400 font-mono">
+                    {paidInstallments.length > 0
+                      ? `${paidInstallments.length} quitada(s) • ${receiptInstallmentsList.length} total`
+                      : `${receiptInstallmentsList.length} parcela(s) disponível(is)`}
+                  </span>
+                </div>
 
-                  {/* Lista de cards visuais para selecionar a parcela */}
-                  <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
-                    {paidInstallments.map((inst) => {
-                      const isSelected = (selectedInstallmentId || activePaidInstallment?.id) === inst.id;
-                      const val = (inst.amount || inst.originalAmount).toFixed(2).replace('.', ',');
-                      return (
-                        <button
-                          key={inst.id}
-                          type="button"
-                          onClick={() => setSelectedInstallmentId(inst.id)}
-                          className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 text-left cursor-pointer ${
-                            isSelected
-                              ? 'bg-emerald-500/20 border-emerald-400/60 shadow-xs ring-1 ring-emerald-400/30'
-                              : 'bg-slate-900/70 hover:bg-slate-800/80 border-white/10 text-slate-300'
-                          }`}
-                        >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <div className="w-8 h-8 rounded-lg bg-emerald-950 text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-500/30">
-                              <span className="material-symbols-outlined text-[16px]">{getProductIcon(inst.product)}</span>
-                            </div>
-                            <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <span className="font-extrabold text-xs text-white truncate">
-                                   {inst.product}
-                                </span>
-                                <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/30 shrink-0">
-                                  Parc. {inst.installmentNumber}/{inst.totalInstallments}
-                                </span>
-                              </div>
-                              <span className="text-[10.5px] text-slate-400 block mt-0.5">
-                                Pago em: {inst.paidAt || inst.dueDate}
+                {/* Lista de cards visuais para selecionar a parcela */}
+                <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1 custom-scrollbar">
+                  {receiptInstallmentsList.map((inst) => {
+                    const isSelected = (selectedInstallmentId || activeReceiptInstallment?.id) === inst.id;
+                    const isPaid = inst.status === 'paid';
+                    const val = (inst.paidAmount || inst.amount || inst.originalAmount || 0).toFixed(2).replace('.', ',');
+                    return (
+                      <button
+                        key={inst.id}
+                        type="button"
+                        onClick={() => setSelectedInstallmentId(inst.id)}
+                        className={`w-full p-2.5 rounded-xl border transition-all flex items-center justify-between gap-3 text-left cursor-pointer ${
+                          isSelected
+                            ? 'bg-emerald-500/20 border-emerald-400/60 shadow-xs ring-1 ring-emerald-400/30'
+                            : 'bg-slate-900/70 hover:bg-slate-800/80 border-white/10 text-slate-300'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-8 h-8 rounded-lg bg-emerald-950 text-emerald-300 flex items-center justify-center shrink-0 border border-emerald-500/30">
+                            <span className="material-symbols-outlined text-[16px]">{getProductIcon(inst.product)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <span className="font-extrabold text-xs text-white truncate">
+                                {inst.product}
+                              </span>
+                              <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/30 shrink-0">
+                                Parc. {inst.installmentNumber}/{inst.totalInstallments}
                               </span>
                             </div>
-                          </div>
-
-                          <div className="text-right shrink-0">
-                            <span className="font-mono font-black text-xs sm:text-sm text-emerald-300 block">
-                              R$ {val}
-                            </span>
-                            <span className="text-[9px] text-emerald-400 font-bold uppercase tracking-wider">
-                              Liquidado
+                            <span className="text-[10.5px] text-slate-400 block mt-0.5">
+                              {isPaid ? `Pago em: ${inst.paidAt || inst.dueDate}` : `Vencimento: ${inst.dueDate}`}
                             </span>
                           </div>
-                        </button>
-                      );
-                    })}
-                  </div>
+                        </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleDownloadReceiptDirect}
-                      className="h-11 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">download</span>
-                      <span>Baixar (PDF)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={handleDownloadReceiptTxt}
-                      className="h-11 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">text_snippet</span>
-                      <span>Baixar (.TXT)</span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!activePaidInstallment || !currentDebtor) return;
-                        const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
-                        const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
-                        onClose();
-                        onShowProof(
-                          currentDebtor.name,
-                          `R$ ${finalAmount.toFixed(2).replace('.', ',')}`,
-                          activePaidInstallment.paidAt || activePaidInstallment.dueDate,
-                          activePaidInstallment.paymentMethod || 'PIX / Asaas',
-                          auth,
-                          `${activePaidInstallment.product} (Parcela ${activePaidInstallment.installmentNumber}/${activePaidInstallment.totalInstallments})`
-                        );
-                      }}
-                      className="h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition-all cursor-pointer"
-                    >
-                      <span className="material-symbols-outlined text-[18px]">visibility</span>
-                      <span>Visualizar</span>
-                    </button>
-                  </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-black text-xs sm:text-sm text-emerald-300 block">
+                            R$ {val}
+                          </span>
+                          <span
+                            className={`text-[9px] font-bold uppercase tracking-wider ${
+                              isPaid ? 'text-emerald-400' : 'text-amber-400'
+                            }`}
+                          >
+                            {isPaid ? 'Liquidado' : 'Em Aberto'}
+                          </span>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
-              )}
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+                  <button
+                    type="button"
+                    disabled={isGeneratingPdf}
+                    onClick={handleDownloadReceiptDirect}
+                    className="h-11 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all cursor-pointer disabled:opacity-60"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">download</span>
+                    <span>{isGeneratingPdf ? 'Gerando...' : 'Baixar Recibo (PDF)'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={handleDownloadReceiptTxt}
+                    className="h-11 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">text_snippet</span>
+                    <span>Baixar Recibo (.TXT)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const targetInst = activeReceiptInstallment || activeInstallmentsList[0];
+                      if (!targetInst || !currentDebtor) return;
+                      const finalAmount = targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0;
+                      const auth = targetInst.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+                      onClose();
+                      onShowProof(
+                        currentDebtor.name,
+                        `R$ ${finalAmount.toFixed(2).replace('.', ',')}`,
+                        targetInst.paidAt || targetInst.dueDate || new Date().toLocaleDateString('pt-BR'),
+                        targetInst.paymentMethod || 'PIX / Asaas',
+                        auth,
+                        `${targetInst.product} (Parcela ${targetInst.installmentNumber}/${targetInst.totalInstallments})`
+                      );
+                    }}
+                    className="h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[18px]">visibility</span>
+                    <span>Visualizar Recibo</span>
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -860,7 +1001,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                   <span className="font-mono font-black text-cyan-300 text-sm">
                     R${' '}
                     {activeInstallmentsList
-                      .reduce((acc, curr) => acc + (curr.originalAmount || curr.amount), 0)
+                      .reduce((acc, curr) => acc + (curr.originalAmount || curr.amount || 0), 0)
                       .toFixed(2)
                       .replace('.', ',')}
                   </span>
@@ -895,7 +1036,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                       Documentos em Formato TxT (Texto Puro .txt)
                     </h4>
                     <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-400/40 font-bold uppercase">
-                      Novo Formato
+                      Formato .TXT
                     </span>
                   </div>
                   <p className="text-xs text-slate-300 mt-1 leading-relaxed">
@@ -933,20 +1074,20 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
               </div>
 
               {/* Seletor de parcela quando em modo recibo TxT */}
-              {txtSubDocType === 'recibo' && paidInstallments.length > 0 && (
+              {txtSubDocType === 'recibo' && receiptInstallmentsList.length > 0 && (
                 <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-900/60 rounded-xl border border-white/10 text-xs">
                   <span className="text-slate-300 font-bold text-[11px] flex items-center gap-1">
                     <span className="material-symbols-outlined text-[14px] text-purple-400">tune</span>
                     <span>Parcela para o Recibo TxT:</span>
                   </span>
                   <select
-                    value={selectedInstallmentId || activePaidInstallment?.id || ''}
+                    value={selectedInstallmentId || activeReceiptInstallment?.id || ''}
                     onChange={(e) => setSelectedInstallmentId(e.target.value)}
                     className="h-8 px-2.5 rounded-lg bg-slate-950 border border-purple-500/40 text-purple-200 text-xs font-mono font-bold focus:outline-none focus:border-purple-400 cursor-pointer shadow-xs max-w-[220px] truncate"
                   >
-                    {paidInstallments.map((inst) => (
+                    {receiptInstallmentsList.map((inst) => (
                       <option key={inst.id} value={inst.id}>
-                        Parc. #{inst.installmentNumber}/{inst.totalInstallments} • R$ {(inst.amount || inst.originalAmount).toFixed(2).replace('.', ',')}
+                        Parc. #{inst.installmentNumber}/{inst.totalInstallments} • R$ {(inst.paidAmount || inst.amount || inst.originalAmount || 0).toFixed(2).replace('.', ',')} {inst.status === 'paid' ? '(Paga)' : ''}
                       </option>
                     ))}
                   </select>

@@ -9,6 +9,7 @@ import { registerAuthCode } from '../utils/authRegistry';
 import { printHtmlContent } from '../utils/printHelper';
 import { capturePanelScreenshot } from '../utils/screenshotHelper';
 import { ShareScreenshotModal } from './ShareScreenshotModal';
+import { triggerUniversalFileDownload } from '../utils/receiptTxtHelper';
 
 interface ExtratoTotalModalProps {
   isOpen: boolean;
@@ -548,7 +549,8 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
 
       // Trigger download
       const filename = `Extrato_Total_${debtorName.replace(/\s+/g, '_')}_${documentId}.pdf`;
-      doc.save(filename);
+      const pdfBlob = doc.output('blob');
+      triggerUniversalFileDownload(pdfBlob, filename);
       if (onToast) onToast('PDF do Extrato Total baixado com sucesso!');
     } catch (err) {
       console.error('Erro ao gerar PDF do extrato:', err);

@@ -7,6 +7,7 @@ import { generateHaspahoLogoPngDataUrl, generateHaspahoFullHeaderPngDataUrl, gen
 import { printHtmlContent } from '../utils/printHelper';
 import { capturePanelScreenshot } from '../utils/screenshotHelper';
 import { ShareScreenshotModal } from './ShareScreenshotModal';
+import { triggerUniversalFileDownload } from '../utils/receiptTxtHelper';
 
 interface DigitalContractModalProps {
   isOpen: boolean;
@@ -492,16 +493,8 @@ export const DigitalContractModal: React.FC<DigitalContractModalProps> = ({
       );
 
       const filename = `instrumento_restituicao_${(signerName || debtor.name).replace(/\s+/g, '_')}_${authHash.slice(0, 8)}.pdf`;
-      
       const pdfBlob = doc.output('blob');
-      const blobUrl = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = blobUrl;
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+      triggerUniversalFileDownload(pdfBlob, filename);
 
       onToast('PDF do instrumento de restituição baixado com sucesso!');
     } catch (err) {

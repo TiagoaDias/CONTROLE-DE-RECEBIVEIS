@@ -6,6 +6,7 @@ import { DigitalContractModal } from './DigitalContractModal';
 import { ProofModal } from './ProofModal';
 import { safeToFixed, safeFormatCurrency } from '../utils/numberUtils';
 import { generateReceiptTxt, generateStatementTxt, downloadTxtFile } from '../utils/receiptTxtHelper';
+import { downloadIndividualReceiptPdf, downloadStatementPdfDirect } from '../utils/receiptPdfHelper';
 
 interface PdfsAndDocumentsModalProps {
   isOpen: boolean;
@@ -36,12 +37,17 @@ export const PdfsAndDocumentsModal: React.FC<PdfsAndDocumentsModalProps> = ({
   // Controle de janelas filhas (Navegação em pilha: Voltar sempre retorna à tela anterior)
   const [activeSubModal, setActiveSubModal] = useState<'none' | 'extrato' | 'contrato' | 'recibo'>('none');
 
-  // Parcelas do devedor atual
+  // Parcelas do devedor atual (por ID ou nome normalizado)
   const debtorInstallments = useMemo(() => {
+    const normName = (debtor.name || '').trim().toLowerCase();
     return installments
-      .filter((i) => i.debtorId === debtor.id)
+      .filter(
+        (i) =>
+          i.debtorId === debtor.id ||
+          (normName.length > 0 && (i.debtorName || '').trim().toLowerCase() === normName)
+      )
       .sort((a, b) => (Number(a.installmentNumber) || 0) - (Number(b.installmentNumber) || 0));
-  }, [installments, debtor.id]);
+  }, [installments, debtor.id, debtor.name]);
 
   const paidInstallments = useMemo(() => {
     return debtorInstallments.filter((i) => i.status === 'paid');
@@ -234,49 +240,110 @@ export const PdfsAndDocumentsModal: React.FC<PdfsAndDocumentsModalProps> = ({
                   </div>
                 </div>
 
-                <button
-                  type="button"
-                  onClick={() => setActiveSubModal('extrato')}
-                  className="w-full sm:w-auto px-3.5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
-                  title="Abrir Extrato e Fazer Download"
-                >
-                  <span className="material-symbols-outlined text-[16px]">visibility</span>
-                  <span>Abrir Extrato</span>
-                </button>
-              </div>
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (onToast) onToast(`📄 Gerando Extrato Total em PDF de ${debtor.name}...`);
+                        downloadStatementPdfDirect(debtor, debtorInstallments, primaryPurchase)
+                          .then(() => {
+                            if (onToast) onToast('✅ Extrato em PDF baixado com sucesso!');
+                          })
+                          .catch((err) => {
+                            console.error(err);
+                            if (onToast) onToast('Erro ao baixar Extrato PDF.');
+                          });
+                      }}
+                      className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-amber-600 to-amber-500 hover:from-amber-700 hover:to-amber-600 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                      title="Baixar Extrato Direto em PDF"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">download</span>
+                      <span>Baixar PDF</span>
+                    </button>
 
-              {/* 2. Opção: ABRIR RECIBO OFICIAL */}
-              <div className="bg-white hover:bg-slate-50/80 border border-emerald-300 hover:border-emerald-400 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between gap-2.5 sm:gap-3 transition-all shadow-xs group">
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3">
-                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
-                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-emerald-100 transition-colors">
-                      <span className="material-symbols-outlined text-[20px] sm:text-[22px]">verified</span>
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <h4 className="font-black text-xs sm:text-sm text-slate-900 leading-tight">
-                          Recibo Oficial de Pagamento
-                        </h4>
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
-                          PDF
-                        </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveSubModal('extrato')}
+                      className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
+                      title="Abrir Extrato e Visualizar"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">visibility</span>
+                      <span>Abrir Extrato</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* 2. Opção: ABRIR RECIBO OFICIAL */}
+                <div className="bg-white hover:bg-slate-50/80 border border-emerald-300 hover:border-emerald-400 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between gap-2.5 sm:gap-3 transition-all shadow-xs group">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3">
+                    <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                      <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-700 border border-emerald-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-emerald-100 transition-colors">
+                        <span className="material-symbols-outlined text-[20px] sm:text-[22px]">verified</span>
                       </div>
-                      <p className="text-[10.5px] text-slate-600 mt-0.5 leading-relaxed">
-                        Recibo com valor por extenso, autenticação digital, QR Code Pix e download individual.
-                      </p>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h4 className="font-black text-xs sm:text-sm text-slate-900 leading-tight">
+                            Recibo Oficial de Pagamento
+                          </h4>
+                          <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-emerald-100 text-emerald-900 border border-emerald-300">
+                            PDF
+                          </span>
+                        </div>
+                        <p className="text-[10.5px] text-slate-600 mt-0.5 leading-relaxed">
+                          Recibo com valor por extenso, autenticação digital, QR Code Pix e download individual.
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const targetInst = targetReceiptInstallment || debtorInstallments[0];
+                          const amountVal = targetInst
+                            ? targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0
+                            : debtor.totalOwed || 100;
+                          if (onToast) onToast(`📄 Baixando Recibo em PDF de ${debtor.name}...`);
+                          downloadIndividualReceiptPdf({
+                            payerName: debtor.name,
+                            payerPhone: debtor.phone,
+                            creditorName: currentUser?.name || 'Tiago Dias',
+                            creditorCompany: 'HASPAHO Tecnologia da Informação',
+                            creditorPix: userPixKey || '(14) 99733-9863',
+                            productName: targetInst?.product || primaryPurchase?.product || 'Parcela do Acordo',
+                            installmentNumber: targetInst?.installmentNumber || 1,
+                            totalInstallments: targetInst?.totalInstallments || debtorInstallments.length || 1,
+                            amount: amountVal,
+                            paymentDate: targetInst?.paidAt || targetInst?.dueDate || new Date().toLocaleDateString('pt-BR'),
+                            paymentMethod: targetInst?.paymentMethod || 'PIX / Asaas',
+                            authCode: targetInst?.authCode || `AUT-HASPAHO-${debtor.id.slice(-4).toUpperCase()}`,
+                          })
+                            .then(() => {
+                              if (onToast) onToast('✅ Recibo em PDF baixado com sucesso!');
+                            })
+                            .catch((err) => {
+                              console.error(err);
+                              if (onToast) onToast('Erro ao baixar Recibo PDF.');
+                            });
+                        }}
+                        className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+                        title="Baixar Recibo Direto em PDF"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">download</span>
+                        <span>Baixar PDF</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setActiveSubModal('recibo')}
+                        className="flex-1 sm:flex-initial px-3 py-2 sm:py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
+                        title="Abrir Recibo e Visualizar"
+                      >
+                        <span className="material-symbols-outlined text-[15px]">visibility</span>
+                        <span>Abrir Recibo</span>
+                      </button>
                     </div>
                   </div>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubModal('recibo')}
-                    className="w-full sm:w-auto px-3.5 py-2 sm:py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm active:scale-95 transition-all cursor-pointer shrink-0"
-                    title="Abrir Recibo e Fazer Download"
-                  >
-                    <span className="material-symbols-outlined text-[16px]">download_done</span>
-                    <span>Abrir Recibo</span>
-                  </button>
-                </div>
 
                 {/* Seletor rápido compacto de parcela */}
                 {debtorInstallments.length > 1 && (

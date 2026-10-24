@@ -66,53 +66,24 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   return (
     <div className="w-full flex flex-col items-center justify-center py-6 px-3 sm:px-6 relative z-10 pointer-events-auto animate-in fade-in duration-300">
       <div className="w-full max-w-4xl flex flex-col md:flex-row items-stretch bg-white rounded-3xl shadow-2xl border border-slate-200/80 overflow-hidden relative z-20 pointer-events-auto">
-        {/* Coluna Esquerda: Apresentação da Marca & Segurança */}
-        <div className="hidden md:flex md:w-[45%] bg-gradient-to-br from-slate-900 via-blue-950 to-indigo-950 p-6 sm:p-8 flex-col justify-between text-white relative z-10 overflow-hidden shrink-0">
-          <div className="absolute -top-12 -right-12 w-48 h-48 rounded-full bg-blue-500/10 blur-2xl pointer-events-none" />
-          <div className="absolute -bottom-12 -left-12 w-48 h-48 rounded-full bg-indigo-500/10 blur-2xl pointer-events-none" />
-
-          <div>
-            <div className="flex items-center gap-3 mb-6">
-              <HaspahoLogo size="md" variant="horizontal" darkTheme={true} />
-            </div>
-
-            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold tracking-wide uppercase mb-3 border border-blue-400/30">
-              <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Autenticação Oficial Gmail • Firebase Auth
-            </div>
-
-            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
-              HASPAHO • RECEBÍVEIS PRO
-            </h2>
-            <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-              Plataforma com validação de conta Gmail (@gmail.com) e sincronização em nuvem protegida via Firebase.
-            </p>
-
-            <div className="mt-6 space-y-3">
-              <div className="flex items-center gap-3 text-xs text-slate-200">
-                <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
-                <span>Acesso exclusivo e rápido com sua conta Gmail</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-200">
-                <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
-                <span>Isolamento individual de recebíveis e devedores</span>
-              </div>
-              <div className="flex items-center gap-3 text-xs text-slate-200">
-                <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
-                <span>Sincronização em tempo real com Firebase Firestore</span>
-              </div>
-            </div>
+        {/* Coluna Esquerda: Capa do Aplicativo (Fundo Branco + Logo Bem Grande + Nome Haspaho) */}
+        <div className="hidden md:flex md:w-[45%] bg-white border-r border-slate-100 p-8 flex-col items-center justify-center text-slate-900 relative z-10 overflow-hidden shrink-0">
+          <div className="flex flex-col items-center justify-center text-center my-auto py-4">
+            <HaspahoLogo size="2xl" variant="icon" />
+            <h1 className="mt-5 text-3xl font-black tracking-tight text-slate-900">
+              Haspaho
+            </h1>
           </div>
 
-          {isLoggedIn ? (
-            <div className="mt-8 pt-4 border-t border-white/10 flex items-center justify-between">
+          {isLoggedIn && (
+            <div className="w-full mt-6 pt-4 border-t border-slate-100 flex items-center justify-between">
               <div className="flex items-center gap-2.5">
                 <div className="w-8 h-8 rounded-full bg-blue-600 text-white font-bold flex items-center justify-center text-xs">
                   {(currentUser?.name || currentUser?.email || 'U').charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left">
-                  <div className="text-xs font-bold text-white truncate max-w-[130px]">{currentUser?.name || currentUser?.email || 'Usuário'}</div>
-                  <div className="text-[10px] text-slate-400 truncate max-w-[130px]">{currentUser?.email || ''}</div>
+                  <div className="text-xs font-bold text-slate-900 truncate max-w-[130px]">{currentUser?.name || currentUser?.email || 'Usuário'}</div>
+                  <div className="text-[10px] text-slate-500 truncate max-w-[130px]">{currentUser?.email || ''}</div>
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -127,18 +98,12 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                   <button
                     type="button"
                     onClick={onLogout}
-                    className="p-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white transition-colors cursor-pointer relative z-10"
+                    className="p-1.5 rounded-lg bg-slate-100 hover:bg-slate-200 text-slate-600 hover:text-slate-900 transition-colors cursor-pointer relative z-10"
                     title="Sair da Conta"
                   >
                     <span className="material-symbols-outlined text-[16px]">logout</span>
                   </button>
                 )}
-              </div>
-            </div>
-          ) : (
-            <div className="mt-8 pt-4 border-t border-white/10 flex flex-col items-center gap-2">
-              <div className="text-[11px] text-slate-400 text-center font-medium">
-                HASPAHO Tecnologia da Informação • Versão 90 PRO Segura
               </div>
             </div>
           )}
@@ -149,8 +114,9 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
           {isLoggedIn ? (
             /* CONTEÚDO PARA QUANDO O USUÁRIO JÁ ESTÁ LOGADO */
             <div className="space-y-6">
-              <div className="mb-2 md:hidden flex items-center justify-center">
-                <HaspahoLogo size="md" variant="horizontal" />
+              <div className="mb-2 md:hidden flex flex-col items-center justify-center bg-white py-3">
+                <HaspahoLogo size="2xl" variant="icon" />
+                <span className="mt-2 text-2xl font-black tracking-tight text-slate-900">Haspaho</span>
               </div>
 
               <div className="p-4 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center gap-3">
@@ -225,12 +191,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
           ) : (
             /* CONTEÚDO PARA QUANDO NÃO ESTÁ LOGADO (FORMULÁRIO DE LOGIN GMAIL) */
             <div>
-              <div className="mb-4 md:hidden flex items-center justify-center">
-                <HaspahoLogo size="md" variant="horizontal" />
+              <div className="mb-5 md:hidden flex flex-col items-center justify-center bg-white py-3">
+                <HaspahoLogo size="2xl" variant="icon" />
+                <span className="mt-2.5 text-2xl font-black tracking-tight text-slate-900">Haspaho</span>
               </div>
 
               <div className="mb-5 text-center md:text-left">
-                <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
+                <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">HASPAHO</span>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
                   Entrar somente com Gmail
                 </h3>

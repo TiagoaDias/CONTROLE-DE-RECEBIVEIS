@@ -150,16 +150,72 @@ ${sep}
 }
 
 /**
- * Dispara o download de um arquivo .TXT no navegador.
+ * Dispara o download universal (Web, Mobile e Android WebView/Capacitor) de qualquer Blob/Arquivo.
+ * Nunca revoga o Blob URL sincronicamente (evita falha silenciosa no Chrome Mobile / Android).
+ */
+export async function triggerUniversalFileDownload(
+  blob: Blob,
+  filename: string
+): Promise<void> {
+  try {
+    const isAndroidWebView =
+      typeof window !== 'undefined' &&
+      (/wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent || '') ||
+        Boolean((window as any).Capacitor?.isNativePlatform?.()));
+
+    // Em WebViews Android que bloqueiam blob: URLs, tenta Web Share API de arquivo se disponível
+    if (isAndroidWebView && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+      try {
+        const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
+        if (!navigator.canShare || navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: filename,
+          });
+          return;
+        }
+      } catch (shareErr) {
+        if ((shareErr as Error)?.name === 'AbortError') return;
+        // Prossegue para o download padrão se o share não for suportado
+      }
+    }
+
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = filename;
+    link.style.display = 'none';
+    document.body.appendChild(link);
+    link.click();
+
+    setTimeout(() => {
+      try {
+        if (link.parentNode) {
+          document.body.removeChild(link);
+        }
+      } catch {
+        // ignore
+      }
+    }, 1500);
+
+    setTimeout(() => {
+      try {
+        URL.revokeObjectURL(url);
+      } catch {
+        // ignore
+      }
+    }, 60000);
+  } catch (err) {
+    console.error('Erro ao baixar arquivo:', err);
+  }
+}
+
+/**
+ * Dispara o download de um arquivo .TXT no navegador e no Android.
  */
 export function downloadTxtFile(filename: string, content: string): void {
-  const blob = new Blob([content], { type: 'text/plain;charset=utf-8' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename.endsWith('.txt') ? filename : `${filename}.txt`;
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+  const safeName = filename.endsWith('.txt') ? filename : `${filename}.txt`;
+  const blob = new Blob(['\uFEFF' + content], { type: 'text/plain;charset=utf-8' });
+  triggerUniversalFileDownload(blob, safeName).catch(console.warn);
 }
+

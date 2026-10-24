@@ -2,6 +2,9 @@ import jsPDF from 'jspdf';
 import { generateHaspahoFullHeaderPngDataUrl, generateHaspahoWatermarkDataUrl } from './logoPdfHelper';
 import { generatePixQrCodeDataUrl } from './pixQrCodeHelper';
 import { valorPorExtenso } from './numberToWordsPtBr';
+import { triggerUniversalFileDownload } from './receiptTxtHelper';
+import { Debtor, Installment, Purchase } from '../types';
+import { safeToFixed } from './numberUtils';
 
 export interface IndividualReceiptData {
   payerName: string;
@@ -267,18 +270,274 @@ export async function downloadIndividualReceiptPdf(data: IndividualReceiptData):
     { align: 'center' }
   );
 
-  // Trigger download as blob
+  // Trigger download via universal file download handler
   try {
     const pdfBlob = doc.output('blob');
-    const blobUrl = URL.createObjectURL(pdfBlob);
-    const link = document.createElement('a');
-    link.href = blobUrl;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    setTimeout(() => URL.revokeObjectURL(blobUrl), 2000);
+    await triggerUniversalFileDownload(pdfBlob, filename);
   } catch {
     doc.save(filename);
   }
 }
+
+/**
+ * Gera e baixa diretamente o PDF oficial do Extrato Total Consolidado de Parcelas (A4).
+ */
+export async function downloadStatementPdfDirect(
+  debtor: Debtor,
+  installments: Installment[],
+  purchase?: Purchase
+): Promise<void> {
+  const randomSuffix = Math.floor(100000 + Math.random() * 900000);
+  const documentId = `EXT-2026-${randomSuffix}`;
+  const now = new Date();
+  const issueTimestamp = `${now.toLocaleDateString('pt-BR')} às ${now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`;
+
+  const sortedInstallments = [...installments].sort(
+    (a, b) => (Number(a.installmentNumber) || 1) - (Number(b.installmentNumber) || 1)
+  );
+
+  const totalInstallmentsCount = sortedInstallments.length || purchase?.installmentsTotal || 1;
+  const paidInstallments = sortedInstallments.filter((i) => i.status === 'paid');
+  const pendingInstallments = sortedInstallments.filter((i) => i.status !== 'paid');
+  const paidCount = paidInstallments.length;
+  const pendingCount = pendingInstallments.length;
+
+  const totalContractedAmount =
+    purchase?.totalAmount ||
+    sortedInstallments.reduce((acc, curr) => acc + (curr.originalAmount || curr.amount || 0), 0) ||
+    debtor.totalOwed ||
+    0;
+
+  const totalPaidAmount = sortedInstallments.reduce((acc, curr) => {
+    if (curr.status === 'paid') {
+      return acc + (curr.paidAmount ?? curr.amount ?? curr.originalAmount ?? 0);
+    }
+    return acc;
+  }, 0);
+
+  const totalPendingAmount = sortedInstallments.reduce((acc, curr) => {
+    if (curr.status !== 'paid') {
+      return acc + (curr.amount || curr.originalAmount || 0);
+    }
+    return acc;
+  }, 0);
+
+  const percentPaid = totalInstallmentsCount > 0 ? (paidCount / totalInstallmentsCount) * 100 : 0;
+  const percentRemaining = Math.max(0, 100 - percentPaid);
+
+  const debtorName = debtor?.name || sortedInstallments[0]?.debtorName || 'Cliente';
+  const debtorDocument = debtor?.cpfCnpj || debtor?.documentNumber || 'Não informado';
+  const debtorPhone = debtor?.phone || 'Não informado';
+  const productName = purchase?.product || sortedInstallments[0]?.product || 'Parcelamento Consolidado';
+  const storeName = purchase?.store || 'Loja Parceira / Online';
+  const cardName = purchase?.cardName || sortedInstallments[0]?.cardName || 'PIX / Cartão';
+
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4', compress: true });
+  const pageWidth = 210;
+  const pageHeight = 297;
+  const marginX = 14;
+  const contentWidth = pageWidth - marginX * 2;
+
+  let logoDataUrl = '';
+  let watermarkDataUrl = '';
+  try {
+    [logoDataUrl, watermarkDataUrl] = await Promise.all([
+      generateHaspahoFullHeaderPngDataUrl(),
+      generateHaspahoWatermarkDataUrl(),
+    ]);
+  } catch (err) {
+    console.warn('Erro ao gerar imagens para PDF de extrato:', err);
+  }
+
+  let y = 10;
+  let currentPage = 1;
+
+  const addDocumentHeader = (pageNum: number) => {
+    if (watermarkDataUrl) {
+      const wmW = 135;
+      const wmH = 154;
+      const wmX = (pageWidth - wmW) / 2;
+      const wmY = (pageHeight - wmH) / 2;
+      doc.addImage(watermarkDataUrl, 'PNG', wmX, wmY, wmW, wmH, undefined, 'FAST');
+    }
+
+    let bannerBottom = 36;
+    if (logoDataUrl) {
+      const imgProps = doc.getImageProperties(logoDataUrl);
+      const bannerWidth = 118;
+      const bannerHeight = (imgProps.height * bannerWidth) / imgProps.width;
+      const bannerX = (pageWidth - bannerWidth) / 2;
+      doc.addImage(logoDataUrl, 'PNG', bannerX, 8, bannerWidth, bannerHeight, undefined, 'FAST');
+      bannerBottom = 8 + bannerHeight + 3;
+    }
+
+    doc.setFillColor(15, 23, 42);
+    doc.rect(marginX, bannerBottom, contentWidth, 12, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(10);
+    doc.text('EXTRATO TOTAL DO PARCELAMENTO • HISTÓRICO INTEGRAL', pageWidth / 2, bannerBottom + 5.5, { align: 'center' });
+    doc.setFontSize(7);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Identificador: ${documentId} • Emitido em: ${issueTimestamp} • Pág. ${pageNum}`, pageWidth / 2, bannerBottom + 9.5, { align: 'center' });
+  };
+
+  addDocumentHeader(currentPage);
+  y = 66;
+
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(marginX, y, contentWidth, 30, 2, 2, 'FD');
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text(`DEVEDOR / CONTRATANTE: ${debtorName.toUpperCase()}`, marginX + 4, y + 6);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`CPF/CNPJ: ${debtorDocument}  |  Tel/WhatsApp: ${debtorPhone}`, marginX + 4, y + 12);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text(`PRODUTO / OPERAÇÃO: ${productName}`, marginX + 4, y + 19);
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Loja/Origem: ${storeName}  |  Forma: ${cardName}`, marginX + 4, y + 25);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(22, 101, 52);
+  doc.text(
+    `VALOR TOTAL LIQUIDADO: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${paidCount}/${totalInstallmentsCount} pagas)`,
+    marginX + 90,
+    25 + y
+  );
+
+  y += 35;
+
+  const renderTableHeader = (currentY: number) => {
+    doc.setFillColor(30, 41, 59);
+    doc.rect(marginX, currentY, contentWidth, 8, 'F');
+    doc.setTextColor(255, 255, 255);
+    doc.setFont('helvetica', 'bold');
+    doc.setFontSize(7.5);
+
+    doc.text('PARCELA', marginX + 3, currentY + 5.5);
+    doc.text('VENCIMENTO', marginX + 22, currentY + 5.5);
+    doc.text('VALOR', marginX + 48, currentY + 5.5);
+    doc.text('SITUAÇÃO', marginX + 70, currentY + 5.5);
+    doc.text('PAGAMENTO', marginX + 96, currentY + 5.5);
+    doc.text('CHAVE DE AUTENTICAÇÃO', marginX + 126, currentY + 5.5);
+  };
+
+  renderTableHeader(y);
+  y += 8;
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(7.5);
+
+  sortedInstallments.forEach((inst, idx) => {
+    if (y > 265) {
+      doc.addPage();
+      currentPage++;
+      addDocumentHeader(currentPage);
+      y = 56;
+      renderTableHeader(y);
+      y += 8;
+    }
+
+    if (idx % 2 === 0) {
+      doc.setFillColor(241, 245, 249);
+      doc.rect(marginX, y, contentWidth, 7, 'F');
+    }
+
+    const isPaid = inst.status === 'paid';
+    const isOverdue = inst.status === 'overdue' || (inst.status !== 'paid' && (inst.delayDays || 0) > 0);
+
+    doc.setTextColor(15, 23, 42);
+    doc.setFont('helvetica', 'bold');
+    doc.text(
+      `${String(inst.installmentNumber || idx + 1).padStart(2, '0')}/${String(inst.totalInstallments || totalInstallmentsCount).padStart(2, '0')}`,
+      marginX + 3,
+      y + 5
+    );
+
+    doc.setFont('helvetica', 'normal');
+    doc.text(inst.dueDate || '—', marginX + 22, y + 5);
+
+    doc.setFont('helvetica', 'bold');
+    const displayVal = safeToFixed(inst.originalAmount || inst.amount || 0).replace('.', ',');
+    doc.text(`R$ ${displayVal}`, marginX + 48, y + 5);
+
+    if (isPaid) {
+      doc.setTextColor(22, 101, 52);
+      doc.text('PAGO', marginX + 70, y + 5);
+    } else if (isOverdue) {
+      doc.setTextColor(185, 28, 28);
+      doc.text('EM ATRASO', marginX + 70, y + 5);
+    } else {
+      doc.setTextColor(180, 83, 9);
+      doc.text('A VENCER', marginX + 70, y + 5);
+    }
+
+    doc.setTextColor(15, 23, 42);
+    const paidDateText = isPaid ? (inst.paidAt || inst.dueDate || '—') : '—';
+    doc.text(paidDateText, marginX + 96, y + 5);
+
+    const effectiveAuthCode = isPaid
+      ? inst.authCode || `EMU${(inst.id || `${inst.installmentNumber}`).replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase()}P${inst.installmentNumber}`
+      : null;
+
+    if (isPaid && effectiveAuthCode) {
+      doc.setFont('courier', 'bold');
+      doc.setFontSize(6.8);
+      doc.setTextColor(6, 95, 70);
+      doc.text(effectiveAuthCode, marginX + 126, y + 5);
+    } else {
+      doc.setFont('helvetica', 'italic');
+      doc.setFontSize(6.2);
+      doc.setTextColor(148, 163, 184);
+      doc.text('— Pendente de Quitação', marginX + 126, y + 5);
+    }
+
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(7.5);
+    y += 7;
+  });
+
+  y += 6;
+  if (y > 235) {
+    doc.addPage();
+    currentPage++;
+    addDocumentHeader(currentPage);
+    y = 56;
+  }
+
+  doc.setFillColor(240, 253, 244);
+  doc.setDrawColor(187, 247, 208);
+  doc.roundedRect(marginX, y, contentWidth, 30, 2, 2, 'FD');
+
+  doc.setTextColor(20, 83, 45);
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.text('RESUMO FINANCEIRO DA DÍVIDA CONSOLIDADA', marginX + 4, y + 6);
+
+  doc.setFontSize(8);
+  doc.setTextColor(15, 23, 42);
+  doc.text(`Valor Contratado: R$ ${safeToFixed(totalContractedAmount).replace('.', ',')}`, marginX + 4, y + 13);
+  doc.text(`Total Pago: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${safeToFixed(percentPaid, 1)}%)`, marginX + 68, y + 13);
+  doc.text(`Saldo Pendente: R$ ${safeToFixed(totalPendingAmount).replace('.', ',')} (${safeToFixed(percentRemaining, 1)}%)`, marginX + 130, y + 13);
+  doc.text(`Parcelas Quitadas: ${paidCount} de ${totalInstallmentsCount}`, marginX + 4, y + 21);
+  doc.text(`Parcelas a Vencer: ${pendingCount}`, marginX + 68, y + 21);
+  doc.text(`Chave PIX Oficial: (14) 99733-9863`, marginX + 130, y + 21);
+
+  const safePayer = debtorName.trim().replace(/[^a-zA-Z0-9]/g, '_');
+  const filename = `Extrato_Total_${safePayer}_${documentId}.pdf`;
+
+  try {
+    const pdfBlob = doc.output('blob');
+    await triggerUniversalFileDownload(pdfBlob, filename);
+  } catch {
+    doc.save(filename);
+  }
+}
+

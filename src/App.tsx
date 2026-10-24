@@ -1001,9 +1001,10 @@ export default function App() {
   const [isMeuGerenciamentoOpen, setIsMeuGerenciamentoOpen] = useState(false);
 
   const handleOpenPdfHub = (debtorId?: string) => {
-    if (debtorId) {
-      setPdfHubDebtorId(debtorId);
-      setTargetDebtorId(debtorId);
+    const validId = debtorId && debtorId !== 'all' ? debtorId : targetDebtorId !== 'all' ? targetDebtorId : debtors[0]?.id || '';
+    if (validId) {
+      setPdfHubDebtorId(validId);
+      setTargetDebtorId(validId);
     }
     setIsPdfHubOpen(true);
   };
@@ -1020,15 +1021,22 @@ export default function App() {
       let matchedDebtor: Debtor | undefined = undefined;
       let matchedInsts: Installment[] = [];
 
-      if (purchaseId) {
-        matchedPurchase = purchases.find((p) => p.id === purchaseId);
+      if (purchaseId && purchaseId !== 'all') {
+        matchedPurchase =
+          purchases.find((p) => p.id === purchaseId) ||
+          purchases.find((p) => (p.product || '').toLowerCase() === purchaseId.toLowerCase());
       }
-      if (debtorId) {
+      if (debtorId && debtorId !== 'all') {
         matchedDebtor = debtors.find((d) => d.id === debtorId);
       }
 
       if (matchedPurchase) {
-        matchedInsts = installments.filter((i) => i.purchaseId === matchedPurchase!.id);
+        matchedInsts = installments.filter(
+          (i) =>
+            i.purchaseId === matchedPurchase!.id ||
+            (i.debtorId === matchedPurchase!.debtorId &&
+              (i.product || '').toLowerCase() === (matchedPurchase!.product || '').toLowerCase())
+        );
         if (!matchedDebtor) {
           matchedDebtor = debtors.find((d) => d.id === matchedPurchase!.debtorId);
         }
@@ -1036,7 +1044,12 @@ export default function App() {
 
       // Se não encontrou parcelas pelo purchaseId ou purchaseId não foi passado, busca pelo devedor
       if (matchedInsts.length === 0 && matchedDebtor) {
-        matchedInsts = installments.filter((i) => i.debtorId === matchedDebtor!.id);
+        const normName = (matchedDebtor.name || '').trim().toLowerCase();
+        matchedInsts = installments.filter(
+          (i) =>
+            i.debtorId === matchedDebtor!.id ||
+            (normName.length > 0 && (i.debtorName || '').trim().toLowerCase() === normName)
+        );
         if (matchedInsts.length > 0 && !matchedPurchase) {
           const pId = matchedInsts[0].purchaseId;
           matchedPurchase = purchases.find((p) => p.id === pId);
@@ -1054,8 +1067,13 @@ export default function App() {
 
       // Fallback final: primeiro devedor
       if (matchedInsts.length === 0 && debtors.length > 0) {
-        matchedDebtor = debtors[0];
-        matchedInsts = installments.filter((i) => i.debtorId === matchedDebtor!.id);
+        matchedDebtor = matchedDebtor || debtors[0];
+        const normName = (matchedDebtor.name || '').trim().toLowerCase();
+        matchedInsts = installments.filter(
+          (i) =>
+            i.debtorId === matchedDebtor!.id ||
+            (normName.length > 0 && (i.debtorName || '').trim().toLowerCase() === normName)
+        );
         if (matchedInsts.length > 0) {
           matchedPurchase = purchases.find((p) => p.id === matchedInsts[0].purchaseId);
         }
@@ -2942,7 +2960,7 @@ export default function App() {
           onOpenExtratoTotal={() => handleOpenExtratoTotal()}
           onOpenAuthLookup={() => setIsAuthLookupOpen(true)}
           onOpenNovoRecibo={() => handleOpenExtratoTotal()}
-          onOpenPdfHub={() => setIsPdfHubOpen(true)}
+          onOpenPdfHub={() => handleOpenPdfHub(targetDebtorId !== 'all' ? targetDebtorId : debtors[0]?.id)}
           onOpenMeuGerenciamento={() => setIsMeuGerenciamentoOpen(true)}
           onOpenUserSettings={(tab) => {
             if (tab) setUserSettingsTab(tab);
