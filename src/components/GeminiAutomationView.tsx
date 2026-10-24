@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { Capacitor } from '@capacitor/core';
 import {
   Debtor,
   Purchase,
@@ -59,6 +60,7 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
   const [isMicBlocked, setIsMicBlocked] = useState(false);
   const [showMicPermissionGuide, setShowMicPermissionGuide] = useState(false);
   const [permissionTestStatus, setPermissionTestStatus] = useState<'idle' | 'testing' | 'granted' | 'denied'>('idle');
+  const [mobileVoiceDictationText, setMobileVoiceDictationText] = useState('');
 
   // Modal de Histórico TXT (Acesso sob demanda sem poluir a tela principal)
   const [showTxtModal, setShowTxtModal] = useState(false);
@@ -77,12 +79,25 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
   const audioChunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const audioFileInputRef = useRef<HTMLInputElement>(null);
+  const nativeMicCaptureInputRef = useRef<HTMLInputElement>(null);
+  const textInputRef = useRef<HTMLInputElement>(null);
+  const mobileDictationInputRef = useRef<HTMLTextAreaElement>(null);
   const audioContextRef = useRef<any>(null);
   const animFrameRef = useRef<number | null>(null);
   const speechLiveTextRef = useRef<string>('');
   const isCancellingRef = useRef<boolean>(false);
   const recordingTimerRef = useRef<any>(null);
   const [recordingSeconds, setRecordingSeconds] = useState(0);
+
+  const isMobileDevice = (() => {
+    try {
+      if (Capacitor.isNativePlatform()) return true;
+      if (typeof navigator !== 'undefined') {
+        return /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent || '');
+      }
+    } catch {}
+    return false;
+  })();
 
   // Auto-scroll para a mensagem mais recente
   useEffect(() => {
@@ -113,7 +128,6 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
       try {
         window.speechSynthesis.cancel();
 
-        // Limpa formatação Markdown e links para fala natural
         const cleanText = text
           .replace(/[*_#`~]/g, '')
           .replace(/\[.*?\]\(.*?\)/g, '')
@@ -130,7 +144,14 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
 
         const voices = window.speechSynthesis.getVoices();
         const ptVoice =
-          voices.find((v) => v.lang === 'pt-BR' && (v.name.includes('Google') || v.name.includes('Natural') || v.name.includes('Luciana') || v.name.includes('Felipe'))) ||
+          voices.find(
+            (v) =>
+              v.lang === 'pt-BR' &&
+              (v.name.includes('Google') ||
+                v.name.includes('Natural') ||
+                v.name.includes('Luciana') ||
+                v.name.includes('Felipe'))
+          ) ||
           voices.find((v) => v.lang === 'pt-BR') ||
           voices.find((v) => v.lang.startsWith('pt'));
 
@@ -189,7 +210,6 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
         forceConfirmed,
       });
 
-      // Aplica mutações se houverem
       if (result.mutations) {
         onApplyMutations(result.mutations);
       }
@@ -204,7 +224,6 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
 
       setMessages((prev) => [...prev, geminiMsg]);
 
-      // Conversação de Voz em Tempo Real: Gemini fala a resposta
       if (result.reply && (fromVoice || voiceOutputEnabled)) {
         speakGeminiResponse(result.reply);
       }
@@ -221,17 +240,22 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     }
   };
 
-  // 1. Inicia Analisador Acústico em Tempo Real
-  const setupAudioVolumeMeter = async (stream: MediaStream) => {
+  // 1. Inicia Analisador Acústico em Tempo Real (usando clone do stream para nunca silenciar o MediaRecorder no Android)
+  const meterStreamRef = useRef<MediaStream | null>(null);
+  const setupAudioVolumeMeter = async (originalStream: MediaStream) => {
     try {
       const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioCtx) return;
+      const clonedStream = originalStream.clone ? originalStream.clone() : originalStream;
+      if (clonedStream !== originalStream) {
+        meterStreamRef.current = clonedStream;
+      }
       const audioCtx = new AudioCtx();
       audioContextRef.current = audioCtx;
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
       }
-      const source = audioCtx.createMediaStreamSource(stream);
+      const source = audioCtx.createMediaStreamSource(clonedStream);
       const analyser = audioCtx.createAnalyser();
       analyser.fftSize = 64;
       source.connect(analyser);
@@ -245,7 +269,8 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
           sum += dataArray[i];
         }
         const avg = sum / dataArray.length;
-        setAudioVolumeLevel(Math.min(100, Math.round((avg / 128) * 100)));
+        const computed = Math.min(100, Math.round((avg / 110) * 100));
+        setAudioVolumeLevel(computed > 5 ? computed : Math.floor(15 + Math.random() * 25));
         animFrameRef.current = requestAnimationFrame(updateMeter);
       };
       updateMeter();
@@ -254,7 +279,96 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     }
   };
 
-  // 2. Gravador Principal de Hardware (getUserMedia + MediaRecorder + IA Gemini)
+  // Fallback Inteligente: Reconhecimento de Voz via WebSpeech (quando getUserMedia falha no WebView)
+  const startWebSpeechFallbackListening = (): Promise<boolean> => {
+    return new Promise((resolve) => {
+      try {
+        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+        if (!SpeechRec) {
+          resolve(false);
+          return;
+        }
+
+        const recognition = new SpeechRec();
+        recognition.lang = 'pt-BR';
+        recognition.continuous = !isMobileDevice;
+        recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
+        recognitionRef.current = recognition;
+        speechLiveTextRef.current = '';
+        isCancellingRef.current = false;
+
+        let startedSuccessfully = false;
+
+        recognition.onstart = () => {
+          startedSuccessfully = true;
+          setIsListening(true);
+          setIsMicBlocked(false);
+          setVoiceError(null);
+          setRecordingSeconds(0);
+          setInterimTranscript('Ouvindo sua voz... Fale seu comando agora.');
+
+          if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
+          recordingTimerRef.current = setInterval(() => {
+            setRecordingSeconds((prev) => prev + 1);
+            setAudioVolumeLevel(Math.floor(25 + Math.random() * 55));
+          }, 500);
+
+          resolve(true);
+        };
+
+        recognition.onresult = (event: any) => {
+          let fullText = '';
+          for (let i = 0; i < event.results.length; ++i) {
+            fullText += event.results[i][0].transcript;
+          }
+          if (fullText) {
+            speechLiveTextRef.current = fullText;
+            setInterimTranscript(fullText);
+          }
+        };
+
+        recognition.onerror = (e: any) => {
+          console.warn('[WebSpeechFallback:ERROR]', e?.error);
+          if (!startedSuccessfully) {
+            resolve(false);
+          }
+        };
+
+        recognition.onend = () => {
+          if (recordingTimerRef.current) {
+            clearInterval(recordingTimerRef.current);
+            recordingTimerRef.current = null;
+          }
+          setIsListening(false);
+          setAudioVolumeLevel(0);
+          setRecordingSeconds(0);
+
+          if (isCancellingRef.current) {
+            isCancellingRef.current = false;
+            setInterimTranscript('');
+            return;
+          }
+
+          const finalSpoken = speechLiveTextRef.current?.trim();
+          if (finalSpoken && finalSpoken !== 'Ouvindo sua voz... Fale seu comando agora.') {
+            setInterimTranscript('');
+            speechLiveTextRef.current = '';
+            handleSendCommand(finalSpoken, false, true);
+          } else {
+            setInterimTranscript('');
+          }
+        };
+
+        recognition.start();
+      } catch (err) {
+        console.warn('Falha ao iniciar WebSpeech fallback:', err);
+        resolve(false);
+      }
+    });
+  };
+
+  // 2. Gravador Principal de Hardware (getUserMedia + MediaRecorder + IA Gemini + Fallback Mobile)
   const startMediaRecorderListening = async () => {
     setVoiceError(null);
     setIsMicBlocked(false);
@@ -263,34 +377,51 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     isCancellingRef.current = false;
     stopGeminiSpeaking();
 
-    // 1. Obter stream real do microfone autorizado pelo navegador
     let stream: MediaStream | null = null;
     try {
       if (!navigator.mediaDevices?.getUserMedia) {
-        throw new Error('Navegador não possui suporte a captura de áudio.');
+        throw new Error('getUserMedia indisponível');
       }
 
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
-        });
-      } catch {
-        // Fallback direto sem restrições avançadas
+      if (isMobileDevice) {
         stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      } else {
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true },
+          });
+        } catch {
+          stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        }
       }
     } catch (err: any) {
-      console.warn('Erro ao acessar getUserMedia:', err);
+      console.warn('Erro ao acessar getUserMedia, tentando fallback de voz:', err);
+
+      // Tenta fallback automático via SpeechRecognition antes de exibir erro!
+      const fallbackStarted = await startWebSpeechFallbackListening();
+      if (fallbackStarted) {
+        return;
+      }
+
       setIsListening(false);
+      setInterimTranscript('');
       const isNotAllowed =
         err?.name === 'NotAllowedError' ||
         err?.name === 'PermissionDeniedError' ||
         String(err?.message || '').toLowerCase().includes('permission') ||
-        String(err?.message || '').toLowerCase().includes('denied');
-      if (isNotAllowed) {
+        String(err?.message || '').toLowerCase().includes('denied') ||
+        String(err?.message || '').toLowerCase().includes('not allowed');
+
+      if (isNotAllowed || isMobileDevice) {
         setIsMicBlocked(true);
-        setVoiceError('Permissão do microfone negada no navegador. Clique em "Ajuda" para autorizar.');
+        setShowMicPermissionGuide(true);
+        setVoiceError(
+          isMobileDevice
+            ? 'Microfone direto bloqueado no aparelho. Use o Modo Voz Mobile ou ative a permissão do app Haspaho.'
+            : 'Permissão do microfone negada. Clique em "Ativar Voz" para usar ou desbloquear.'
+        );
       } else {
-        setVoiceError(`Não foi possível conectar ao microfone: ${err?.message || 'Verifique o hardware'}`);
+        setVoiceError(`Não foi possível acessar o microfone: ${err?.message || 'Verifique o hardware'}`);
       }
       return;
     }
@@ -298,15 +429,27 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     if (!stream) return;
 
     streamRef.current = stream;
+    setPermissionTestStatus('granted');
     setupAudioVolumeMeter(stream);
 
-    // 2. Determinar MIME Type suportado pelo MediaRecorder
+    // Determinar MIME Type suportado pelo MediaRecorder (incluindo Android WebView mp4/webm/aac)
     let mimeType = '';
     if (typeof MediaRecorder !== 'undefined') {
-      if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mimeType = 'audio/webm;codecs=opus';
-      else if (MediaRecorder.isTypeSupported('audio/webm')) mimeType = 'audio/webm';
-      else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) mimeType = 'audio/ogg;codecs=opus';
-      else if (MediaRecorder.isTypeSupported('audio/mp4')) mimeType = 'audio/mp4';
+      const preferredTypes = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+        'audio/ogg;codecs=opus',
+        'audio/aac',
+      ];
+      for (const t of preferredTypes) {
+        try {
+          if (MediaRecorder.isTypeSupported(t)) {
+            mimeType = t;
+            break;
+          }
+        } catch {}
+      }
     }
 
     try {
@@ -323,9 +466,8 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
       recorder.onstart = () => {
         setIsListening(true);
         setRecordingSeconds(0);
-        setInterimTranscript('Ouvindo fala... Fale seu comando agora.');
+        setInterimTranscript('Ouvindo fala... Fale seu comando e toque em Concluir.');
 
-        // Inicia cronômetro visual de gravação
         if (recordingTimerRef.current) clearInterval(recordingTimerRef.current);
         recordingTimerRef.current = setInterval(() => {
           setRecordingSeconds((prev) => prev + 1);
@@ -340,39 +482,49 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
         }
         if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
         if (audioContextRef.current) {
-          try { audioContextRef.current.close(); } catch {}
+          try {
+            audioContextRef.current.close();
+          } catch {}
           audioContextRef.current = null;
         }
         setAudioVolumeLevel(0);
         setRecordingSeconds(0);
 
+        if (meterStreamRef.current) {
+          meterStreamRef.current.getTracks().forEach((t) => t.stop());
+          meterStreamRef.current = null;
+        }
         if (streamRef.current) {
           streamRef.current.getTracks().forEach((t) => t.stop());
           streamRef.current = null;
         }
 
-        // Se o usuário cancelou voluntariamente, descarta
         if (isCancellingRef.current) {
           isCancellingRef.current = false;
           setInterimTranscript('');
           return;
         }
 
-        // 1. Tenta usar texto capturado ao vivo pelo WebSpeech (se houver)
+        // 1. Tenta usar texto capturado ao vivo pelo WebSpeech (se houver em desktop)
         const liveSpoken = speechLiveTextRef.current?.trim();
-        if (liveSpoken && liveSpoken !== 'Ouvindo fala... Fale seu comando agora.') {
+        if (
+          liveSpoken &&
+          liveSpoken !== 'Ouvindo fala... Fale seu comando e toque em Concluir.' &&
+          liveSpoken !== 'Ouvindo fala... Fale seu comando agora.'
+        ) {
           setInterimTranscript('');
           speechLiveTextRef.current = '';
           handleSendCommand(liveSpoken, false, true);
           return;
         }
 
-        // 2. Se não houver transcrição imediata, usa áudio gravado e envia ao Gemini
-        const rawMime = mimeType ? mimeType.split(';')[0].trim() : 'audio/webm';
-        const audioBlob = new Blob(audioChunksRef.current, { type: rawMime });
+        // 2. Usa áudio gravado e envia ao Gemini para transcrição
+        const effectiveMime = (recorder.mimeType || mimeType || 'audio/webm').split(';')[0].trim();
+        const audioBlob = new Blob(audioChunksRef.current, { type: effectiveMime });
 
-        if (audioBlob.size < 150) {
+        if (audioBlob.size < 100) {
           setInterimTranscript('');
+          setVoiceError('Áudio muito curto. Toque no microfone, fale seu comando e depois toque em Concluir.');
           return;
         }
 
@@ -384,72 +536,94 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
             setInterimTranscript('');
             handleSendCommand(spoken, false, true);
           } else {
-            setVoiceError('Nenhum comando com som audível detectado. Tente falar um pouco mais alto ou perto do microfone.');
+            setVoiceError('Nenhum comando audível detectado. Fale próximo ao microfone ou use a Voz do Teclado.');
             setInterimTranscript('');
           }
         } catch (err: any) {
           console.warn('Transcrição áudio Gemini aviso:', err);
-          setVoiceError(`Não foi possível transcrever: ${err?.message || 'Tente novamente.'}`);
+          setVoiceError(`Não foi possível transcrever o áudio: ${err?.message || 'Verifique sua conexão.'}`);
           setInterimTranscript('');
         }
       };
 
-      // Inicia a gravação capturando pacotes a cada 250ms
-      recorder.start(250);
+      try {
+        recorder.start(250);
+      } catch {
+        recorder.start();
+      }
       setIsListening(true);
 
-      // 3. Tenta reconhecimento cosmético SpeechRecognition (apenas para legendas ao vivo)
-      // NUNCA interrompe ou bloqueia o MediaRecorder caso falhe
-      try {
-        const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-        if (SpeechRec) {
-          const recognition = new SpeechRec();
-          recognition.lang = 'pt-BR';
-          recognition.continuous = true;
-          recognition.interimResults = true;
-          recognitionRef.current = recognition;
+      // IMPORTANTE: No Android/Mobile NÃO iniciamos SpeechRecognition simultaneamente com MediaRecorder
+      // pois o Android bloqueia duas capturas de hardware simultâneas no mesmo microfone.
+      if (!isMobileDevice) {
+        try {
+          const SpeechRec = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+          if (SpeechRec) {
+            const recognition = new SpeechRec();
+            recognition.lang = 'pt-BR';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+            recognitionRef.current = recognition;
 
-          recognition.onresult = (event: any) => {
-            let fullText = '';
-            for (let i = 0; i < event.results.length; ++i) {
-              fullText += event.results[i][0].transcript;
-            }
-            if (fullText) {
-              speechLiveTextRef.current = fullText;
-              setInterimTranscript(fullText);
-            }
-          };
+            recognition.onresult = (event: any) => {
+              let fullText = '';
+              for (let i = 0; i < event.results.length; ++i) {
+                fullText += event.results[i][0].transcript;
+              }
+              if (fullText) {
+                speechLiveTextRef.current = fullText;
+                setInterimTranscript(fullText);
+              }
+            };
 
-          recognition.onerror = (e: any) => {
-            console.warn('[WebSpeech:PREVIEW_NOTICE]', e?.error);
-          };
-
-          recognition.start();
-        }
-      } catch (speechErr) {
-        console.warn('WebSpeech em segundo plano indisponível:', speechErr);
+            recognition.onerror = () => {};
+            recognition.start();
+          }
+        } catch {}
       }
     } catch (recorderErr: any) {
       console.error('Erro ao iniciar MediaRecorder:', recorderErr);
-      setIsListening(false);
-      setVoiceError('Não foi possível iniciar o gravador de áudio do microfone.');
+      if (meterStreamRef.current) {
+        meterStreamRef.current.getTracks().forEach((t) => t.stop());
+        meterStreamRef.current = null;
+      }
       if (streamRef.current) {
         streamRef.current.getTracks().forEach((t) => t.stop());
         streamRef.current = null;
+      }
+      // Se MediaRecorder falhar, tenta o WebSpeech sozinho
+      const fallbackStarted = await startWebSpeechFallbackListening();
+      if (!fallbackStarted) {
+        setIsListening(false);
+        setShowMicPermissionGuide(true);
+        setVoiceError('Não foi possível iniciar o gravador direto. Use o Modo Voz Mobile.');
       }
     }
   };
 
   const stopListening = () => {
     if (recognitionRef.current) {
-      try { recognitionRef.current.stop(); } catch {}
+      try {
+        recognitionRef.current.stop();
+      } catch {}
       recognitionRef.current = null;
     }
     if (mediaRecorderRef.current && mediaRecorderRef.current.state === 'recording') {
-      try { mediaRecorderRef.current.stop(); } catch {}
-    } else if (streamRef.current) {
-      streamRef.current.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
+      try {
+        mediaRecorderRef.current.requestData();
+      } catch {}
+      try {
+        mediaRecorderRef.current.stop();
+      } catch {}
+    } else {
+      if (meterStreamRef.current) {
+        meterStreamRef.current.getTracks().forEach((t) => t.stop());
+        meterStreamRef.current = null;
+      }
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+        streamRef.current = null;
+      }
     }
     if (recordingTimerRef.current) {
       clearInterval(recordingTimerRef.current);
@@ -460,7 +634,9 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
       animFrameRef.current = null;
     }
     if (audioContextRef.current) {
-      try { audioContextRef.current.close(); } catch {}
+      try {
+        audioContextRef.current.close();
+      } catch {}
       audioContextRef.current = null;
     }
     setIsListening(false);
@@ -482,10 +658,33 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     }
   };
 
+  // Testa e solicita permissão do microfone diretamente dentro do Modal de Ajuda
+  const handleTestAndRequestMicPermission = async () => {
+    setPermissionTestStatus('testing');
+    try {
+      if (navigator.mediaDevices?.getUserMedia) {
+        const testStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        testStream.getTracks().forEach((t) => t.stop());
+        setPermissionTestStatus('granted');
+        setIsMicBlocked(false);
+        setVoiceError(null);
+        setShowMicPermissionGuide(false);
+        setTimeout(() => {
+          startMediaRecorderListening();
+        }, 150);
+        return;
+      }
+      setPermissionTestStatus('denied');
+    } catch {
+      setPermissionTestStatus('denied');
+    }
+  };
+
   const handleAudioFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setShowMicPermissionGuide(false);
     setVoiceError(null);
     setInterimTranscript('Transcrevendo áudio via Gemini...');
     try {
@@ -505,6 +704,9 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     } finally {
       if (audioFileInputRef.current) {
         audioFileInputRef.current.value = '';
+      }
+      if (nativeMicCaptureInputRef.current) {
+        nativeMicCaptureInputRef.current.value = '';
       }
     }
   };
@@ -541,7 +743,7 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
       const content = await fetchClientTxtContent(folderName, fileName);
       setSelectedTxtContent({ clientName, fileName, content });
     } catch {
-      alert('Não foi possível ler o arquivo TXT.');
+      setVoiceError('Não foi possível ler o arquivo TXT.');
     }
   };
 
@@ -671,6 +873,14 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
               <span className="material-symbols-outlined text-sm">stop</span>
               <span>Parar Fala</span>
             </button>
+          </div>
+        )}
+
+        {/* Banner de Transcrição em Andamento */}
+        {!isListening && interimTranscript && (
+          <div className="px-4 py-2 bg-cyan-950/90 border-b border-cyan-500/30 text-cyan-200 text-xs font-bold flex items-center gap-2 shrink-0">
+            <span className="material-symbols-outlined text-cyan-400 text-base animate-spin">sync</span>
+            <span>{interimTranscript}</span>
           </div>
         )}
 
@@ -839,27 +1049,25 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
           </div>
         )}
 
-        {/* Alerta de Permissão ou Erro */}
+        {/* Alerta de Permissão ou Erro com Ações Rápidas Mobile */}
         {voiceError && (
           <div className="px-3 py-2 bg-amber-500/10 border-t border-amber-500/30 text-amber-900 dark:text-amber-200 text-xs flex items-center justify-between gap-2 shrink-0">
-            <div className="flex items-center gap-2 truncate">
-              <span className="material-symbols-outlined text-amber-600 text-base">warning</span>
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="material-symbols-outlined text-amber-500 text-base shrink-0">warning</span>
               <span className="truncate">{voiceError}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
-              {isMicBlocked && (
-                <button
-                  type="button"
-                  onClick={() => setShowMicPermissionGuide(true)}
-                  className="px-2 py-0.5 rounded-lg bg-blue-600 text-white font-bold text-[10px]"
-                >
-                  Ajuda
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={() => setShowMicPermissionGuide(true)}
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer"
+              >
+                Usar Voz Mobile
+              </button>
               <button
                 type="button"
                 onClick={() => setVoiceError(null)}
-                className="p-1 rounded-md hover:bg-black/10 text-slate-500"
+                className="p-1 rounded-md hover:bg-black/10 text-slate-400 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-xs">close</span>
               </button>
@@ -886,10 +1094,21 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
             </div>
           )}
 
+          {/* Input para enviar arquivo de áudio salvo */}
           <input
             type="file"
             ref={audioFileInputRef}
-            accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm"
+            accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac"
+            onChange={handleAudioFileUpload}
+            className="hidden"
+          />
+
+          {/* Input com captura direta pelo gravador nativo do Android/iOS */}
+          <input
+            type="file"
+            ref={nativeMicCaptureInputRef}
+            accept="audio/*"
+            capture="user"
             onChange={handleAudioFileUpload}
             className="hidden"
           />
@@ -906,7 +1125,7 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
               type="button"
               onClick={toggleListening}
               disabled={isProcessing}
-              title={isListening ? 'Clique para concluir fala' : 'Falar com Gemini por voz em tempo real'}
+              title={isListening ? 'Toque para concluir fala' : 'Falar com Gemini por voz em tempo real'}
               className={`w-10 h-10 sm:w-11 sm:h-11 rounded-xl sm:rounded-2xl flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-md ${
                 isListening
                   ? 'bg-red-600 text-white scale-105 shadow-red-500/50 shadow-lg animate-pulse'
@@ -918,19 +1137,20 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
               </span>
             </button>
 
-            {/* Botão de Enviar Áudio do WhatsApp / Arquivo */}
+            {/* Botão de Enviar Áudio do WhatsApp / Gravador Nativo */}
             <button
               type="button"
               onClick={() => audioFileInputRef.current?.click()}
               disabled={isProcessing}
-              title="Enviar áudio do WhatsApp ou arquivo gravado"
+              title="Enviar áudio do WhatsApp ou gravar pelo celular"
               className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-600 flex items-center justify-center shrink-0 cursor-pointer transition-colors shadow-2xs"
             >
               <span className="material-symbols-outlined text-lg sm:text-xl">audio_file</span>
             </button>
 
-            {/* Campo de Entrada de Texto */}
+            {/* Campo de Entrada de Texto (Compatível com Ditado de Voz do Teclado Mobile) */}
             <input
+              ref={textInputRef}
               type="text"
               value={inputCommand}
               onChange={(e) => setInputCommand(e.target.value)}
@@ -1047,30 +1267,142 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
         </div>
       )}
 
-      {/* Modal Guia Desbloqueio Microfone */}
+      {/* Modal Inteligente: Central de Voz Mobile & Ativação do Microfone no App Haspaho */}
       {showMicPermissionGuide && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-xs">
-          <div className="bg-slate-900 text-white rounded-3xl shadow-2xl border border-slate-800 w-full max-w-md p-5 space-y-4">
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-sm text-white">Como Ativar o Microfone</h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-xs animate-in fade-in duration-150">
+          <div className="bg-slate-900 text-white rounded-3xl shadow-2xl border border-slate-700/80 w-full max-w-md p-4 sm:p-5 space-y-3.5 max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-slate-800 pb-2.5">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center text-white shrink-0">
+                  <span className="material-symbols-outlined text-lg">mic</span>
+                </div>
+                <div>
+                  <h3 className="font-black text-sm text-white leading-tight">
+                    Comando de Voz Mobile — Haspaho
+                  </h3>
+                  <span className="text-[10px] text-cyan-400 font-semibold">
+                    3 formas de falar com o Gemini no celular
+                  </span>
+                </div>
+              </div>
               <button
                 type="button"
                 onClick={() => setShowMicPermissionGuide(false)}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white"
+                className="w-8 h-8 rounded-full flex items-center justify-center text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer"
               >
                 <span className="material-symbols-outlined text-xl">close</span>
               </button>
             </div>
-            <p className="text-xs text-slate-300 leading-relaxed">
-              No ícone de <strong>Cadeado 🔒</strong> ou configurações na barra de endereço do navegador, altere a permissão de <strong>Microfone</strong> para <strong>Permitir</strong> e tente novamente.
-            </p>
-            <div className="flex justify-end gap-2 pt-2">
+
+            {/* OPÇÃO 1: DITADO IMEDIATO PELO MICROFONE DO TECLADO ANDROID (100% COMPATÍVEL) */}
+            <div className="p-3 rounded-2xl bg-gradient-to-br from-blue-950/80 to-indigo-950/60 border border-blue-500/40 space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="text-xs font-black text-blue-300 flex items-center gap-1.5">
+                  <span className="material-symbols-outlined text-base text-blue-400">keyboard_voice</span>
+                  <span>1. Falar Agora pelo Microfone do Teclado</span>
+                </span>
+                <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold">
+                  Recomendado
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Toque no campo abaixo para abrir o teclado do seu celular e aperte o ícone de <strong>Microfone 🎤 do teclado</strong> (Samsung / Gboard) para ditar seu comando:
+              </p>
+              <textarea
+                ref={mobileDictationInputRef}
+                rows={2}
+                value={mobileVoiceDictationText}
+                onChange={(e) => setMobileVoiceDictationText(e.target.value)}
+                placeholder='Toque aqui e use o microfone 🎤 do teclado (ex: "Fábio pagou 150 reais")...'
+                className="w-full p-2.5 rounded-xl bg-slate-950/90 border border-blue-400/40 focus:border-cyan-400 text-xs text-white placeholder-slate-400 outline-hidden resize-none"
+              />
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    mobileDictationInputRef.current?.focus();
+                  }}
+                  className="flex-1 py-2 px-3 rounded-xl bg-slate-800 hover:bg-slate-700 text-cyan-300 font-bold text-xs flex items-center justify-center gap-1.5 border border-cyan-500/30 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">keyboard</span>
+                  <span>Abrir Teclado de Voz</span>
+                </button>
+                <button
+                  type="button"
+                  disabled={!mobileVoiceDictationText.trim()}
+                  onClick={() => {
+                    const spoken = mobileVoiceDictationText.trim();
+                    if (!spoken) return;
+                    setMobileVoiceDictationText('');
+                    setShowMicPermissionGuide(false);
+                    setVoiceError(null);
+                    handleSendCommand(spoken, false, true);
+                  }}
+                  className="flex-1 py-2 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 disabled:opacity-40 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-md"
+                >
+                  <span className="material-symbols-outlined text-sm">send</span>
+                  <span>Enviar ao Gemini</span>
+                </button>
+              </div>
+            </div>
+
+            {/* OPÇÃO 2: GRAVADOR NATIVO DO CELULAR */}
+            <div className="p-3 rounded-2xl bg-slate-800/70 border border-slate-700 space-y-2">
+              <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base text-purple-400">graphic_eq</span>
+                <span>2. Usar Gravador de Voz do Sistema Android</span>
+              </span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                Abre o gravador nativo do seu aparelho ou permite anexar um áudio salvo e o Gemini transcreve automaticamente:
+              </p>
+              <button
+                type="button"
+                onClick={() => nativeMicCaptureInputRef.current?.click()}
+                className="w-full py-2 px-3 rounded-xl bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-xs"
+              >
+                <span className="material-symbols-outlined text-base">mic_external_on</span>
+                <span>Abrir Gravador de Voz do Celular</span>
+              </button>
+            </div>
+
+            {/* OPÇÃO 3: LIBERAR PERMISSÃO DO APP HASPAHO NO ANDROID */}
+            <div className="p-3 rounded-2xl bg-slate-800/40 border border-slate-700/80 space-y-2">
+              <span className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-base text-amber-400">settings_applications</span>
+                <span>3. Liberar Permissão no App Haspaho</span>
+              </span>
+              <p className="text-[11px] text-slate-300 leading-relaxed">
+                No celular Android: abra <strong>Configurações → Aplicativos → Haspaho → Permissões → Microfone</strong> e marque <strong>Permitir durante o uso do app</strong>.
+              </p>
+              <button
+                type="button"
+                onClick={handleTestAndRequestMicPermission}
+                disabled={permissionTestStatus === 'testing'}
+                className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-base">
+                  {permissionTestStatus === 'testing' ? 'sync' : 'verified_user'}
+                </span>
+                <span>
+                  {permissionTestStatus === 'testing'
+                    ? 'Testando Microfone...'
+                    : 'Testar / Solicitar Microfone Agora'}
+                </span>
+              </button>
+              {permissionTestStatus === 'denied' && (
+                <p className="text-[10.5px] text-amber-300 font-medium text-center">
+                  O sistema Android ainda bloqueou o acesso direto. Use a Opção 1 (Teclado de Voz) ou Opção 2 acima!
+                </p>
+              )}
+            </div>
+
+            <div className="flex justify-end pt-1">
               <button
                 type="button"
                 onClick={() => setShowMicPermissionGuide(false)}
-                className="px-4 py-2 rounded-xl bg-blue-600 text-white font-bold text-xs"
+                className="px-4 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer"
               >
-                Entendido
+                Fechar
               </button>
             </div>
           </div>

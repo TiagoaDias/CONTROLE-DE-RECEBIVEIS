@@ -273,34 +273,42 @@ Clientes cadastrados no sistema atualmente:
 ${debtorsSummary || '(Nenhum cliente cadastrado ainda)'}
 `;
 
-      // Timeout de 2.5s para evitar que a requisição fique travada indefinidamente se houver latência externa
-      const timeoutPromise = new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error('Timeout de comunicação com o serviço Gemini (limite 2.5s)')), 2500)
-      );
+      // Timeout de 10s para evitar que a requisição fique travada indefinidamente se houver latência externa
+      const callAutomationModel = async (modelName: string) => {
+        const timeoutPromise = new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error(`Timeout de comunicação com o serviço Gemini (${modelName})`)), 10000)
+        );
+        return Promise.race([
+          geminiClient.models.generateContent({
+            model: modelName,
+            contents: prompt,
+            config: {
+              systemInstruction,
+              tools: [
+                {
+                  functionDeclarations: [
+                    toolConsultarClientes,
+                    toolConsultarRecebiveis,
+                    toolRegistrarPagamentoInformado,
+                    toolConfirmarPagamento,
+                    toolRegistrarObservacao,
+                    toolGerarRelatorioResumo,
+                    toolConsultarArquivosTxt,
+                  ],
+                },
+              ],
+            },
+          }),
+          timeoutPromise,
+        ]);
+      };
 
-      const response = await Promise.race([
-        geminiClient.models.generateContent({
-          model: 'gemini-3.8-flash',
-          contents: prompt,
-          config: {
-            systemInstruction,
-            tools: [
-              {
-                functionDeclarations: [
-                  toolConsultarClientes,
-                  toolConsultarRecebiveis,
-                  toolRegistrarPagamentoInformado,
-                  toolConfirmarPagamento,
-                  toolRegistrarObservacao,
-                  toolGerarRelatorioResumo,
-                  toolConsultarArquivosTxt,
-                ],
-              },
-            ],
-          },
-        }),
-        timeoutPromise,
-      ]);
+      let response;
+      try {
+        response = await callAutomationModel('gemini-3.1-flash-lite');
+      } catch {
+        response = await callAutomationModel('gemini-3-flash-preview');
+      }
 
       // Verifica se o Gemini chamou alguma função
       const functionCalls = response.functionCalls;
@@ -316,8 +324,8 @@ ${debtorsSummary || '(Nenhum cliente cadastrado ainda)'}
       // Se respondeu diretamente em texto sem function call
       const replyText = response.text || 'Comando compreendido pelo Gemini.';
       return analyzeDirectTextReply(replyText, userCommand, context, operationId);
-    } catch (err: any) {
-      console.warn('[GeminiAutomation] Aviso na chamada da API, utilizando motor autônomo heurístico:', err?.message);
+    } catch {
+      // Continua de forma transparente para o motor autônomo heurístico
     }
   }
 

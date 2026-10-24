@@ -3000,6 +3000,7 @@ export default function App() {
           currentUser={currentUser}
           debtors={debtors}
           onSettleInstallment={handleSettleInstallment}
+          onConfirmPayment={handleConfirmPayment}
           onOpenExtratoTotal={handleOpenExtratoTotal}
         />
       </ErrorBoundary>

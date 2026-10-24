@@ -1,18 +1,26 @@
 package com.haspaho.recebiveispro;
 
+import android.Manifest;
 import android.app.Dialog;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.os.Message;
 import android.view.ViewGroup;
 import android.webkit.CookieManager;
+import android.webkit.PermissionRequest;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import com.getcapacitor.BridgeActivity;
 
 public class MainActivity extends BridgeActivity {
+    private static final int REQUEST_RECORD_AUDIO_PERMISSION = 1001;
+    private PermissionRequest pendingWebPermissionRequest;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -24,6 +32,7 @@ public class MainActivity extends BridgeActivity {
             settings.setSupportMultipleWindows(true);
             settings.setDomStorageEnabled(true);
             settings.setDatabaseEnabled(true);
+            settings.setMediaPlaybackRequiresUserGesture(false);
 
             // Allow cookies & third party cookies for Firebase OAuth authentication
             CookieManager cookieManager = CookieManager.getInstance();
@@ -39,8 +48,32 @@ public class MainActivity extends BridgeActivity {
                 settings.setUserAgentString(cleanUa);
             }
 
-            // Support popup windows (window.open) for Google OAuth popup in Android WebView
+            // Support microphone permissions (getUserMedia) and popup windows in Android WebView
             webView.setWebChromeClient(new WebChromeClient() {
+                @Override
+                public void onPermissionRequest(final PermissionRequest request) {
+                    runOnUiThread(() -> {
+                        boolean needsAudio = false;
+                        for (String res : request.getResources()) {
+                            if (PermissionRequest.RESOURCE_AUDIO_CAPTURE.equals(res)) {
+                                needsAudio = true;
+                                break;
+                            }
+                        }
+
+                        if (!needsAudio || ContextCompat.checkSelfPermission(MainActivity.this, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED) {
+                            request.grant(request.getResources());
+                        } else {
+                            pendingWebPermissionRequest = request;
+                            ActivityCompat.requestPermissions(
+                                MainActivity.this,
+                                new String[]{Manifest.permission.RECORD_AUDIO, Manifest.permission.MODIFY_AUDIO_SETTINGS},
+                                REQUEST_RECORD_AUDIO_PERMISSION
+                            );
+                        }
+                    });
+                }
+
                 @Override
                 public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
                     WebView newWebView = new WebView(view.getContext());
@@ -50,6 +83,7 @@ public class MainActivity extends BridgeActivity {
                     newSettings.setDatabaseEnabled(true);
                     newSettings.setSupportMultipleWindows(true);
                     newSettings.setJavaScriptCanOpenWindowsAutomatically(true);
+                    newSettings.setMediaPlaybackRequiresUserGesture(false);
                     if (cleanUa != null) {
                         newSettings.setUserAgentString(cleanUa);
                     }
@@ -65,6 +99,11 @@ public class MainActivity extends BridgeActivity {
                     dialog.setContentView(newWebView);
 
                     newWebView.setWebChromeClient(new WebChromeClient() {
+                        @Override
+                        public void onPermissionRequest(final PermissionRequest request) {
+                            runOnUiThread(() -> request.grant(request.getResources()));
+                        }
+
                         @Override
                         public void onCloseWindow(WebView window) {
                             if (dialog.isShowing()) {
@@ -89,6 +128,19 @@ public class MainActivity extends BridgeActivity {
                     return true;
                 }
             });
+        }
+    }
+
+    @Override
+    public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] grantResults) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (requestCode == REQUEST_RECORD_AUDIO_PERMISSION && pendingWebPermissionRequest != null) {
+            if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+                pendingWebPermissionRequest.grant(pendingWebPermissionRequest.getResources());
+            } else {
+                pendingWebPermissionRequest.deny();
+            }
+            pendingWebPermissionRequest = null;
         }
     }
 }

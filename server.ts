@@ -32,6 +32,16 @@ process.on('unhandledRejection', (reason) => {
 
 const app = express();
 
+app.use((req: Request, res: Response, next) => {
+  res.header('Access-Control-Allow-Origin', '*');
+  res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization');
+  if (req.method === 'OPTIONS') {
+    return res.sendStatus(204);
+  }
+  next();
+});
+
 app.use(express.json({ limit: '25mb' }));
 
 // Helper para inicializar o cliente Google GenAI
@@ -103,39 +113,61 @@ app.post('/api/gemini/transcribe-audio', async (req: Request, res: Response) => 
 
     const cleanBase64 = audioBase64.replace(/^data:[^;]+;base64,/, '');
     let rawMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
-    if (rawMime === 'audio/m4a' || rawMime === 'audio/x-m4a') {
+    if (rawMime === 'audio/m4a' || rawMime === 'audio/x-m4a' || rawMime === 'audio/aac') {
       rawMime = 'audio/mp4';
     }
-    const cleanMime = rawMime;
+    const cleanMime = rawMime || 'audio/webm';
 
-    const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error('Timeout de comunicação no reconhecimento de áudio Gemini (12s)')), 12000)
-    );
+    const promptInstruction =
+      'Você é o módulo de reconhecimento de voz do sistema de controle financeiro Haspaho Recebíveis & Parcelas. Transcreva com fidelidade absoluta o comando falado pelo usuário em português do Brasil (exemplo: "Fábio Dias efetuou um pagamento de 150 reais. Salve essa informação para mim" ou "Quanto Carlos ainda deve?"). Retorne EXCLUSIVAMENTE o texto transcrito, sem aspas, sem formatação Markdown e sem comentários adicionais. Se o áudio estiver completamente mudo e sem nenhuma fala inteligível, retorne apenas: __SILENCIO__';
 
-    const response = await Promise.race([
-      ai.models.generateContent({
-        model: 'gemini-3.8-flash',
-        contents: [
-          {
-            role: 'user',
-            parts: [
-              {
-                inlineData: {
-                  mimeType: cleanMime,
-                  data: cleanBase64,
+    const callTranscribeModel = async (modelName: string): Promise<string> => {
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error(`Timeout no reconhecimento de áudio (${modelName})`)), 10000)
+      );
+      const res = await Promise.race([
+        ai.models.generateContent({
+          model: modelName,
+          contents: [
+            {
+              role: 'user',
+              parts: [
+                {
+                  inlineData: {
+                    mimeType: cleanMime,
+                    data: cleanBase64,
+                  },
                 },
-              },
-              {
-                text: 'Você é o módulo de reconhecimento de voz do sistema de controle financeiro Recebíveis & Parcelas PRO. Transcreva com fidelidade absoluta o comando falado pelo usuário em português do Brasil (exemplo: "Fábio Dias efetuou um pagamento de 150 reais. Salve essa informação para mim" ou "Quanto Carlos ainda deve?"). Retorne EXCLUSIVAMENTE o texto transcrito, sem aspas, sem formatação Markdown e sem comentários adicionais.',
-              },
-            ],
-          },
-        ],
-      }),
-      timeoutPromise,
-    ]);
+                {
+                  text: promptInstruction,
+                },
+              ],
+            },
+          ],
+        }),
+        timeoutPromise,
+      ]);
+      const text = res.text?.trim() || '';
+      return text;
+    };
 
-    const transcript = response.text?.trim() || '';
+    const modelsToTry = ['gemini-3.1-flash-lite', 'gemini-3-flash-preview', 'gemini-3.1-flash-lite-preview'];
+    let transcript = '';
+
+    for (const modelName of modelsToTry) {
+      try {
+        const resultText = await callTranscribeModel(modelName);
+        if (resultText === '__SILENCIO__' || resultText.includes('__SILENCIO__')) {
+          transcript = '';
+        } else {
+          transcript = resultText;
+        }
+        break;
+      } catch {
+        // Tenta o próximo modelo com cota disponível silenciosamente
+      }
+    }
+
     return res.json({ success: true, transcript });
   } catch (err: any) {
     console.error('[GeminiTranscribeAudio:ERROR]', err);
@@ -244,7 +276,7 @@ ${text ? `Conteúdo textual fornecido:\n"""\n${text}\n"""` : 'Analise a imagem e
         contents.push({ text: promptText });
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.1-flash-lite',
           contents,
           config: {
             responseMimeType: 'application/json',
@@ -299,11 +331,11 @@ ${text ? `Conteúdo textual fornecido:\n"""\n${text}\n"""` : 'Analise a imagem e
 
         return res.json({
           success: true,
-          source: 'gemini-3.8-flash',
+          source: 'gemini-3.1-flash-lite',
           data: parsed,
         });
-      } catch (geminiError: any) {
-        console.warn('Falha na chamada direta ao Gemini SDK, acionando analisador heurístico:', geminiError?.message);
+      } catch {
+        // Aciona o analisador heurístico de contingência silenciosamente
       }
     }
 
@@ -448,7 +480,7 @@ ${text ? `Texto do comprovante:\n"""\n${text}\n"""` : 'Analise o print ou foto d
         contents.push({ text: promptText });
 
         const response = await ai.models.generateContent({
-          model: 'gemini-3.8-flash',
+          model: 'gemini-3.1-flash-lite',
           contents,
           config: {
             responseMimeType: 'application/json',
@@ -477,10 +509,10 @@ ${text ? `Texto do comprovante:\n"""\n${text}\n"""` : 'Analise o print ou foto d
           if (parsed.paymentMethod) detectedMethod = parsed.paymentMethod;
           if (parsed.authCode) detectedAuth = parsed.authCode;
           if (parsed.bankName) detectedBank = parsed.bankName;
-          usedSource = 'gemini-3.8-flash';
+          usedSource = 'gemini-3.1-flash-lite';
         }
-      } catch (geminiError: any) {
-        console.warn('Falha no Gemini para comprovante, usando heurística:', geminiError?.message);
+      } catch {
+        // Utiliza heurística de apoio silenciosamente
       }
     }
 
