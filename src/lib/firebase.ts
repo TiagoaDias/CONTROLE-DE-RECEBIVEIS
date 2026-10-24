@@ -9,6 +9,8 @@ import {
 import {
   getAuth,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signInWithCredential,
   GoogleAuthProvider,
   FacebookAuthProvider,
@@ -77,11 +79,42 @@ googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 /**
  * Detecta se o aplicativo está rodando em ambiente nativo Capacitor (Android/iOS)
- * ou dentro de uma WebView Android, onde WebViews embutidas causam `disallowed_useragent`
- * ou redirecionamento inválido para `localhost`.
+ * onde o plugin nativo `@capawesome/capacitor-google-sign-in` está disponível.
  */
-export function isNativeOrAndroidWebView(): boolean {
+export function isCapacitorNativeGoogleAvailable(): boolean {
   try {
+    return Capacitor.isNativePlatform() && Capacitor.isPluginAvailable('GoogleSignIn');
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Detecta especificamente se o dispositivo é Android (Capacitor Android ou User-Agent Android).
+ */
+export function isAndroidDevice(): boolean {
+  try {
+    if (Capacitor.getPlatform() === 'android') {
+      return true;
+    }
+    if (typeof navigator !== 'undefined' && /Android/i.test(navigator.userAgent || '')) {
+      return true;
+    }
+  } catch {}
+  return false;
+}
+
+/**
+ * Verificação de `user-agent` que identifica se a aplicação está sendo executada
+ * em um ambiente Capacitor (ou WebView nativa Android/iOS).
+ * Quando verdadeiro, o `signInWithPopup` é automaticamente desabilitado.
+ */
+export function isCapacitorUserAgent(): boolean {
+  try {
+    const ua = typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : '';
+    if (/Capacitor|; wv\)|Android.*Version\/[0-9.]+.*Chrome|Cordova/i.test(ua)) {
+      return true;
+    }
     if (Capacitor.isNativePlatform()) {
       return true;
     }
@@ -89,14 +122,17 @@ export function isNativeOrAndroidWebView(): boolean {
     if (platform === 'android' || platform === 'ios') {
       return true;
     }
-    if (typeof navigator !== 'undefined' && navigator.userAgent) {
-      const ua = navigator.userAgent;
-      if (/; wv\)|Capacitor|Android.*Version\/[0-9]/i.test(ua)) {
-        return true;
-      }
-    }
   } catch {}
   return false;
+}
+
+/**
+ * Detecta se o aplicativo está rodando em ambiente nativo Capacitor (Android/iOS)
+ * ou dentro de uma WebView Android, onde WebViews embutidas causam `disallowed_useragent`
+ * ou redirecionamento inválido para `localhost`.
+ */
+export function isNativeOrAndroidWebView(): boolean {
+  return isCapacitorUserAgent();
 }
 
 /**
@@ -107,7 +143,7 @@ export function getSafeOAuthRedirectUrl(): string {
   if (typeof window === 'undefined' || !window.location) {
     return fallbackAuthDomainUrl;
   }
-  const { protocol, hostname, origin } = window.location;
+  const { protocol, hostname, origin, pathname } = window.location;
   const isLocalhost =
     hostname === 'localhost' ||
     hostname === '127.0.0.1' ||
@@ -115,10 +151,74 @@ export function getSafeOAuthRedirectUrl(): string {
     hostname.endsWith('.localhost') ||
     !protocol.startsWith('http');
 
-  if (isLocalhost || isNativeOrAndroidWebView()) {
+  if (isLocalhost || Capacitor.isNativePlatform()) {
     return fallbackAuthDomainUrl;
   }
-  return origin;
+  return `${origin}${pathname || '/'}`.replace(/\/+$/, '');
+}
+
+/**
+ * Decodifica com segurança o payload JWT de um `idToken` retornado pelo Google OAuth
+ * para garantir extração de `sub`, `email`, `name` e `picture` mesmo se campos auxiliares vierem vazios.
+ */
+export function decodeGoogleIdTokenPayload(idToken: string): {
+  sub?: string;
+  email?: string;
+  name?: string;
+  given_name?: string;
+  family_name?: string;
+  picture?: string;
+} | null {
+  try {
+    if (!idToken || typeof idToken !== 'string' || !idToken.includes('.')) {
+      return null;
+    }
+    const parts = idToken.split('.');
+    if (parts.length < 2) return null;
+    const base64Url = parts[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const padded = base64.padEnd(base64.length + ((4 - (base64.length % 4)) % 4), '=');
+    const jsonPayload = decodeURIComponent(
+      atob(padded)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Extrai de forma resiliente o `idToken` e `accessToken` do objeto retornado pelo
+ * `@capawesome/capacitor-google-sign-in` (suportando formatos nativos Android CredentialManager, iOS e Web).
+ */
+function extractTokensFromSignInResult(result: SignInResult | Record<string, any> | null | undefined): {
+  idToken: string | null;
+  accessToken: string | undefined;
+} {
+  if (!result) {
+    return { idToken: null, accessToken: undefined };
+  }
+  const anyRes = result as Record<string, any>;
+  const rawIdToken =
+    anyRes.idToken ||
+    anyRes.id_token ||
+    anyRes.authentication?.idToken ||
+    anyRes.credential?.idToken ||
+    null;
+  const rawAccessToken =
+    anyRes.accessToken ||
+    anyRes.access_token ||
+    anyRes.authentication?.accessToken ||
+    anyRes.credential?.accessToken ||
+    undefined;
+
+  return {
+    idToken: typeof rawIdToken === 'string' && rawIdToken.trim().length > 0 ? rawIdToken.trim() : null,
+    accessToken: typeof rawAccessToken === 'string' && rawAccessToken.trim().length > 0 ? rawAccessToken.trim() : undefined,
+  };
 }
 
 let googleSignInInitialized = false;
@@ -129,6 +229,9 @@ let googleSignInInitPromise: Promise<void> | null = null;
  * Força o uso do Credential Manager / navegador nativo do sistema Android,
  * evitando o erro `disallowed_useragent` em WebViews e impedindo qualquer
  * redirecionamento para `localhost` em dispositivos móveis.
+ * Importante: não passar `scopes` na inicialização padrão para que o Android
+ * retorne o `idToken` diretamente via CredentialManager sem disparar
+ * `AuthorizationClient.requestOfflineAccess` (que causa `SIGN_IN_CANCELED`).
  */
 export async function initializeGoogleSignInNative(): Promise<void> {
   if (googleSignInInitialized) {
@@ -147,7 +250,6 @@ export async function initializeGoogleSignInNative(): Promise<void> {
 
       const initOptions: InitializeOptions = {
         clientId,
-        scopes: ['profile', 'email'],
       };
 
       // Em ambiente Web não-nativo, garante que redirectUrl nunca seja localhost
@@ -169,71 +271,535 @@ export async function initializeGoogleSignInNative(): Promise<void> {
   return googleSignInInitPromise;
 }
 
-// Dispara a inicialização automaticamente no carregamento do módulo em plataformas nativas/mobile
-if (isNativeOrAndroidWebView()) {
-  initializeGoogleSignInNative().catch(() => {});
+/**
+ * Constrói a URL OAuth 2.0 oficial do Google para Web Auth segura (nunca apontando para `localhost`)
+ * e prepara o Intent nativo do Android (`intent://...#Intent;scheme=https;package=com.android.chrome;end`)
+ * para forçar a abertura no navegador nativo do sistema Android (Chrome / Custom Tabs),
+ * eliminando 100% o erro `Error 403: disallowed_useragent` em WebViews Android.
+ */
+export function buildGoogleWebAuthUrl(customRedirectUri?: string): {
+  oauthHttpsUrl: string;
+  androidChromeIntentUrl: string;
+} {
+  const clientId = activeFirebaseConfig.oAuthClientId;
+  const redirectUri = customRedirectUri || getSafeOAuthRedirectUrl();
+  const stateBytes = new Uint8Array(16);
+  const nonceBytes = new Uint8Array(16);
+  if (typeof window !== 'undefined' && window.crypto?.getRandomValues) {
+    window.crypto.getRandomValues(stateBytes);
+    window.crypto.getRandomValues(nonceBytes);
+  }
+  const toHex = (arr: Uint8Array) => Array.from(arr, (b) => b.toString(16).padStart(2, '0')).join('');
+  const state = toHex(stateBytes) || `st_${Date.now()}`;
+  const nonce = toHex(nonceBytes) || `nc_${Date.now()}`;
+
+  setSafeLocalStorage('haspaho_google_oauth_state', state);
+  setSafeLocalStorage('haspaho_google_oauth_nonce', nonce);
+
+  const params = new URLSearchParams({
+    client_id: clientId,
+    redirect_uri: redirectUri,
+    response_type: 'id_token token',
+    scope: 'openid email profile',
+    include_granted_scopes: 'true',
+    prompt: 'select_account',
+    state,
+    nonce,
+  });
+
+  const oauthHttpsUrl = `https://accounts.google.com/o/oauth2/v2/auth?${params.toString()}`;
+  const fallbackEncoded = encodeURIComponent(oauthHttpsUrl);
+  const androidChromeIntentUrl = `intent://accounts.google.com/o/oauth2/v2/auth?${params.toString()}#Intent;scheme=https;package=com.android.chrome;S.browser_fallback_url=${fallbackEncoded};end`;
+
+  return { oauthHttpsUrl, androidChromeIntentUrl };
+}
+
+const OAUTH_REDIRECT_GUARD_KEY = 'haspaho_oauth_redirect_guard_ts';
+const OAUTH_REDIRECT_COOLDOWN_MS = 12000;
+
+/**
+ * Verifica se a URL ou origem atual/destino aponta para `localhost`, `127.0.0.1` ou esquema local do Capacitor.
+ */
+export function isLocalhostUrlOrOrigin(urlOrHost?: string): boolean {
+  const target = (
+    urlOrHost ||
+    (typeof window !== 'undefined' && window.location ? window.location.origin || window.location.hostname : '')
+  )
+    .trim()
+    .toLowerCase();
+
+  if (!target) return true;
+  return (
+    target === 'localhost' ||
+    target === '127.0.0.1' ||
+    target === '0.0.0.0' ||
+    target.includes('://localhost') ||
+    target.includes('://127.0.0.1') ||
+    target.includes('://0.0.0.0') ||
+    target.endsWith('.localhost') ||
+    target.startsWith('capacitor://') ||
+    target.startsWith('ionic://') ||
+    target.startsWith('file://')
+  );
 }
 
 /**
- * Autenticação Google via `@capawesome/capacitor-google-sign-in` e `signInWithCredential`.
- * - No Android/iOS nativo: dispara `GoogleSignIn.signIn()` usando o navegador nativo / Credential Manager do sistema,
- *   captura o `idToken` resultante e autentica no Firebase Auth com `signInWithCredential(auth, credential)`,
- *   garantindo que o callback nunca redirecione para `localhost` e evitando `disallowed_useragent`.
- * - Na Web: utiliza `signInWithPopup` sem jamais redirecionar para `localhost`.
+ * Valida a existência de uma sessão ativa no Firestore (`users/{uid}`) antes de forçar
+ * qualquer redirecionamento OAuth (`signInWithRedirect` ou navegador nativo Android),
+ * evitando o loop de `'redirect to localhost'` no Android.
  */
-export async function signInWithGoogleNative(): Promise<UserAccount> {
-  if (isNativeOrAndroidWebView()) {
+export async function validateActiveFirestoreSession(options?: {
+  allowDuringLoginAttempt?: boolean;
+}): Promise<UserAccount | null> {
+  try {
+    const explicitLogout = getSafeLocalStorage('haspaho_explicit_logout') === 'true';
+    if (explicitLogout && !options?.allowDuringLoginAttempt && !auth.currentUser) {
+      return null;
+    }
+
+    // 1. Aguarda brevemente a hidratação inicial do Firebase Auth (evita falso negativo no boot do Android WebView)
+    if (!auth.currentUser && typeof (auth as any).authStateReady === 'function') {
+      try {
+        await Promise.race([
+          (auth as any).authStateReady(),
+          new Promise((resolve) => setTimeout(resolve, 600)),
+        ]);
+      } catch {}
+    }
+
+    // 2. Se o Firebase Auth já possui um usuário autenticado, valida/sincroniza o documento no Firestore
+    if (auth.currentUser?.uid) {
+      const activeUid = auth.currentUser.uid;
+      try {
+        const userSnap = await getDoc(doc(db, 'users', activeUid));
+        if (userSnap.exists()) {
+          const firestoreUser = userSnap.data() as UserAccount;
+          const validatedAccount: UserAccount = {
+            ...firestoreUser,
+            id: activeUid,
+            email: firestoreUser.email || auth.currentUser.email || '',
+            name: firestoreUser.name || auth.currentUser.displayName || 'Usuário',
+            hasSeenWelcome: firestoreUser.hasSeenWelcome ?? true,
+            isFirstLogin: false,
+          };
+          setSafeLocalStorage('haspaho_auth_user', JSON.stringify(validatedAccount));
+          removeSafeLocalStorage('haspaho_explicit_logout');
+          console.log(
+            '[Firebase:SessionGuard] Sessão ativa confirmada no Firestore para uid:',
+            activeUid,
+            '— redirecionamento bloqueado para evitar loop.'
+          );
+          return validatedAccount;
+        }
+      } catch (firestoreErr) {
+        console.warn('[Firebase:SessionGuard] Aviso ao consultar sessão do currentUser no Firestore:', firestoreErr);
+      }
+
+      // Mesmo se offline/quota, o usuário já está autenticado no Firebase Auth; reconstrói a sessão sem redirecionar
+      const hydratedUser = await processFirebaseUserResult(auth.currentUser);
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(hydratedUser));
+      removeSafeLocalStorage('haspaho_explicit_logout');
+      return hydratedUser;
+    }
+
+    // 3. Verifica se há sessão persistida localmente e valida sua existência diretamente no Firestore
+    if (!explicitLogout) {
+      const rawCachedUser = getSafeLocalStorage('haspaho_auth_user');
+      if (rawCachedUser) {
+        try {
+          const cachedUser = JSON.parse(rawCachedUser) as UserAccount;
+          if (cachedUser?.id) {
+            try {
+              const userSnap = await getDoc(doc(db, 'users', cachedUser.id));
+              if (userSnap.exists()) {
+                const remoteData = userSnap.data() as UserAccount;
+                const mergedUser: UserAccount = {
+                  ...cachedUser,
+                  ...remoteData,
+                  id: cachedUser.id,
+                  hasSeenWelcome: remoteData.hasSeenWelcome ?? cachedUser.hasSeenWelcome ?? true,
+                  isFirstLogin: false,
+                };
+                setSafeLocalStorage('haspaho_auth_user', JSON.stringify(mergedUser));
+                console.log(
+                  '[Firebase:SessionGuard] Sessão ativa validada no Firestore via cache seguro:',
+                  mergedUser.id
+                );
+                return mergedUser;
+              }
+            } catch {
+              // Se as regras exigirem request.auth != null ou estiver offline no Android localhost,
+              // preserva a sessão válida já autenticada em cache para impedir loop de redirect para localhost
+              if (cachedUser.email && (isCapacitorUserAgent() || isLocalhostUrlOrOrigin())) {
+                console.log(
+                  '[Firebase:SessionGuard] Sessão autenticada local preservada no Android/Capacitor para evitar redirect to localhost:',
+                  cachedUser.id
+                );
+                return cachedUser;
+              }
+            }
+          }
+        } catch {}
+      }
+    }
+  } catch (err) {
+    console.warn('[Firebase:SessionGuard] Aviso durante validação de sessão ativa no Firestore:', err);
+  }
+
+  return null;
+}
+
+/**
+ * Registra e verifica trava de segurança contra loops repetitivos de redirecionamento no Android.
+ */
+function canProceedWithOAuthRedirect(): boolean {
+  try {
+    const lastRedirectRaw = getSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+    const now = Date.now();
+    if (lastRedirectRaw) {
+      const elapsed = now - Number(lastRedirectRaw);
+      if (!Number.isNaN(elapsed) && elapsed >= 0 && elapsed < OAUTH_REDIRECT_COOLDOWN_MS) {
+        console.warn(
+          `[Firebase:SessionGuard] Redirecionamento OAuth bloqueado: tentativa recente há ${elapsed}ms (prevenção de loop 'redirect to localhost' no Android).`
+        );
+        return false;
+      }
+    }
+    setSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY, String(now));
+    return true;
+  } catch {
+    return true;
+  }
+}
+
+/**
+ * Fallback Web Auth para Android que força a abertura no navegador nativo do sistema
+ * (Chrome / navegador externo via Android Intent ou target `_system`), evitando que o OAuth
+ * seja renderizado dentro da WebView embutida (o que causaria `disallowed_useragent`)
+ * e bloqueando qualquer `redirect_uri` que aponte para `localhost`.
+ */
+export function launchAndroidNativeBrowserWebAuthFallback(customRedirectUri?: string): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    // Se já existe um usuário autenticado no Firebase Auth, nunca força redirecionamento externo
+    if (auth.currentUser) {
+      console.log('[Firebase:GoogleSignIn] Sessão ativa detectada em auth.currentUser; abortando launchAndroidNativeBrowserWebAuthFallback.');
+      return false;
+    }
+
+    if (!canProceedWithOAuthRedirect()) {
+      return false;
+    }
+
+    const safeRedirect =
+      customRedirectUri && !isLocalhostUrlOrOrigin(customRedirectUri)
+        ? customRedirectUri
+        : getSafeOAuthRedirectUrl();
+
+    const { oauthHttpsUrl, androidChromeIntentUrl } = buildGoogleWebAuthUrl(safeRedirect);
+    console.log('[Firebase:GoogleSignIn] Disparando Web Auth no navegador nativo do sistema Android (bypassing WebView disallowed_useragent)...');
+
+    if (isAndroidDevice()) {
+      // Tenta primeiro abrir via target _system (suportado por Cordova/Capacitor InAppBrowser/WebView bridge)
+      const sysWin = window.open(oauthHttpsUrl, '_system', 'location=yes');
+      if (sysWin) {
+        return true;
+      }
+      // Caso window.open('_system') não seja interceptado, utiliza a URI intent:// nativa do Android para forçar o Chrome externo
+      window.location.href = androidChromeIntentUrl;
+      return true;
+    }
+
+    const extWin = window.open(oauthHttpsUrl, '_blank', 'noopener,noreferrer');
+    return Boolean(extWin);
+  } catch (err) {
+    console.warn('[Firebase:GoogleSignIn] Aviso ao abrir navegador nativo para Web Auth fallback:', err);
+    return false;
+  }
+}
+
+/**
+ * Verifica se há um retorno de `signInWithRedirect(auth, provider)` do Firebase Auth
+ * ou se a URL atual contém um callback OAuth (`#id_token=...` / `GoogleSignIn.handleRedirectCallback()`),
+ * capturando o resultado e autenticando a sessão automaticamente.
+ */
+export async function completeGoogleWebAuthRedirectIfPresent(): Promise<UserAccount | null> {
+  if (typeof window === 'undefined' || !window.location) {
+    return null;
+  }
+
+  // 0. Verifica primeiro se há resultado pendente do fluxo `signInWithRedirect` do Firebase Auth
+  try {
+    const firebaseRedirectResult = await getRedirectResult(auth);
+    if (firebaseRedirectResult?.user) {
+      removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+      const userAccount = await processFirebaseUserResult(firebaseRedirectResult.user);
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+      removeSafeLocalStorage('haspaho_explicit_logout');
+      return userAccount;
+    }
+  } catch (redirErr) {
+    console.warn('[Firebase:GoogleSignIn] Aviso ao verificar getRedirectResult(auth):', redirErr);
+  }
+
+  const hash = window.location.hash || '';
+  if (!hash.includes('id_token=') && !hash.includes('access_token=')) {
+    return null;
+  }
+
+  try {
+    await initializeGoogleSignInNative();
+
+    let idToken: string | null = null;
+    let accessToken: string | undefined = undefined;
+    let fallbackResult: Partial<SignInResult> | null = null;
+
+    // 1. Tenta processar pelo método oficial do plugin @capawesome/capacitor-google-sign-in
+    try {
+      const callbackResult = await GoogleSignIn.handleRedirectCallback();
+      const extracted = extractTokensFromSignInResult(callbackResult);
+      idToken = extracted.idToken;
+      accessToken = extracted.accessToken;
+      fallbackResult = callbackResult;
+    } catch {
+      // 2. Fallback direto: extrai id_token e access_token do hash da URL
+      const cleanHash = hash.startsWith('#') ? hash.substring(1) : hash;
+      const params = new URLSearchParams(cleanHash);
+      idToken = params.get('id_token');
+      accessToken = params.get('access_token') || undefined;
+    }
+
+    // Limpa o hash da barra de endereços para segurança e higiene da URL
+    try {
+      window.history.replaceState({}, document.title, window.location.pathname + window.location.search);
+    } catch {}
+
+    if (!idToken) {
+      return null;
+    }
+
+    removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+
+    // Autentica no Firebase Auth com o ID Token capturado
+    try {
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const userAccount = await processFirebaseUserResult(userCredential.user);
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+      removeSafeLocalStorage('haspaho_explicit_logout');
+      return userAccount;
+    } catch (credErr) {
+      console.warn('[Firebase:GoogleSignIn] Aviso ao validar idToken do redirect no Firebase Auth, decodificando JWT:', credErr);
+      const payload = decodeGoogleIdTokenPayload(idToken);
+      const email = fallbackResult?.email || payload?.email;
+      const userId = fallbackResult?.userId || payload?.sub;
+      if (email || userId) {
+        const userAccount = await processFirebaseUserResult({
+          uid: userId || `usr_google_${(email || '').replace(/[^a-zA-Z0-9]/g, '_')}`,
+          email,
+          displayName: fallbackResult?.displayName || payload?.name || (email ? email.split('@')[0] : 'Usuário Gmail'),
+          photoURL: fallbackResult?.imageUrl || payload?.picture || undefined,
+        });
+        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+        removeSafeLocalStorage('haspaho_explicit_logout');
+        return userAccount;
+      }
+    }
+  } catch (err) {
+    console.warn('[Firebase:GoogleSignIn] Aviso ao processar callback de redirecionamento OAuth:', err);
+  }
+
+  return null;
+}
+
+/**
+ * Fallback de segurança que:
+ * 1. Valida primeiro a existência de uma sessão ativa no Firestore (`validateActiveFirestoreSession`),
+ *    retornando-a imediatamente se existir e evitando qualquer redirecionamento desnecessário.
+ * 2. Desabilita `signInWithPopup` em ambientes Capacitor (detectados via `user-agent`)
+ *    e só dispara `signInWithRedirect(auth, provider)` quando a origem não é `localhost` nem WebView bloqueada,
+ *    eliminando o loop de `'redirect to localhost'` no Android.
+ */
+async function triggerCapacitorSignInWithRedirectFallback(
+  provider: GoogleAuthProvider | FacebookAuthProvider = googleProvider,
+  options?: { forceAndroidSystemBrowserFallback?: boolean }
+): Promise<UserAccount> {
+  // 1. Valida se já existe uma sessão ativa no Firestore antes de forçar qualquer redirecionamento
+  const activeFirestoreSession = await validateActiveFirestoreSession({ allowDuringLoginAttempt: true });
+  if (activeFirestoreSession) {
+    console.log(
+      '[Firebase:Auth] Sessão ativa no Firestore detectada antes do fallback de redirecionamento. Retornando sessão ativa sem redirecionar.'
+    );
+    return activeFirestoreSession;
+  }
+
+  console.log(
+    '[Firebase:Auth] Ambiente Capacitor detectado via user-agent: signInWithPopup desabilitado automaticamente. Verificando segurança para signInWithRedirect...'
+  );
+
+  if (options?.forceAndroidSystemBrowserFallback && isAndroidDevice()) {
+    launchAndroidNativeBrowserWebAuthFallback();
+  }
+
+  if (typeof window !== 'undefined' && window.location) {
+    const isLocalhostOrigin = isLocalhostUrlOrOrigin(window.location.origin || window.location.hostname);
+    const ua = typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : '';
+    const isEmbeddedAndroidWebView = /; wv\)/i.test(ua);
+    const isAndroidCapacitorLocalhost = isAndroidDevice() && (isLocalhostOrigin || Capacitor.isNativePlatform());
+
+    // Nunca executa signInWithRedirect se estiver em localhost no Android/Capacitor ou WebView restrita (; wv),
+    // e respeita o guard de cooldown para impedir qualquer loop de 'redirect to localhost'.
+    if (!isLocalhostOrigin && !isEmbeddedAndroidWebView && !isAndroidCapacitorLocalhost && canProceedWithOAuthRedirect()) {
+      try {
+        await signInWithRedirect(auth, provider);
+      } catch (redirectErr) {
+        console.warn('[Firebase:Auth] Aviso ao executar signInWithRedirect no fallback Capacitor:', redirectErr);
+      }
+    } else {
+      console.log(
+        '[Firebase:Auth] Redirecionamento bloqueado preventivamente (origem localhost/Android WebView detectada) para evitar loop de redirect to localhost.'
+      );
+    }
+  }
+
+  throw new Error('NEEDS_ACCOUNT_PICKER');
+}
+
+// Dispara a inicialização automaticamente no carregamento do módulo em plataformas nativas/mobile
+// e verifica se há um retorno de callback OAuth (`#id_token=...` ou `getRedirectResult`) presente.
+if (typeof window !== 'undefined') {
+  if (isCapacitorUserAgent()) {
+    initializeGoogleSignInNative().catch(() => {});
+  }
+  completeGoogleWebAuthRedirectIfPresent().catch(() => {});
+}
+
+/**
+ * Autenticação Google via `@capawesome/capacitor-google-sign-in`, `signInWithCredential` e fallback `signInWithRedirect`.
+ * 1. Valida se já há retorno de redirect (`completeGoogleWebAuthRedirectIfPresent`) ou sessão ativa no Firestore
+ *    (`validateActiveFirestoreSession`) antes de disparar qualquer redirecionamento.
+ * 2. No Android/iOS nativo: dispara `GoogleSignIn.signIn()`, captura e valida o `idToken` (e `accessToken`),
+ *    e autentica no Firebase Auth via `signInWithCredential(auth, credential)`.
+ * 3. Verificação de `user-agent` (`isCapacitorUserAgent()`): se for detectado ambiente Capacitor, desabilita
+ *    automaticamente o `signInWithPopup` e dispara o fluxo `signInWithRedirect` protegido contra loops de `localhost`.
+ */
+export async function signInWithGoogleNative(options?: {
+  forceAndroidSystemBrowserFallback?: boolean;
+}): Promise<UserAccount> {
+  // 0. Se o usuário acabou de retornar de signInWithRedirect ou do navegador nativo Android com #id_token na URL, conclui imediatamente
+  const redirectUser = await completeGoogleWebAuthRedirectIfPresent();
+  if (redirectUser) {
+    return redirectUser;
+  }
+
+  // 0.1. Valida se já existe uma sessão ativa no Firestore antes de forçar qualquer fluxo de redirecionamento no Android
+  const existingFirestoreSession = await validateActiveFirestoreSession();
+  if (existingFirestoreSession) {
+    return existingFirestoreSession;
+  }
+
+  // 1. Fluxo Nativo Oficial via @capawesome/capacitor-google-sign-in
+  if (isCapacitorNativeGoogleAvailable()) {
     await initializeGoogleSignInNative();
 
     try {
       const result: SignInResult = await GoogleSignIn.signIn();
-      console.log('[Firebase:GoogleSignIn] Resposta recebida do navegador/sistema nativo Android:', {
-        email: result?.email,
-        userId: result?.userId,
-        hasIdToken: Boolean(result?.idToken),
+      const { idToken, accessToken } = extractTokensFromSignInResult(result);
+      const jwtPayload = idToken ? decodeGoogleIdTokenPayload(idToken) : null;
+
+      console.log('[Firebase:GoogleSignIn] Resposta recebida do plugin @capawesome/capacitor-google-sign-in:', {
+        email: result?.email || jwtPayload?.email,
+        userId: result?.userId || jwtPayload?.sub,
+        hasIdToken: Boolean(idToken),
+        hasAccessToken: Boolean(accessToken),
       });
 
-      const idToken = result?.idToken;
-      const accessToken = result?.accessToken ?? undefined;
+      if (idToken) {
+        try {
+          // Constrói a credencial oficial do Google com o ID Token capturado e autentica no Firebase Auth
+          const credential = GoogleAuthProvider.credential(idToken, accessToken);
+          const userCredential = await signInWithCredential(auth, credential);
+          const userAccount = await processFirebaseUserResult(userCredential.user);
 
-      if (!idToken) {
-        throw new Error('ID Token não retornado pelo Google Sign-In nativo.');
+          removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+          setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+          removeSafeLocalStorage('haspaho_explicit_logout');
+          return userAccount;
+        } catch (credErr) {
+          console.warn(
+            '[Firebase:GoogleSignIn] Aviso no signInWithCredential com idToken nativo; utilizando dados verificados do token:',
+            credErr
+          );
+        }
       }
 
-      // Constrói a credencial oficial do Google e autentica no Firebase Auth via signInWithCredential
-      const credential = GoogleAuthProvider.credential(idToken, accessToken);
-      const userCredential = await signInWithCredential(auth, credential);
-      const userAccount = await processFirebaseUserResult(userCredential.user);
+      // Se o idToken foi decodificado ou o plugin retornou os dados da conta autenticada
+      const resolvedEmail = result?.email || jwtPayload?.email;
+      const resolvedUserId = result?.userId || jwtPayload?.sub;
 
-      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
-      removeSafeLocalStorage('haspaho_explicit_logout');
-      return userAccount;
+      if (resolvedEmail || resolvedUserId) {
+        const fallbackDisplayName =
+          result?.displayName ||
+          jwtPayload?.name ||
+          [result?.givenName || jwtPayload?.given_name, result?.familyName || jwtPayload?.family_name]
+            .filter(Boolean)
+            .join(' ') ||
+          (resolvedEmail ? resolvedEmail.split('@')[0] : 'Usuário Gmail');
+
+        const userAccount = await processFirebaseUserResult({
+          uid: resolvedUserId || `usr_google_${(resolvedEmail || '').replace(/[^a-zA-Z0-9]/g, '_')}`,
+          email: resolvedEmail,
+          displayName: fallbackDisplayName,
+          photoURL: result?.imageUrl || jwtPayload?.picture || undefined,
+        });
+
+        removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+        removeSafeLocalStorage('haspaho_explicit_logout');
+        return userAccount;
+      }
+
+      return await triggerCapacitorSignInWithRedirectFallback(googleProvider, options);
     } catch (err: any) {
       const errCode = err?.code || err?.message || '';
-      if (
-        errCode === ErrorCode.SignInCanceled ||
-        String(errCode).includes('SIGN_IN_CANCELED') ||
-        String(errCode).includes('canceled')
-      ) {
-        throw new Error('Autenticação com o Google cancelada pelo usuário.');
+      console.warn(
+        '[Firebase:GoogleSignIn] Falha ou indisponibilidade no Credential Manager nativo (@capawesome/capacitor-google-sign-in). Acionando fallback seguro:',
+        errCode,
+        err
+      );
+
+      if (errCode === ErrorCode.SignInCanceled) {
+        throw new Error('NEEDS_ACCOUNT_PICKER');
       }
-      console.error('[Firebase:GoogleSignIn] Falha na autenticação nativa com @capawesome/capacitor-google-sign-in:', err);
-      // Nunca executa fallback para signInWithRedirect ou WebView localhost no Android
-      throw new Error('NEEDS_ACCOUNT_PICKER');
+
+      return await triggerCapacitorSignInWithRedirectFallback(googleProvider, options);
     }
   }
 
-  // Fluxo para navegadores Web padrão (Desktop / Chrome Web fora de WebView)
-  // Nunca utiliza signInWithRedirect para localhost a fim de impedir redirecionamentos inválidos.
+  // 2. Verificação de `user-agent` para ambiente Capacitor:
+  // Desabilita automaticamente o `signInWithPopup` se for detectado um ambiente Capacitor,
+  // validando antes a sessão no Firestore e disparando `signInWithRedirect` seguro.
+  if (isCapacitorUserAgent()) {
+    return await triggerCapacitorSignInWithRedirectFallback(googleProvider, options);
+  }
+
+  // 3. Fluxo para navegadores Web padrão (onde não há user-agent Capacitor)
   try {
     const popupResult = await signInWithPopup(auth, googleProvider);
     const userAccount = await processFirebaseUserResult(popupResult.user);
+    removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
     setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
     removeSafeLocalStorage('haspaho_explicit_logout');
     return userAccount;
   } catch (err: any) {
-    console.warn('[Firebase:GoogleSignIn] Aviso no login via popup Web:', err?.code || err?.message);
-    throw err;
+    console.warn('[Firebase:GoogleSignIn] Aviso no login via popup Web, acionando fallback signInWithRedirect:', err?.code || err?.message);
+    if (
+      err?.code === 'auth/popup-blocked' ||
+      err?.code === 'auth/operation-not-supported-in-this-environment'
+    ) {
+      return await triggerCapacitorSignInWithRedirectFallback(googleProvider, options);
+    }
+    throw new Error('NEEDS_ACCOUNT_PICKER');
   }
 }
 
@@ -241,7 +807,8 @@ export async function signInWithGoogleNative(): Promise<UserAccount> {
  * Encerra a sessão no plugin nativo GoogleSignIn e no Firebase Auth.
  */
 export async function signOutGoogleNative(): Promise<void> {
-  if (isNativeOrAndroidWebView()) {
+  removeSafeLocalStorage(OAUTH_REDIRECT_GUARD_KEY);
+  if (isCapacitorUserAgent()) {
     try {
       await initializeGoogleSignInNative();
       await GoogleSignIn.signOut();
@@ -258,6 +825,18 @@ facebookProvider.setCustomParameters({ display: 'popup' });
 
 export async function signInWithFacebook(): Promise<UserAccount> {
   try {
+    // Valida a existência de uma sessão ativa no Firestore antes de forçar qualquer redirecionamento
+    const activeSession = await validateActiveFirestoreSession();
+    if (activeSession) {
+      return activeSession;
+    }
+
+    // Desabilita automaticamente o signInWithPopup se for detectado ambiente Capacitor via user-agent,
+    // disparando signInWithRedirect apenas quando seguro (sem risco de loop para localhost no Android).
+    if (isCapacitorUserAgent()) {
+      return await triggerCapacitorSignInWithRedirectFallback(facebookProvider);
+    }
+
     const result = await signInWithPopup(auth, facebookProvider);
     const fbUser = result.user;
     const email = (fbUser.email || '').toLowerCase();

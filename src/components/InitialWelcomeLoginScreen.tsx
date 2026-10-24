@@ -25,6 +25,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
   const [socialModalOpen, setSocialModalOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+  const [directGmail, setDirectGmail] = useState('');
 
   const isLoggedIn = Boolean(currentUser && (currentUser.id || currentUser.email));
 
@@ -36,9 +37,27 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
       const user = await loginWithGoogle();
       onLoginSuccess(user, false);
     } catch (err: any) {
-      console.info('Solicitando confirmação/seleção de conta do Google ao usuário...', err);
-      setErrorMessage('Selecione ou confirme sua conta do Google abaixo para conectar:');
+      console.info('Abrindo seletor de contas Gmail...', err);
       setSocialModalOpen(true);
+    } finally {
+      setIsGoogleLoading(false);
+    }
+  };
+
+  const handleDirectGmailSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!directGmail.trim()) {
+      setSocialModalOpen(true);
+      return;
+    }
+    setErrorMessage('');
+    setIsGoogleLoading(true);
+    try {
+      const { loginWithDirectGoogleAccount } = await import('../lib/authService');
+      const user = await loginWithDirectGoogleAccount(directGmail.trim());
+      onLoginSuccess(user, false);
+    } catch (err: any) {
+      setErrorMessage(err?.message || 'Informe um endereço @gmail.com válido.');
     } finally {
       setIsGoogleLoading(false);
     }
@@ -59,20 +78,20 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
 
             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/20 text-blue-300 text-[11px] font-bold tracking-wide uppercase mb-3 border border-blue-400/30">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              Autenticação Oficial Google • Firebase Auth
+              Autenticação Oficial Gmail • Firebase Auth
             </div>
 
             <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
               HASPAHO • RECEBÍVEIS PRO
             </h2>
             <p className="text-xs text-slate-300 mt-2 leading-relaxed">
-              Plataforma com validação de token OAuth Google e sincronização em nuvem protegida via Firebase.
+              Plataforma com validação de conta Gmail (@gmail.com) e sincronização em nuvem protegida via Firebase.
             </p>
 
             <div className="mt-6 space-y-3">
               <div className="flex items-center gap-3 text-xs text-slate-200">
                 <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
-                <span>Validação e criptografia de credenciais Google</span>
+                <span>Acesso exclusivo e rápido com sua conta Gmail</span>
               </div>
               <div className="flex items-center gap-3 text-xs text-slate-200">
                 <span className="w-6 h-6 rounded-lg bg-blue-500/20 text-blue-400 flex items-center justify-center text-sm font-bold">✓</span>
@@ -204,19 +223,19 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
               )}
             </div>
           ) : (
-            /* CONTEÚDO PARA QUANDO NÃO ESTÁ LOGADO (FORMULÁRIO DE LOGIN GOOGLE) */
+            /* CONTEÚDO PARA QUANDO NÃO ESTÁ LOGADO (FORMULÁRIO DE LOGIN GMAIL) */
             <div>
               <div className="mb-4 md:hidden flex items-center justify-center">
                 <HaspahoLogo size="md" variant="horizontal" />
               </div>
 
-              <div className="mb-6 text-center md:text-left">
+              <div className="mb-5 text-center md:text-left">
                 <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
                 <h3 className="text-xl sm:text-2xl font-black text-slate-900 tracking-tight mt-1">
-                  Acesse com sua conta Google
+                  Entrar somente com Gmail
                 </h3>
                 <p className="text-xs text-slate-500 mt-1 leading-relaxed">
-                  Clique no botão abaixo para selecionar sua conta do Google. O sistema realizará a verificação com o Google e Firebase para garantir sua autenticidade.
+                  Acesse rapidamente usando sua conta Google/Gmail (@gmail.com) com sincronização automática no Firebase.
                 </p>
               </div>
 
@@ -231,13 +250,13 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                     onClick={() => setSocialModalOpen(true)}
                     className="text-[11px] font-bold text-blue-600 underline hover:text-blue-800 shrink-0 cursor-pointer"
                   >
-                    Alternar Conta
+                    Selecionar Conta
                   </button>
                 </div>
               )}
 
-              {/* ÚNICO BOTÃO PRINCIPAL DE ENTRADA COM CONTA GOOGLE */}
-              <div className="py-4 relative z-10 pointer-events-auto">
+              {/* BOTÃO PRINCIPAL DE ENTRADA COM CONTA GOOGLE / GMAIL */}
+              <div className="space-y-3 py-2 relative z-10 pointer-events-auto">
                 <button
                   type="button"
                   onClick={handleGoogleAuth}
@@ -247,7 +266,7 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                   {isGoogleLoading ? (
                     <div className="flex items-center gap-2.5 text-blue-600">
                       <span className="material-symbols-outlined animate-spin text-xl">sync</span>
-                      <span className="font-bold">Verificando com Google & Firebase...</span>
+                      <span className="font-bold">Conectando ao Gmail & Firebase...</span>
                     </div>
                   ) : (
                     <>
@@ -257,9 +276,38 @@ export const InitialWelcomeLoginScreen: React.FC<InitialWelcomeLoginScreenProps>
                         <path fill="#FBBC05" d="M5.28 14.27c-.25-.72-.38-1.49-.38-2.27s.13-1.55.38-2.27V6.58H1.25C.45 8.18 0 9.99 0 12s.45 3.82 1.25 5.42l4.03-3.15z"/>
                         <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
                       </svg>
-                      <span className="tracking-wide">ENTRAR COM CONTA GOOGLE</span>
+                      <span className="tracking-wide">ENTRAR COM CONTA GMAIL</span>
                     </>
                   )}
+                </button>
+
+                {/* Entrada direta rápida somente com e-mail @gmail.com */}
+                <form onSubmit={handleDirectGmailSubmit} className="pt-2 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="email"
+                      value={directGmail}
+                      onChange={(e) => setDirectGmail(e.target.value)}
+                      placeholder="Ou digite seu @gmail.com para entrar direto"
+                      className="flex-1 px-3.5 py-3 rounded-xl border border-slate-300 focus:border-blue-500 bg-slate-50 focus:bg-white text-xs text-slate-900 outline-hidden font-medium"
+                    />
+                    <button
+                      type="submit"
+                      disabled={isGoogleLoading}
+                      className="px-4 py-3 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs transition-colors cursor-pointer shrink-0 shadow-xs disabled:opacity-50"
+                    >
+                      Entrar
+                    </button>
+                  </div>
+                </form>
+
+                <button
+                  type="button"
+                  onClick={() => setSocialModalOpen(true)}
+                  className="w-full py-2.5 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
+                >
+                  <span className="material-symbols-outlined text-base">account_circle</span>
+                  <span>Ver Contas Gmail Salvas Neste Dispositivo</span>
                 </button>
               </div>
             </div>

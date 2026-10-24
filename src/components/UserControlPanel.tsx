@@ -212,30 +212,45 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
         {/* ============================================================ */}
         {/* CORPO DO PAINEL (SCROLLÁVEL E RESPONSIVO)                     */}
         {/* ============================================================ */}
-        <div className="flex-1 overflow-y-auto overscroll-contain p-3.5 sm:p-4 space-y-3.5">
+        <div className="flex-1 overflow-y-auto overscroll-contain p-2.5 sm:p-3.5 space-y-2.5">
           {/* ---------------------------------------------------------- */}
           {/* CAMADA 1: HOME DA CARENAGEM (ACESSO RÁPIDO & ORGANIZADO)    */}
           {/* ---------------------------------------------------------- */}
           {activeLayer === 'root' && (
-            <div className="space-y-3.5 animate-in fade-in duration-150">
-              {/* 1. Grade de Atalhos Rápidos (Poucos e Importantes) */}
+            <div className="space-y-2.5 animate-in fade-in duration-150">
+              {/* 1. Grade de Ações Rápidas Compacta (Automação Gemini + Ícones em Grade Única) */}
               <div>
-                <span className="text-[10.5px] font-bold text-slate-500 uppercase tracking-wider block mb-2 px-1">
-                  Acesso Rápido
+                <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block mb-1.5 px-1">
+                  Ações Rápidas
                 </span>
-                <div className="grid grid-cols-4 gap-1.5 sm:gap-2">
+                <div className="grid grid-cols-3 gap-1.5">
+                  {/* Automação Gemini */}
+                  <button
+                    type="button"
+                    onClick={() => handleActionAndClose(() => onNavigate('gemini-automacao'))}
+                    className="p-1.5 sm:p-2 rounded-xl bg-indigo-50/90 hover:bg-indigo-100 active:scale-95 border border-indigo-200/80 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
+                    title="Abrir Automação Inteligente Gemini (Voz & Texto)"
+                  >
+                    <span className="material-symbols-outlined text-[18px] text-indigo-600 group-hover:scale-110 transition-transform">
+                      smart_toy
+                    </span>
+                    <span className="text-[10px] font-bold text-indigo-950 leading-tight truncate w-full">
+                      IA Gemini
+                    </span>
+                  </button>
+
                   {/* + Novo Relacionado */}
                   {onOpenNewDebtor && (
                     <button
                       type="button"
                       onClick={() => handleActionAndClose(onOpenNewDebtor)}
-                      className="p-2 sm:p-2.5 rounded-2xl bg-blue-50/80 hover:bg-blue-100 active:scale-95 border border-blue-200/70 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group"
+                      className="p-1.5 sm:p-2 rounded-xl bg-blue-50/80 hover:bg-blue-100 active:scale-95 border border-blue-200/70 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
                       title="Cadastrar novo relacionado ou devedor"
                     >
-                      <span className="material-symbols-outlined text-[20px] text-blue-600 group-hover:scale-110 transition-transform">
+                      <span className="material-symbols-outlined text-[18px] text-blue-600 group-hover:scale-110 transition-transform">
                         person_add
                       </span>
-                      <span className="text-[10px] font-bold text-blue-900 leading-tight">
+                      <span className="text-[10px] font-bold text-blue-900 leading-tight truncate w-full">
                         + Novo
                       </span>
                     </button>
@@ -245,13 +260,13 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveLayer('devedores')}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group"
+                    className="p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
                     title="Editar ou pesquisar devedores"
                   >
-                    <span className="material-symbols-outlined text-[20px] text-indigo-600 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-[18px] text-indigo-600 group-hover:scale-110 transition-transform">
                       group
                     </span>
-                    <span className="text-[10px] font-bold text-slate-800 leading-tight">
+                    <span className="text-[10px] font-bold text-slate-800 leading-tight truncate w-full">
                       Devedores
                     </span>
                   </button>
@@ -260,13 +275,13 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveLayer('credor')}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group"
+                    className="p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
                     title="Visualizar e editar dados do credor"
                   >
-                    <span className="material-symbols-outlined text-[20px] text-emerald-600 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-[18px] text-emerald-600 group-hover:scale-110 transition-transform">
                       account_balance_wallet
                     </span>
-                    <span className="text-[10px] font-bold text-slate-800 leading-tight">
+                    <span className="text-[10px] font-bold text-slate-800 leading-tight truncate w-full">
                       Credor
                     </span>
                   </button>
@@ -275,13 +290,13 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => handleActionAndClose(() => onNavigate('parcelas'))}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-cyan-50/80 hover:bg-cyan-100 active:scale-95 border border-cyan-200/80 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group"
+                    className="p-1.5 sm:p-2 rounded-xl bg-cyan-50/80 hover:bg-cyan-100 active:scale-95 border border-cyan-200/80 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
                     title="Central de Parcelas e Recebíveis"
                   >
-                    <span className="material-symbols-outlined text-[20px] text-cyan-600 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-[18px] text-cyan-600 group-hover:scale-110 transition-transform">
                       view_kanban
                     </span>
-                    <span className="text-[10px] font-bold text-cyan-900 leading-tight">
+                    <span className="text-[10px] font-bold text-cyan-900 leading-tight truncate w-full">
                       Parcelas
                     </span>
                   </button>
@@ -290,13 +305,13 @@ export const UserControlPanel: React.FC<UserControlPanelProps> = ({
                   <button
                     type="button"
                     onClick={() => setActiveLayer('conta')}
-                    className="p-2 sm:p-2.5 rounded-2xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group"
+                    className="p-1.5 sm:p-2 rounded-xl bg-slate-50 hover:bg-slate-100 active:scale-95 border border-slate-200/80 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group"
                     title="Segurança e configurações de conta"
                   >
-                    <span className="material-symbols-outlined text-[20px] text-amber-600 group-hover:scale-110 transition-transform">
+                    <span className="material-symbols-outlined text-[18px] text-amber-600 group-hover:scale-110 transition-transform">
                       shield_person
                     </span>
-                    <span className="text-[10px] font-bold text-slate-800 leading-tight">
+                    <span className="text-[10px] font-bold text-slate-800 leading-tight truncate w-full">
                       Conta
                     </span>
                   </button>

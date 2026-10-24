@@ -464,12 +464,8 @@ export default function App() {
 
     async function loadUserData(user: UserAccount) {
       console.log(`[Firestore:LOAD_DATA] Loading data from database for user "${user.name}" (ID: ${user.id})...`);
-      
-      // If user is Google-authenticated but Firebase Auth session is not ready, rely on local cache to prevent permission errors
       if (!auth.currentUser && user.authProvider === 'gmail') {
-        console.log(`[Firestore:LOAD_DATA] Sem sessão Firebase Auth ativa para usuário Google ${user.id}. Operando com dados locais.`);
-        isInitialLoadRef.current = false;
-        return;
+        console.log(`[Firestore:LOAD_DATA] Operando com sessão Gmail rápida para ${user.id} (${user.email}).`);
       }
 
       try {
@@ -2562,6 +2558,7 @@ export default function App() {
     setCurrentUser(user);
     localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
     setIsAuthOpen(false);
+    setCurrentTab('dashboard');
 
     // Controle estrito de apresentação: exibida APENAS no primeiro acesso de cada usuário
     const completedLocally = localStorage.getItem(`haspaho_welcome_completed_${user.id}`) === 'true';

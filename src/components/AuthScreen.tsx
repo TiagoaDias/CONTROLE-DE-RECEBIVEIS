@@ -32,8 +32,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
       onLoginSuccess(user, false);
       if (onClose) onClose();
     } catch (err: any) {
-      console.info('Abertura do seletor de contas do Google...', err);
-      setErrorMessage('Selecione ou confirme sua conta do Google abaixo:');
+      console.info('Abertura do seletor de contas Gmail...', err);
       setSocialModalOpen(true);
     } finally {
       setIsLoading(false);
@@ -68,25 +67,25 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
 
           <div className="mb-4 text-center">
             <span className="text-[11px] font-black tracking-widest text-blue-600 uppercase">RECEBÍVEIS PRO</span>
-            <h3 className="text-xl font-black text-slate-900 mt-1">Acesse com sua conta Google</h3>
+            <h3 className="text-xl font-black text-slate-900 mt-1">Entrar somente com Gmail</h3>
             <p className="text-xs text-slate-500 mt-1">
-              Segurança avançada com login direto sem pop-up no celular.
+              Segurança avançada com login direto usando sua conta @gmail.com.
             </p>
           </div>
 
           {errorMessage && (
-            <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex flex-col gap-2">
+            <div className="mb-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-amber-800 text-xs flex flex-col gap-2">
               <div className="flex items-start gap-2">
-                <span className="material-symbols-outlined text-[16px] shrink-0 text-red-600">error</span>
+                <span className="material-symbols-outlined text-[16px] shrink-0 text-amber-600">info</span>
                 <span>{errorMessage}</span>
               </div>
               <button
                 type="button"
                 onClick={() => setSocialModalOpen(true)}
-                className="w-full py-2 px-3 rounded-lg bg-red-600 hover:bg-red-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
+                className="w-full py-2 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer"
               >
                 <span className="material-symbols-outlined text-sm">account_circle</span>
-                <span>SELECIONAR OU DIGITAR CONTA GOOGLE</span>
+                <span>SELECIONAR OU DIGITAR CONTA GMAIL</span>
               </button>
             </div>
           )}
@@ -106,7 +105,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
                 <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.33 0 3.26 2.64 1.25 6.58l4.03 3.15c.95-2.83 3.6-4.98 6.72-4.98z"/>
               </svg>
               <div className="text-left">
-                <div className="font-extrabold text-xs">{isLoading ? 'Conectando...' : 'ENTRAR COM GOOGLE'}</div>
+                <div className="font-extrabold text-xs">{isLoading ? 'Conectando...' : 'ENTRAR COM CONTA GMAIL'}</div>
               </div>
             </button>
 
@@ -116,7 +115,7 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({
               className="w-full py-2 px-3 rounded-xl bg-slate-50 hover:bg-blue-50 text-slate-700 hover:text-blue-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer border border-slate-200"
             >
               <span className="material-symbols-outlined text-base">manage_accounts</span>
-              <span>Alternar ou Digitar E-mail Google</span>
+              <span>Alternar ou Digitar E-mail @gmail.com</span>
             </button>
 
             
