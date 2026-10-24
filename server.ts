@@ -4,6 +4,13 @@ import fs from 'fs';
 import { createServer as createViteServer } from 'vite';
 import dotenv from 'dotenv';
 import { GoogleGenAI, Type } from '@google/genai';
+import { runGeminiAutomation } from './server/geminiAutomationEngine';
+import {
+  listAllClientHistories,
+  readClientTxtFile,
+  syncCadastroTxt,
+  syncStatusFinanceiroTxt,
+} from './server/txtHistoryManager';
 
 dotenv.config();
 
@@ -50,6 +57,148 @@ app.get('/api/health', (req: Request, res: Response) => {
     hasGeminiKey: Boolean(process.env.GEMINI_API_KEY),
     timestamp: new Date().toISOString(),
   });
+});
+
+// 1. Endpoint Oficial de Automação Inteligente Gemini + Controle de Recebíveis
+app.post('/api/gemini/automate', async (req: Request, res: Response) => {
+  try {
+    const { command, context, forceConfirmed } = req.body;
+    if (!command || typeof command !== 'string') {
+      return res.status(400).json({ error: 'Comando em linguagem natural é obrigatório.' });
+    }
+
+    const ai = getGeminiClient();
+    const result = await runGeminiAutomation(
+      command,
+      context || { debtors: [], purchases: [], installments: [], transactions: [], currentUser: null },
+      ai,
+      Boolean(forceConfirmed)
+    );
+
+    return res.json({
+      success: true,
+      result,
+    });
+  } catch (err: any) {
+    console.error('[GeminiAutomate:ERROR]', err);
+    return res.status(500).json({
+      error: 'Falha ao executar a automação Gemini.',
+      details: err?.message,
+    });
+  }
+});
+
+// 1.1 Endpoint para Transcrição Inteligente de Áudio via Gemini
+app.post('/api/gemini/transcribe-audio', async (req: Request, res: Response) => {
+  try {
+    const { audioBase64, mimeType } = req.body;
+    if (!audioBase64 || typeof audioBase64 !== 'string') {
+      return res.status(400).json({ error: 'Áudio não fornecido ou formato inválido.' });
+    }
+
+    const ai = getGeminiClient();
+    if (!ai) {
+      return res.status(503).json({ error: 'Serviço Gemini temporariamente indisponível no servidor.' });
+    }
+
+    const cleanBase64 = audioBase64.replace(/^data:[^;]+;base64,/, '');
+    let rawMime = (mimeType || 'audio/webm').split(';')[0].trim().toLowerCase();
+    if (rawMime === 'audio/m4a' || rawMime === 'audio/x-m4a') {
+      rawMime = 'audio/mp4';
+    }
+    const cleanMime = rawMime;
+
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('Timeout de comunicação no reconhecimento de áudio Gemini (12s)')), 12000)
+    );
+
+    const response = await Promise.race([
+      ai.models.generateContent({
+        model: 'gemini-3.8-flash',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              {
+                inlineData: {
+                  mimeType: cleanMime,
+                  data: cleanBase64,
+                },
+              },
+              {
+                text: 'Você é o módulo de reconhecimento de voz do sistema de controle financeiro Recebíveis & Parcelas PRO. Transcreva com fidelidade absoluta o comando falado pelo usuário em português do Brasil (exemplo: "Fábio Dias efetuou um pagamento de 150 reais. Salve essa informação para mim" ou "Quanto Carlos ainda deve?"). Retorne EXCLUSIVAMENTE o texto transcrito, sem aspas, sem formatação Markdown e sem comentários adicionais.',
+              },
+            ],
+          },
+        ],
+      }),
+      timeoutPromise,
+    ]);
+
+    const transcript = response.text?.trim() || '';
+    return res.json({ success: true, transcript });
+  } catch (err: any) {
+    console.error('[GeminiTranscribeAudio:ERROR]', err);
+    return res.status(500).json({
+      error: 'Falha ao transcrever o áudio com o Gemini.',
+      details: err?.message,
+    });
+  }
+});
+
+// 2. Endpoints para Gerenciamento e Consulta da Estrutura de Arquivos TXT de Histórico
+app.get('/api/txt-historico', (req: Request, res: Response) => {
+  try {
+    const list = listAllClientHistories();
+    res.json({ success: true, clients: list });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao listar históricos TXT.', details: err?.message });
+  }
+});
+
+app.get('/api/txt-historico/:folderName/:fileName', (req: Request, res: Response) => {
+  try {
+    const { folderName, fileName } = req.params;
+    const content = readClientTxtFile(folderName, fileName);
+    if (content === null) {
+      return res.status(404).json({ error: 'Arquivo TXT não encontrado.' });
+    }
+    if (req.query.download === 'true') {
+      res.setHeader('Content-Disposition', `attachment; filename="${fileName}"`);
+      res.setHeader('Content-Type', 'text/plain; charset=utf-8');
+      return res.send(content);
+    }
+    res.json({ success: true, folderName, fileName, content });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao ler arquivo TXT.', details: err?.message });
+  }
+});
+
+app.post('/api/txt-historico/sync-all', (req: Request, res: Response) => {
+  try {
+    const { debtors, installments } = req.body;
+    if (Array.isArray(debtors)) {
+      for (const d of debtors) {
+        syncCadastroTxt(d);
+        const clientInsts = Array.isArray(installments) ? installments.filter((i: any) => i.debtorId === d.id) : [];
+        const paidInsts = clientInsts.filter((i: any) => i.status === 'paid').length;
+        const pendingInsts = clientInsts.filter((i: any) => i.status !== 'paid').length;
+        const overdueInsts = clientInsts.filter((i: any) => i.status === 'overdue').length;
+        syncStatusFinanceiroTxt(d, {
+          totalOwed: d.totalOwed || 0,
+          totalPaid: d.totalPaid || 0,
+          totalInstallments: clientInsts.length,
+          paidInstallments: paidInsts,
+          pendingInstallments: pendingInsts,
+          overdueInstallments: overdueInsts,
+          nextDueDate: d.nextDueDate,
+        });
+      }
+    }
+    res.json({ success: true, message: 'Arquivos TXT sincronizados com sucesso.' });
+  } catch (err: any) {
+    res.status(500).json({ error: 'Erro ao sincronizar arquivos TXT.', details: err?.message });
+  }
 });
 
 // Endpoint do Gemini para leitura e identificação inteligente de Contratos Assinados

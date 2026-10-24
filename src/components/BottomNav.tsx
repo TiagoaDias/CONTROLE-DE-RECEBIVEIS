@@ -76,20 +76,20 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <div
           role="menu"
           aria-label="Menu de Ações Rápidas"
-          className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[calc(100vw-20px)] max-w-[380px] sm:max-w-[480px] md:max-w-[520px] max-h-[84vh] overflow-y-auto no-scrollbar bg-slate-950/95 sm:bg-slate-900/95 backdrop-blur-2xl text-white p-2 sm:p-4 rounded-3xl border border-cyan-500/40 shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_35px_rgba(6,182,212,0.3)] flex flex-col gap-1.5 sm:gap-2 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200 select-none"
+          className="fixed bottom-20 sm:bottom-24 left-1/2 -translate-x-1/2 z-[70] w-[calc(100vw-16px)] max-w-[420px] sm:max-w-[490px] bg-slate-950/95 sm:bg-slate-900/95 backdrop-blur-2xl text-white p-2.5 sm:p-3.5 rounded-3xl border border-cyan-500/40 shadow-[0_20px_60px_rgba(0,0,0,0.85),0_0_35px_rgba(6,182,212,0.25)] flex flex-col gap-2 animate-in slide-in-from-bottom-5 zoom-in-95 duration-200 select-none"
         >
           {/* Header do Menu */}
-          <div className="flex items-center justify-between px-2 sm:px-3 py-1 border-b border-white/10 shrink-0">
+          <div className="flex items-center justify-between px-1.5 py-0.5 border-b border-white/10 shrink-0">
             <div className="flex items-center gap-1.5 sm:gap-2">
-              <span className="w-6 h-6 sm:w-8 sm:h-8 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-xs">
-                <span className="material-symbols-outlined text-[15px] sm:text-[18px]">bolt</span>
+              <span className="w-6 h-6 sm:w-7 sm:h-7 rounded-xl bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-xs">
+                <span className="material-symbols-outlined text-[15px] sm:text-[17px]">bolt</span>
               </span>
               <div>
                 <span className="text-[11px] sm:text-xs font-black uppercase tracking-wider text-slate-100 block leading-tight">
                   Ações Rápidas
                 </span>
                 <span className="text-[9.5px] text-cyan-300/80 font-medium hidden sm:block">
-                  Atalhos essenciais para gestão rápida sem rolagem
+                  Atalhos essenciais compactos sem rolagem
                 </span>
               </div>
             </div>
@@ -106,8 +106,57 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </button>
           </div>
 
-          {/* Lista de Ações Rápidas: Um de baixo do outro (Formato Lista Vertical Otimizado) */}
-          <div className="flex flex-col gap-1 sm:gap-2">
+          {/* Destaque Central: Botão Automação Inteligente Gemini com Comando de Voz & Texto */}
+          <div
+            role="button"
+            tabIndex={0}
+            onClick={() => {
+              setIsMenuOpen(false);
+              onNavigate('gemini-automacao');
+              try { playAppSound('click'); } catch {}
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                setIsMenuOpen(false);
+                onNavigate('gemini-automacao');
+                try { playAppSound('click'); } catch {}
+              }
+            }}
+            className="p-2 sm:p-2.5 rounded-2xl bg-gradient-to-r from-blue-900/60 via-indigo-900/60 to-purple-900/60 hover:from-blue-600/40 hover:to-purple-600/40 border border-blue-400/50 hover:border-blue-300 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98] shadow-md hover:shadow-indigo-500/20"
+          >
+            <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_15px_rgba(99,102,241,0.6)] group-hover:scale-105 transition-transform">
+              <span className="material-symbols-outlined text-[20px] sm:text-[22px]">smart_toy</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs sm:text-sm font-black text-white group-hover:text-cyan-200 transition-colors truncate">
+                  Automação Gemini
+                </span>
+                <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 text-white shrink-0 animate-pulse">
+                  IA Ativa
+                </span>
+                <span className="text-[8.5px] sm:text-[9.5px] font-bold px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-300 border border-cyan-400/30 shrink-0 hidden sm:inline-flex items-center gap-0.5">
+                  <span className="material-symbols-outlined text-[10px]">mic</span>
+                  <span>Voz &amp; Texto</span>
+                </span>
+              </div>
+              <div className="text-[10px] sm:text-[11px] text-cyan-200/80 truncate">
+                Comandos falados ou digitados, histórico TXT e rateio
+              </div>
+            </div>
+            <div className="flex items-center gap-1 shrink-0 text-cyan-300">
+              <span className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center">
+                <span className="material-symbols-outlined text-[14px]">mic</span>
+              </span>
+              <span className="material-symbols-outlined text-slate-400 text-[18px] group-hover:text-white group-hover:translate-x-0.5 transition-all">
+                chevron_right
+              </span>
+            </div>
+          </div>
+
+          {/* Grid Otimizado de Ações Rápidas (2 Colunas Compactas: Cabe perfeitamente na tela sem rolagem) */}
+          <div className="grid grid-cols-2 gap-1.5 sm:gap-2">
             {/* 1. Novo Comprador */}
             <div
               role="button"
@@ -125,27 +174,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/50 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
             >
-              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">person_add</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px]">person_add</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-200 transition-colors truncate">
-                    Novo Comprador
-                  </span>
-                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-300 shrink-0">
-                    Principal
-                  </span>
-                </div>
-                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                  Cadastrar comprador e nova compra integrados
-                </div>
+                <span className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors block truncate">
+                  Novo Comprador
+                </span>
+                <span className="text-[9.5px] text-slate-400 truncate block">
+                  Cadastrar devedor
+                </span>
               </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                chevron_right
-              </span>
             </div>
 
             {/* 2. Nova Compra */}
@@ -165,27 +206,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-blue-500/10 border border-white/10 hover:border-blue-500/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-blue-500/15 border border-white/10 hover:border-blue-500/50 flex items-center gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
             >
-              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(37,99,235,0.35)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">add_shopping_cart</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px]">add_shopping_cart</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-blue-200 transition-colors truncate">
-                    Nova Compra
-                  </span>
-                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-blue-500/30 text-blue-300 shrink-0">
-                    Frequente
-                  </span>
-                </div>
-                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                  Lançar produto, valores e gerar parcelas automáticas
-                </div>
+                <span className="text-xs font-bold text-white group-hover:text-blue-200 transition-colors block truncate">
+                  Nova Compra
+                </span>
+                <span className="text-[9.5px] text-slate-400 truncate block">
+                  Lançar parcelas
+                </span>
               </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-blue-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                chevron_right
-              </span>
             </div>
 
             {/* 3. Escanear com IA */}
@@ -206,27 +239,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     try { playAppSound('click'); } catch {}
                   }
                 }}
-                className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-cyan-500/10 border border-white/10 hover:border-cyan-400/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+                className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-400/50 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
               >
-                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(6,182,212,0.35)] group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-[18px] sm:text-[22px]">document_scanner</span>
+                <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[18px]">document_scanner</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-cyan-200 transition-colors truncate">
-                      Escanear com IA
-                    </span>
-                    <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-cyan-500/30 text-cyan-200 shrink-0">
-                      Gemini IA
-                    </span>
-                  </div>
-                  <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                    Importar contratos, cupons ou prints via IA
-                  </div>
+                  <span className="text-xs font-bold text-white group-hover:text-cyan-200 transition-colors block truncate">
+                    Escanear com IA
+                  </span>
+                  <span className="text-[9.5px] text-slate-400 truncate block">
+                    Contratos &amp; cupons
+                  </span>
                 </div>
-                <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-cyan-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                  chevron_right
-                </span>
               </div>
             )}
 
@@ -247,27 +272,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-rose-500/10 border border-white/10 hover:border-rose-500/40 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
             >
-              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(225,29,72,0.35)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">picture_as_pdf</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px]">picture_as_pdf</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-rose-200 transition-colors truncate">
-                    Gerar Comprovantes &amp; PDFs
-                  </span>
-                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/30 text-rose-200 shrink-0">
-                    Documentos
-                  </span>
-                </div>
-                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                  Extrato Total, Recibos Individuais e Contrato
-                </div>
+                <span className="text-xs font-bold text-white group-hover:text-rose-200 transition-colors block truncate">
+                  PDFs &amp; Recibos
+                </span>
+                <span className="text-[9.5px] text-slate-400 truncate block">
+                  Extratos &amp; contratos
+                </span>
               </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-rose-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                chevron_right
-              </span>
             </div>
 
             {/* 5. Meu Gerenciamento Pessoal */}
@@ -287,27 +304,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/10 border border-white/10 hover:border-emerald-500/40 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+              className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/40 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
             >
-              <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(16,185,129,0.35)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[18px] sm:text-[22px]">account_balance_wallet</span>
+              <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[18px]">account_balance_wallet</span>
               </div>
               <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs sm:text-sm font-bold text-white group-hover:text-emerald-200 transition-colors truncate">
-                    Meu Gerenciamento Pessoal
-                  </span>
-                  <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-emerald-500/30 text-emerald-200 shrink-0">
-                    Finanças
-                  </span>
-                </div>
-                <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                  Controle de despesas fixas, variáveis e receitas
-                </div>
+                <span className="text-xs font-bold text-white group-hover:text-emerald-200 transition-colors block truncate">
+                  Minhas Finanças
+                </span>
+                <span className="text-[9.5px] text-slate-400 truncate block">
+                  Controle de despesas
+                </span>
               </div>
-              <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-emerald-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                chevron_right
-              </span>
             </div>
 
             {/* 6. Verificar Autenticação Digital */}
@@ -328,27 +337,19 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     try { playAppSound('click'); } catch {}
                   }
                 }}
-                className="p-1.5 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-400/50 flex items-center gap-2.5 sm:gap-3 transition-all cursor-pointer group active:scale-[0.98]"
+                className="p-2 sm:p-2.5 rounded-2xl bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-400/50 flex items-center gap-2 sm:gap-2.5 transition-all cursor-pointer group active:scale-[0.98]"
               >
-                <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-purple-100 border border-purple-300 text-purple-900 flex items-center justify-center shrink-0 shadow-[0_0_12px_rgba(168,85,247,0.3)] group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-[18px] sm:text-[22px] text-purple-700 font-bold">verified</span>
+                <div className="w-8 h-8 rounded-xl bg-purple-500/20 border border-purple-400/30 text-purple-200 flex items-center justify-center shrink-0 shadow-xs group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[18px] text-purple-300 font-bold">verified</span>
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-xs sm:text-sm font-bold text-white group-hover:text-purple-200 transition-colors truncate">
-                      Verificar Autenticação Digital
-                    </span>
-                    <span className="text-[8.5px] sm:text-[9.5px] font-black px-1.5 py-0.2 rounded-full bg-purple-500/30 text-purple-200 shrink-0">
-                      Oficial
-                    </span>
-                  </div>
-                  <div className="text-[10px] sm:text-[11.5px] text-slate-400 truncate">
-                    Consultar e autenticar código oficial de recibo
-                  </div>
+                  <span className="text-xs font-bold text-white group-hover:text-purple-200 transition-colors block truncate">
+                    Autenticar Código
+                  </span>
+                  <span className="text-[9.5px] text-slate-400 truncate block">
+                    Verificar recibo
+                  </span>
                 </div>
-                <span className="material-symbols-outlined text-slate-500 text-[18px] sm:text-[20px] group-hover:text-purple-300 group-hover:translate-x-0.5 transition-all shrink-0">
-                  chevron_right
-                </span>
               </div>
             )}
           </div>
@@ -363,10 +364,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   onOpenControlPanel();
                   try { playAppSound('pop'); } catch {}
                 }}
-                className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+                className="flex-1 py-1.5 px-2.5 rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
                 title="Abrir Centro de Controle e Configurações"
               >
-                <span className="material-symbols-outlined text-[16px] text-cyan-400">tune</span>
+                <span className="material-symbols-outlined text-[15px] text-cyan-400">tune</span>
                 <span className="truncate">Painel &amp; Ajustes</span>
               </button>
             )}
@@ -378,10 +379,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 if (onLogout) onLogout();
                 try { playAppSound('whoosh'); } catch {}
               }}
-              className="flex-1 py-1.5 sm:py-2 px-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-200 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
+              className="flex-1 py-1.5 px-2.5 rounded-xl bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-200 hover:text-white text-[11px] sm:text-xs font-bold flex items-center justify-center gap-1.5 active:scale-95 transition-all cursor-pointer"
               title="Encerrar sessão com segurança"
             >
-              <span className="material-symbols-outlined text-[16px] text-red-400">logout</span>
+              <span className="material-symbols-outlined text-[15px] text-red-400">logout</span>
               <span className="truncate">Sair da Conta</span>
             </button>
           </div>

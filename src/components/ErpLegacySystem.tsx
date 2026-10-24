@@ -59,7 +59,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   const [mobileViewMode, setMobileViewMode] = useState<'cards' | 'table'>('cards');
   const [activeBalloonDebtorId, setActiveBalloonDebtorId] = useState<string | null>(null);
   const [showPrintModal, setShowPrintModal] = useState(false);
-  const themeMode = 'classic_delphi';
+  const [themeMode, setThemeMode] = useState<'modern_erp' | 'classic_delphi'>('modern_erp');
 
   // Helper para formatar data sem risco de 'Invalid Date'
   const formatDateSafe = (rawDate?: string): string => {
@@ -1001,7 +1001,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       className={`min-h-[calc(100vh-4.5rem)] pb-16 sm:pb-8 flex flex-col font-sans select-text ${
         themeMode === 'classic_delphi'
           ? 'bg-[#d4d0c8] text-black text-xs'
-          : 'bg-slate-900 text-slate-100 text-xs'
+          : 'bg-slate-100 text-slate-900 text-xs'
       }`}
     >
       {/* Top Windows ERP Titlebar & System Bar (Reenquadrado e Otimizado no Mobile) */}
@@ -1009,24 +1009,40 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         className={`w-full border-b px-2.5 sm:px-3 py-1.5 flex items-center justify-between gap-2 shadow-xs select-none ${
           themeMode === 'classic_delphi'
             ? 'bg-gradient-to-r from-[#000080] via-[#1084d0] to-[#000080] text-white border-slate-400 font-bold'
-            : 'bg-slate-950 text-slate-200 border-slate-800'
+            : 'bg-white text-slate-900 border-slate-200'
         }`}
       >
         <div className="flex items-center gap-1.5 min-w-0">
-          <span className="material-symbols-outlined text-[18px] text-amber-400 shrink-0">desktop_windows</span>
-          <span className="font-mono text-xs tracking-tight font-bold truncate">
-            HASPAHO ERP <span className="hidden xs:inline">Enterprise</span> <span className="hidden md:inline">• Gestão Financeira</span> <span className="text-[10px] text-amber-300 font-normal">[v4.8.2]</span>
+          <span className="material-symbols-outlined text-[18px] text-amber-500 shrink-0 font-bold">desktop_windows</span>
+          <span className="font-mono text-xs tracking-tight font-bold truncate text-slate-900">
+            HASPAHO ERP <span className="hidden xs:inline">Enterprise</span> <span className="hidden md:inline text-slate-600">• Gestão Financeira</span> <span className="text-[10px] text-blue-700 font-bold">[v4.8.2]</span>
           </span>
-          <span className="hidden lg:inline text-[10px] px-1.5 py-0.2 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 whitespace-nowrap">
+          <span className="hidden lg:inline text-[10px] px-1.5 py-0.2 rounded bg-blue-50 text-blue-800 border border-blue-200 font-semibold whitespace-nowrap">
             Operador: {currentUser?.name || 'Thiago Dias'}
           </span>
         </div>
 
         <div className="flex items-center gap-1.5 shrink-0">
-          {/* Static Classic Theme Badge */}
-          <span className="hidden md:inline px-2 py-0.5 rounded text-[10px] font-bold uppercase bg-[#d4d0c8] text-black border border-slate-500 shadow-2xs">
-            🖥️ Tema Clássico
-          </span>
+          {/* Theme Mode Toggle Button */}
+          <button
+            type="button"
+            onClick={() => {
+              setThemeMode((prev) => (prev === 'modern_erp' ? 'classic_delphi' : 'modern_erp'));
+              playAppSound('pop');
+              onToast(`Visual alternado para: ${themeMode === 'modern_erp' ? 'Modo Retrô Delphi' : 'Modo ERP Moderno'}`);
+            }}
+            className={`hidden md:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[11px] font-bold border transition-all cursor-pointer ${
+              themeMode === 'modern_erp'
+                ? 'bg-blue-50 text-blue-800 border-blue-300 hover:bg-blue-100'
+                : 'bg-slate-200 text-slate-800 border-slate-400 hover:bg-slate-300'
+            }`}
+            title="Alternar entre Visual ERP Moderno e Retrô Delphi"
+          >
+            <span className="material-symbols-outlined text-[14px]">
+              {themeMode === 'modern_erp' ? 'view_quilt' : 'history_toggle_off'}
+            </span>
+            <span>{themeMode === 'modern_erp' ? 'Visual: ERP Moderno' : 'Visual: Retrô Delphi'}</span>
+          </button>
 
           {/* Quick Exit to Modern Mode */}
           <button
@@ -1039,24 +1055,24 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           </button>
 
           {/* Windows Classic Window Controls */}
-          <div className="flex items-center gap-1 pl-1 sm:pl-2 border-l border-white/20">
+          <div className="flex items-center gap-1 pl-1 sm:pl-2 border-l border-slate-300">
             <button
               onClick={() => onNavigate('dashboard')}
-              className="w-5 h-5 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold flex items-center justify-center rounded-xs"
+              className="w-5 h-5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center justify-center rounded-xs cursor-pointer"
               title="Minimizar para o Dashboard"
             >
               _
             </button>
             <button
               onClick={() => onToast('Janela maximizada em modo tela cheia ERP.')}
-              className="w-5 h-5 bg-slate-700 hover:bg-slate-600 text-white text-[10px] font-bold flex items-center justify-center rounded-xs"
+              className="w-5 h-5 bg-slate-200 hover:bg-slate-300 text-slate-700 text-[10px] font-bold flex items-center justify-center rounded-xs cursor-pointer"
               title="Maximizar"
             >
               🗖
             </button>
             <button
               onClick={() => onNavigate('dashboard')}
-              className="w-5 h-5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold flex items-center justify-center rounded-xs"
+              className="w-5 h-5 bg-red-600 hover:bg-red-700 text-white text-[10px] font-bold flex items-center justify-center rounded-xs cursor-pointer"
               title="Fechar Modo ERP (Esc)"
             >
               ✕
@@ -1070,7 +1086,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         className={`w-full px-2.5 sm:px-3 py-1 hidden sm:flex items-center gap-3 sm:gap-4 text-[11px] border-b select-none overflow-x-auto scrollbar-none flex-nowrap ${
           themeMode === 'classic_delphi'
             ? 'bg-[#ece9d8] text-black border-slate-300 font-medium'
-            : 'bg-slate-900 text-slate-300 border-slate-800'
+            : 'bg-slate-50 text-slate-700 border-slate-200'
         }`}
       >
         {[
@@ -1104,7 +1120,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         className={`w-full px-1.5 sm:px-3 py-1 sm:py-1.5 border-b select-none ${
           themeMode === 'classic_delphi'
             ? 'bg-[#f0f0f0] border-slate-300'
-            : 'bg-slate-950/80 border-slate-800'
+            : 'bg-white border-slate-200 shadow-2xs'
         }`}
       >
         {/* Mobile Layout: 3 Columns x 2 Rows - High Contrast & High Legibility - Otimizado e Mais Junto */}
@@ -1186,11 +1202,11 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-slate-700'
+                : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-2xs'
             }`}
             title="Criar novo cadastro em branco (F2)"
           >
-            <span className="material-symbols-outlined text-[15px] text-emerald-500">add_box</span>
+            <span className="material-symbols-outlined text-[15px] text-emerald-600 font-bold">add_box</span>
             <span>[F2] Novo</span>
           </button>
 
@@ -1200,7 +1216,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-blue-900 border-slate-400 shadow-xs'
-                : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-500'
+                : 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-2xs'
             }`}
             title="Salvar alterações no banco (F3)"
           >
@@ -1214,7 +1230,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700'
+                : 'bg-white hover:bg-slate-50 text-blue-700 border-slate-300 shadow-2xs'
             }`}
             title="Localizar devedor ou título (F6)"
           >
@@ -1228,11 +1244,11 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-red-700 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-red-900/40 text-red-400 border-slate-700'
+                : 'bg-white hover:bg-red-50 text-red-700 border-slate-300 shadow-2xs'
             }`}
             title="Excluir devedor ativo (F5)"
           >
-            <span className="material-symbols-outlined text-[15px] text-red-500">delete</span>
+            <span className="material-symbols-outlined text-[15px] text-red-600">delete</span>
             <span>[F5] Excluir</span>
           </button>
 
@@ -1247,15 +1263,15 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-blue-800 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-blue-400 border-slate-700'
+                : 'bg-white hover:bg-slate-50 text-slate-800 border-slate-300 shadow-2xs'
             }`}
             title="Atualizar página e recarregar dados do sistema (F9)"
           >
-            <span className="material-symbols-outlined text-[15px] text-blue-500">refresh</span>
+            <span className="material-symbols-outlined text-[15px] text-blue-600">refresh</span>
             <span>[F9] Atualizar</span>
           </button>
 
-          <span className="w-px h-5 bg-slate-400 mx-0.5 shrink-0"></span>
+          <span className="w-px h-5 bg-slate-300 mx-0.5 shrink-0"></span>
 
           <button
             type="button"
@@ -1266,7 +1282,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-slate-800 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border-slate-700'
+                : 'bg-white hover:bg-slate-50 text-slate-700 border-slate-300 shadow-2xs'
             }`}
             title="Imprimir Documentos, Carnês e Fichas ARP (F7)"
           >
@@ -1280,7 +1296,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
             className={`px-2 py-1 rounded text-[11px] font-bold flex items-center gap-1 transition-all active:scale-95 cursor-pointer border whitespace-nowrap shrink-0 min-w-max ${
               themeMode === 'classic_delphi'
                 ? 'bg-white hover:bg-slate-100 text-emerald-800 border-slate-400 shadow-xs'
-                : 'bg-slate-800 hover:bg-slate-700 text-emerald-400 border-slate-700'
+                : 'bg-white hover:bg-slate-50 text-emerald-700 border-slate-300 shadow-2xs'
             }`}
             title="Exportar dados para Excel / CSV (F8)"
           >
@@ -1397,7 +1413,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         {/* Desktop PageControl Tabs: Horizontal Row */}
         <div
           className={`hidden sm:flex items-end gap-1 border-b px-1 sm:px-2 overflow-x-auto scrollbar-none flex-nowrap ${
-            themeMode === 'classic_delphi' ? 'border-slate-300 bg-slate-100' : 'border-slate-800 bg-slate-950/40'
+            themeMode === 'classic_delphi' ? 'border-slate-300 bg-slate-100' : 'border-slate-300 bg-slate-200/50'
           }`}
         >
           {[
@@ -1413,14 +1429,14 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-[11px] sm:text-xs font-bold border-t border-x rounded-t-sm sm:rounded-t-md transition-all whitespace-nowrap cursor-pointer shrink-0 ${
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3 py-2 text-[11px] sm:text-xs font-bold border-t border-x rounded-t-md transition-all whitespace-nowrap cursor-pointer shrink-0 ${
                   isActive
                     ? themeMode === 'classic_delphi'
                       ? 'bg-white text-blue-900 border-slate-300 font-black shadow-xs -mb-px'
-                      : 'bg-slate-800 text-blue-400 border-slate-700 shadow-xs -mb-px'
+                      : 'bg-white text-blue-700 border-slate-300 border-b-white font-black shadow-xs -mb-px'
                     : themeMode === 'classic_delphi'
                     ? 'bg-slate-100 text-slate-700 border-slate-300 hover:bg-white hover:text-blue-900'
-                    : 'bg-slate-900/60 text-slate-400 border-slate-800 hover:bg-slate-800'
+                    : 'bg-slate-100/70 text-slate-600 border-slate-300 hover:bg-white hover:text-blue-800'
                 }`}
               >
                 <span className="material-symbols-outlined text-[15px] sm:text-[16px]">{tab.icon}</span>
@@ -1440,32 +1456,40 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
           className={`flex-1 border border-t-0 ${activeTab === 'massa' ? 'p-1 sm:p-3' : 'p-2 sm:p-4'} min-h-0 overflow-y-visible sm:overflow-y-auto ${
             themeMode === 'classic_delphi'
               ? 'bg-white text-slate-900 border-slate-400 shadow-inner'
-              : 'bg-slate-900/90 text-slate-100 border-slate-800'
+              : 'bg-white text-slate-900 border-slate-300 shadow-xs'
           }`}
         >
           {/* TAB 1: FICHA CADASTRAL DO DEVEDOR (DATA ENTRY FORM) */}
           {activeTab === 'cadastro' && (
             <div className="space-y-4">
-              {/* Quick Record Selector Bar (Reenquadrado no Mobile e Super Animado) */}
+              {/* Modern Enterprise ERP Record Selector & Financial KPIs Bar */}
               <div
-                className={`p-2 sm:p-3 rounded-xl sm:rounded-2xl border flex flex-col gap-1.5 sm:gap-2.5 shadow-sm transition-all ${
+                className={`p-3 sm:p-4 rounded-xl border flex flex-col gap-3 transition-all ${
                   themeMode === 'classic_delphi'
-                    ? 'bg-gradient-to-b from-[#f8f6f0] to-[#eae6d8] border-slate-300'
-                    : 'bg-gradient-to-b from-slate-900 via-slate-950 to-slate-900 border-slate-800'
+                    ? 'bg-gradient-to-b from-[#f8f6f0] to-[#eae6d8] border-slate-300 shadow-xs'
+                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs'
                 }`}
               >
-                {/* Selector Row com Animação Vibrante, Efeito Radar & Botões Anterior/Próximo */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 sm:gap-2.5 p-1.5 sm:p-2 rounded-xl bg-white/60 dark:bg-slate-800/60 border border-blue-400/40 shadow-xs animate-debtor-selector">
-                  <div className="flex items-center gap-1.5 sm:gap-2">
-                    <span className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg sm:rounded-xl bg-blue-600 text-white flex items-center justify-center shadow-md animate-debtor-avatar shrink-0 text-xs sm:text-sm">
-                      👤
-                    </span>
-                    <label className="font-black text-[11px] sm:text-sm text-blue-900 dark:text-blue-300 shrink-0 flex items-center gap-1">
-                      <span>Seletor de Devedor:</span>
-                    </label>
+                {/* Selector Row - Modern ERP Control */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
+                      <span className="material-symbols-outlined text-lg">badge</span>
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
+                        Registro Ativo
+                      </span>
+                      <label className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
+                        <span>Seletor de Devedor</span>
+                        <span className="text-[10px] font-mono text-slate-400 font-normal hidden sm:inline">
+                          ({debtors.length} cadastrados)
+                        </span>
+                      </label>
+                    </div>
                   </div>
 
-                  <div className="flex items-center gap-1 sm:gap-1.5 flex-1 max-w-full sm:max-w-xl">
+                  <div className="flex items-center gap-1.5 flex-1 max-w-full sm:max-w-xl">
                     {/* Botão Anterior */}
                     <button
                       type="button"
@@ -1477,10 +1501,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           playAppSound('click');
                         }
                       }}
-                      className="h-8 sm:h-9 px-1.5 sm:px-2 bg-slate-100 hover:bg-blue-100 text-blue-900 border border-blue-200 dark:bg-slate-800 dark:text-blue-300 dark:border-slate-700 rounded-lg sm:rounded-xl text-xs font-black transition-all active:scale-90 cursor-pointer flex items-center justify-center shrink-0"
-                      title="Devedor Anterior [◀]"
+                      className="h-9 w-9 bg-white hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
+                      title="Devedor Anterior (Seta Esquerda)"
                     >
-                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chevron_left</span>
+                      <span className="material-symbols-outlined text-[18px]">chevron_left</span>
                     </button>
 
                     <div className="relative flex-1 min-w-0">
@@ -1490,11 +1514,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           setSelectedDebtorId(e.target.value);
                           playAppSound('pop');
                         }}
-                        className={`w-full h-8 sm:h-9 px-2 sm:px-3 border-2 rounded-lg sm:rounded-xl font-black text-xs sm:text-sm outline-none transition-all focus:ring-4 focus:ring-blue-400/30 shadow-xs cursor-pointer truncate ${
-                          themeMode === 'classic_delphi'
-                            ? 'bg-white text-slate-900 border-blue-400/70 hover:border-blue-500'
-                            : 'bg-slate-900 text-slate-100 border-blue-500/70 hover:border-blue-400'
-                        }`}
+                        className="w-full h-9 px-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 rounded-lg font-mono text-xs sm:text-sm font-semibold outline-none transition-all shadow-2xs cursor-pointer truncate"
                       >
                         {debtors.map((d, idx) => {
                           const isDemo = d.id === 'DEMO-001' || d.id === 'DEMO-002' || d.relation === 'Demonstração' || (d.id && d.id.startsWith('DEMO-'));
@@ -1518,74 +1538,113 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           playAppSound('click');
                         }
                       }}
-                      className="h-8 sm:h-9 px-1.5 sm:px-2 bg-slate-100 hover:bg-blue-100 text-blue-900 border border-blue-200 dark:bg-slate-800 dark:text-blue-300 dark:border-slate-700 rounded-lg sm:rounded-xl text-xs font-black transition-all active:scale-90 cursor-pointer flex items-center justify-center shrink-0"
-                      title="Próximo Devedor [▶]"
+                      className="h-9 w-9 bg-white hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
+                      title="Próximo Devedor (Seta Direita)"
                     >
-                      <span className="material-symbols-outlined text-[15px] sm:text-[16px]">chevron_right</span>
+                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Etiqueta para devedores de demonstração / fictícios */}
+                {/* Etiqueta para devedores de demonstração / fictícios - Estilo ERP Corporativo com Máximo Contraste em Verde */}
                 {activeDebtor && (activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
-                  <div className="flex items-center justify-between bg-amber-500/15 border border-amber-500/40 rounded-xl px-3 py-1.5 text-xs animate-fadeIn">
-                    <div className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
-                      <span>🏷️</span>
-                      <span>Cliente Fictício (Usuário de Exemplo / Demonstração)</span>
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-emerald-50 border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs shadow-xs">
+                    <div className="flex items-center gap-2.5 text-emerald-950">
+                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                        <span className="material-symbols-outlined text-[18px]">verified_user</span>
+                      </div>
+                      <span className="text-emerald-950 font-medium">
+                        <strong className="font-black text-emerald-950 text-xs sm:text-[13px]">Cliente de Demonstração:</strong>{' '}
+                        <span className="text-emerald-900 font-bold">
+                          Registro gerado para testes e homologação de rotinas no sistema.
+                        </span>
+                      </span>
                     </div>
                     {onRequestDeleteDebtor && (
                       <button
                         type="button"
                         onClick={() => onRequestDeleteDebtor(activeDebtor)}
-                        className="px-2.5 py-1 rounded-lg bg-red-600 hover:bg-red-500 text-white font-extrabold text-[10px] flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
-                        title="Excluir usuário de exemplo"
+                        className="self-end sm:self-auto px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all shrink-0"
+                        title="Excluir cliente fictício de exemplo"
                       >
-                        <span className="material-symbols-outlined text-[13px]">delete</span>
+                        <span className="material-symbols-outlined text-[15px]">delete</span>
                         <span>Excluir Exemplo</span>
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* 3 KPI Summary Cards - Animated, Fun & Interactive - Otimizado e Mais Junto */}
-                <div className="grid grid-cols-3 gap-1 sm:gap-2 text-center font-sans">
-                  {/* CARD 1: A Receber */}
+                {/* 3 KPI Summary Cards - Modern Enterprise ERP Financial Metrics */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-left">
+                  {/* CARD 1: Total a Receber */}
                   <div
                     onClick={() => {
                       playAppSound('pop');
                       onToast(`💸 A Receber: R$ ${(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
                     }}
-                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-red-400/80 bg-gradient-to-b from-red-500/15 via-red-50/80 to-red-100/90 dark:from-red-950/80 dark:to-red-900/60 shadow-md shadow-red-500/10 hover:shadow-lg hover:shadow-red-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
+                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-rose-400/60 dark:hover:border-rose-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                     title="Clique para ver detalhes do saldo a receber"
                   >
-                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-red-700 dark:text-red-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
-                      <span className="animate-bounce inline-block text-[10px] sm:text-xs">🚨</span>
-                      <span>A Receber:</span>
-                    </span>
-                    <strong className="text-red-600 dark:text-red-400 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
-                      R$ {(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </strong>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+                        </div>
+                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Total a Receber
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
+                        Em Aberto
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <div className="text-base sm:text-xl font-mono font-black text-rose-600 dark:text-rose-400 tracking-tight tabular-nums">
+                        R$ {(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
+                        <span className="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
+                        <span>Saldo devedor ativo na conta</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* CARD 2: Já Liquidado */}
+                  {/* CARD 2: Total Já Liquidado */}
                   <div
                     onClick={() => {
                       playAppSound('pop');
                       onToast(`🎉 Já Liquidado: R$ ${(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
                     }}
-                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-emerald-400/80 bg-gradient-to-b from-emerald-500/15 via-emerald-50/80 to-emerald-100/90 dark:from-emerald-950/80 dark:to-emerald-900/60 shadow-md shadow-emerald-500/10 hover:shadow-lg hover:shadow-emerald-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
+                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-emerald-400/60 dark:hover:border-emerald-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                     title="Clique para ver total já liquidado"
                   >
-                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-emerald-800 dark:text-emerald-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
-                      <span className="animate-pulse inline-block text-[10px] sm:text-xs">🎉</span>
-                      <span>Já Liquidado:</span>
-                    </span>
-                    <strong className="text-emerald-700 dark:text-emerald-400 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
-                      R$ {(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                    </strong>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-base">check_circle</span>
+                        </div>
+                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Total Já Liquidado
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                        Quitado
+                      </span>
+                    </div>
+
+                    <div className="space-y-0.5">
+                      <div className="text-base sm:text-xl font-mono font-black text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
+                        R$ {(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      </div>
+                      <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
+                        <span className="material-symbols-outlined text-[13px] text-emerald-500">verified</span>
+                        <span>Baixas autenticadas com recibo</span>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* CARD 3: Score Crediário */}
+                  {/* CARD 3: Score Crediário & Risco */}
                   <div
                     onClick={() => {
                       playAppSound('pop');
@@ -1593,27 +1652,50 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                         (activeDebtor?.score || 800) >= 700 ? 'Excelente!' : (activeDebtor?.score || 800) >= 500 ? 'Médio Risk' : 'Atenção ao Crédito'
                       }`);
                     }}
-                    className="p-1.5 sm:p-2.5 rounded-lg sm:rounded-xl border-2 border-blue-400/80 bg-gradient-to-b from-blue-500/15 via-indigo-50/80 to-blue-100/90 dark:from-blue-950/80 dark:to-indigo-900/60 shadow-md shadow-blue-500/10 hover:shadow-lg hover:shadow-blue-500/20 hover:scale-[1.03] active:scale-95 transition-all cursor-pointer flex flex-col items-center justify-center relative overflow-hidden group select-none"
-                    title="Clique para ver avaliação de score"
+                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-blue-400/60 dark:hover:border-blue-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                    title="Clique para ver avaliação de score de crédito"
                   >
-                    <span className="text-[9px] sm:text-xs font-black uppercase tracking-wider text-blue-900 dark:text-blue-300 flex items-center gap-0.5 sm:gap-1 mb-0.5">
-                      <span className="inline-block text-[10px] sm:text-xs">🚀</span>
-                      <span>Score:</span>
-                    </span>
-                    <strong className="text-blue-700 dark:text-blue-300 font-mono font-black text-[11px] sm:text-base leading-tight drop-shadow-2xs truncate max-w-full">
-                      {activeDebtor?.score || 800}/1000
-                    </strong>
+                    <div className="flex items-center justify-between gap-2 mb-2">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-base">speed</span>
+                        </div>
+                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
+                          Score de Pontualidade
+                        </span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                        {(activeDebtor?.score || 800) >= 700 ? 'Excelente' : (activeDebtor?.score || 800) >= 500 ? 'Regular' : 'Atenção'}
+                      </span>
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex items-baseline gap-1.5">
+                        <span className="text-base sm:text-xl font-mono font-black text-blue-600 dark:text-blue-400 tracking-tight">
+                          {activeDebtor?.score || 800}
+                        </span>
+                        <span className="text-[11px] font-mono text-slate-400">/ 1000 pts</span>
+                      </div>
+                      
+                      {/* Subtle Progress Bar */}
+                      <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full"
+                          style={{ width: `${Math.min(100, Math.max(0, ((activeDebtor?.score || 800) / 1000) * 100))}%` }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
 
               {/* SECTION 1: DADOS DE IDENTIFICAÇÃO PRINCIPAL */}
               <fieldset
-                className={`p-3 rounded border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-800 bg-slate-950/40'
+                className={`p-3 rounded-lg border ${
+                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-blue-500 uppercase tracking-wider">
+                <legend className="px-2 font-bold text-[11px] text-blue-700 uppercase tracking-wider">
                   1. Identificação Principal &amp; Documentos Fiscais
                 </legend>
 
@@ -1629,7 +1711,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Tipo Pessoa</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Tipo Pessoa</label>
                     <div className="flex items-center gap-3 h-8.5 sm:h-7">
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
@@ -1638,7 +1720,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           checked={formData.personType === 'F'}
                           onChange={() => setFormData({ ...formData, personType: 'F' })}
                         />
-                        <span className="text-xs sm:text-[11px] font-semibold">Física</span>
+                        <span className="text-xs sm:text-[11px] font-semibold text-slate-800">Física</span>
                       </label>
                       <label className="flex items-center gap-1.5 cursor-pointer">
                         <input
@@ -1647,13 +1729,13 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           checked={formData.personType === 'J'}
                           onChange={() => setFormData({ ...formData, personType: 'J' })}
                         />
-                        <span className="text-xs sm:text-[11px] font-semibold">Jurídica</span>
+                        <span className="text-xs sm:text-[11px] font-semibold text-slate-800">Jurídica</span>
                       </label>
                     </div>
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
                       Nome Completo / Razão Social *
                     </label>
                     <input
@@ -1661,14 +1743,12 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="EX: JOÃO DA SILVA SA"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-semibold text-xs sm:text-[11px] uppercase outline-none focus:border-blue-500 ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-semibold text-xs sm:text-[11px] uppercase outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
                       {formData.personType === 'F' ? 'CPF' : 'CNPJ'} *
                     </label>
                     <input
@@ -1677,14 +1757,12 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       value={formData.cpfCnpj}
                       onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })}
                       placeholder="000.000.000-00"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none focus:border-blue-500 ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
                       {formData.personType === 'F' ? 'RG' : 'Inscrição Estadual'}
                     </label>
                     <input
@@ -1692,46 +1770,38 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       inputMode="numeric"
                       value={formData.rgIe}
                       onChange={(e) => setFormData({ ...formData, rgIe: e.target.value })}
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Apelido / Parentesco</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Apelido / Parentesco</label>
                     <input
                       type="text"
                       value={formData.apelido}
                       onChange={(e) => setFormData({ ...formData, apelido: e.target.value })}
                       placeholder="Amigo, Primo, Cliente"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Data Nasc. / Abertura</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Data Nasc. / Abertura</label>
                     <input
                       type="date"
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Órgão Expedidor</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Órgão Expedidor</label>
                     <input
                       type="text"
                       value={formData.orgaoExp}
                       onChange={(e) => setFormData({ ...formData, orgaoExp: e.target.value })}
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1739,17 +1809,17 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 2: DADOS DE CONTATO & CHAVE PIX */}
               <fieldset
-                className={`p-3 rounded border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-800 bg-slate-950/40'
+                className={`p-3 rounded-lg border ${
+                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-emerald-500 uppercase tracking-wider">
+                <legend className="px-2 font-bold text-[11px] text-emerald-700 uppercase tracking-wider">
                   2. Contatos, WhatsApp &amp; Chave PIX
                 </legend>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Celular / WhatsApp Principal *</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Celular / WhatsApp Principal *</label>
                     <div className="flex gap-1.5">
                       <input
                         type="tel"
@@ -1757,9 +1827,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="(14) 99733-9863"
-                        className={`flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
-                          themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                        }`}
+                        className="flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                       />
                       <button
                         type="button"
@@ -1776,42 +1844,36 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Telefone Secundário / Fixo</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Telefone Secundário / Fixo</label>
                     <input
                       type="tel"
                       inputMode="numeric"
                       value={formData.phoneSecondary}
                       onChange={(e) => setFormData({ ...formData, phoneSecondary: e.target.value })}
                       placeholder="(14) 3642-0000"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">E-mail de Cobrança</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">E-mail de Cobrança</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="devedor@email.com"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Chave PIX Cadastrada</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Chave PIX Cadastrada</label>
                     <input
                       type="text"
                       value={formData.pixKey}
                       onChange={(e) => setFormData({ ...formData, pixKey: e.target.value })}
                       placeholder="CPF, Telefone ou E-mail"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1819,88 +1881,76 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 3: ENDEREÇO & CEP */}
               <fieldset
-                className={`p-3 rounded border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-800 bg-slate-950/40'
+                className={`p-3 rounded-lg border ${
+                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-amber-500 uppercase tracking-wider">
+                <legend className="px-2 font-bold text-[11px] text-amber-700 uppercase tracking-wider">
                   3. Endereço Completo &amp; Localização Notarial
                 </legend>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">CEP *</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">CEP *</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={formData.cep}
                       onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
                       placeholder="17320-000"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div className="md:col-span-2">
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Logradouro / Rua</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Logradouro / Rua</label>
                     <input
                       type="text"
                       value={formData.logradouro}
                       onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
                       placeholder="Rua Central"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Número</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Número</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={formData.numero}
                       onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                       placeholder="100"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Bairro</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Bairro</label>
                     <input
                       type="text"
                       value={formData.bairro}
                       onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                       placeholder="Centro"
-                      className={`w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5">Cidade / UF</label>
+                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Cidade / UF</label>
                     <div className="flex gap-1.5">
                       <input
                         type="text"
                         value={formData.cidade}
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                        className={`flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                          themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                        }`}
+                        className="flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                       />
                       <input
                         type="text"
                         maxLength={2}
                         value={formData.uf}
                         onChange={(e) => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
-                        className={`w-11 sm:w-9 h-8.5 sm:h-7 text-center font-bold uppercase border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none ${
-                          themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                        }`}
+                        className="w-11 sm:w-9 h-8.5 sm:h-7 text-center font-bold uppercase border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                       />
                     </div>
                   </div>
@@ -1909,69 +1959,61 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 4: PARÂMETROS FINANCEIROS, SCORE & REGRAS */}
               <fieldset
-                className={`p-3 rounded border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-800 bg-slate-950/40'
+                className={`p-3 rounded-lg border ${
+                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-purple-400 uppercase tracking-wider">
+                <legend className="px-2 font-bold text-[11px] text-purple-700 uppercase tracking-wider">
                   4. Parâmetros de Crédito, Juros &amp; Políticas de Cobrança
                 </legend>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Limite de Crédito Concedido (R$)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Limite de Crédito Concedido (R$)</label>
                     <input
                       type="number"
                       value={formData.limiteCredito}
                       onChange={(e) => setFormData({ ...formData, limiteCredito: Number(e.target.value) })}
-                      className={`w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Score de Pontualidade (0 - 1000)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Score de Pontualidade (0 - 1000)</label>
                     <input
                       type="number"
                       min={0}
                       max={1000}
                       value={formData.score}
                       onChange={(e) => setFormData({ ...formData, score: Number(e.target.value) })}
-                      className={`w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Multa por Atraso Fixa (R$)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Multa por Atraso Fixa (R$)</label>
                     <input
                       type="number"
                       value={formData.multaAtrasoFixa}
                       onChange={(e) => setFormData({ ...formData, multaAtrasoFixa: Number(e.target.value) })}
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-7 px-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5">Juros Mensais Padrão (%)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Juros Mensais Padrão (%)</label>
                     <input
                       type="number"
                       step={0.1}
                       value={formData.taxaJurosMensal}
                       onChange={(e) => setFormData({ ...formData, taxaJurosMensal: Number(e.target.value) })}
-                      className={`w-full h-7 px-2 border rounded font-mono text-[11px] outline-none ${
-                        themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                      }`}
+                      className="w-full h-7 px-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 {/* Dense Checkboxes & Flags */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-3 border-t border-slate-800/40 mt-2">
+                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-3 border-t border-slate-200 mt-2 text-slate-800">
                   <label className="flex items-center gap-2 cursor-pointer text-[11px]">
                     <input
                       type="checkbox"
@@ -2005,7 +2047,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       checked={formData.bloqueioPreventivo}
                       onChange={(e) => setFormData({ ...formData, bloqueioPreventivo: e.target.checked })}
                     />
-                    <span className="text-red-400 font-bold">[ ] Bloqueio Preventivo de Crédito</span>
+                    <span className="text-red-600 font-bold">[ ] Bloqueio Preventivo de Crédito</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer text-[11px]">
@@ -2021,11 +2063,11 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 5: OBSERVAÇÕES & HISTÓRICO DE NEGOCIAÇÃO */}
               <fieldset
-                className={`p-3 rounded border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-800 bg-slate-950/40'
+                className={`p-3 rounded-lg border ${
+                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-slate-400 uppercase tracking-wider">
+                <legend className="px-2 font-bold text-[11px] text-slate-600 uppercase tracking-wider">
                   5. Parecer Contábil &amp; Histórico de Negociações
                 </legend>
                 <textarea
@@ -2033,9 +2075,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   value={formData.observacoes}
                   onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                   placeholder="Anotações internas, promessas de pagamento, datas combinadas..."
-                  className={`w-full p-2 border rounded font-mono text-[11px] outline-none ${
-                    themeMode === 'classic_delphi' ? 'bg-white border-slate-300' : 'bg-slate-800 border-slate-700'
-                  }`}
+                  className="w-full p-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                 />
               </fieldset>
 

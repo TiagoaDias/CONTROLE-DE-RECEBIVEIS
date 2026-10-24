@@ -1,6 +1,6 @@
 import { safeToFixed, safeFormatCurrency, safeToNumber } from "./utils/numberUtils";
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ScreenTab, Debtor, Purchase, Installment, BankInstitution, UserAccount, generateAuthCode, GeminiDistributionItem } from './types';
+import { ScreenTab, Debtor, Purchase, Installment, BankInstitution, UserAccount, generateAuthCode, GeminiDistributionItem, TransactionRecord } from './types';
 import { registerAuthCode } from './utils/authRegistry';
 import {
   INITIAL_DEBTORS,
@@ -41,10 +41,12 @@ import {
   auth,
   isFirestoreQuotaExhausted,
   processFirebaseUserResult,
+  initializeGoogleSignInNative,
+  isNativeOrAndroidWebView,
 } from './lib/firebase';
 import { logoutUser } from './lib/authService';
 import './utils/appIconHelper';
-import { onAuthStateChanged, getRedirectResult } from 'firebase/auth';
+import { onAuthStateChanged } from 'firebase/auth';
 
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -58,6 +60,8 @@ import { RelatoriosView } from './components/RelatoriosView';
 import { PerfilView } from './components/PerfilView';
 import { ErpLegacySystem } from './components/ErpLegacySystem';
 import { AdminDevForumView } from './components/AdminDevForumView';
+import { GeminiAutomationView } from './components/GeminiAutomationView';
+import { GeminiAutomationResult } from './types';
 
 import { AssetInspectorModal } from './components/AssetInspectorModal';
 import { WhatsAppModal } from './components/WhatsAppModal';
@@ -83,6 +87,7 @@ import { systemHealthSentinel } from './utils/systemHealthSentinel';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { FuturisticCosmicBackground } from './components/FuturisticCosmicBackground';
 import { CredorScoreModal } from './components/CredorScoreModal';
+import { HaspahoAutomatedTourModal } from './components/HaspahoAutomatedTourModal';
 import { GeminiParsedContract } from './types';
 
 const GUEST_EMPTY_USER: UserAccount = {
@@ -223,6 +228,7 @@ export default function App() {
   // A apresentação inicia sempre como fechada no carregamento para nunca reaparecer em reload
   const [isWelcomeOpen, setIsWelcomeOpen] = useState(false);
   const [isCredorScoreOpen, setIsCredorScoreOpen] = useState(false);
+  const [isTourModalOpen, setIsTourModalOpen] = useState(false);
 
   // Deleted Debtors Trash Bin (Lixeira) - LocalStorage Persistence per user
   const [deletedDebtors, setDeletedDebtors] = useState<Debtor[]>(() => {
@@ -361,6 +367,22 @@ export default function App() {
   });
 
   const [institutions] = useState<BankInstitution[]>(INITIAL_INSTITUTIONS);
+  const [transactions, setTransactions] = useState<TransactionRecord[]>(() => {
+    try {
+      const saved = localStorage.getItem('haspaho_transactions');
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return INITIAL_TRANSACTIONS;
+  });
+
+  useEffect(() => {
+    try {
+      localStorage.setItem('haspaho_transactions', JSON.stringify(transactions));
+    } catch {}
+  }, [transactions]);
 
   const isInitialLoadRef = useRef(true);
   const lastSyncSignatureRef = useRef<string>('');
@@ -368,20 +390,10 @@ export default function App() {
 
   // Enforce Firebase Auth session listener without wiping valid local user sessions
   useEffect(() => {
-    // Process any pending OAuth redirect result (e.g. mobile Chrome or redirected sign-in)
-    getRedirectResult(auth)
-      .then(async (result) => {
-        if (result && result.user) {
-          console.log('[Auth:REDIRECT_SUCCESS] User authenticated via redirect:', result.user.email);
-          const user = await processFirebaseUserResult(result.user);
-          setCurrentUser(user);
-          localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
-          localStorage.removeItem('haspaho_explicit_logout');
-        }
-      })
-      .catch((err) => {
-        console.warn('[Auth:REDIRECT_NOTICE]', err);
-      });
+    // Inicializa o plugin @capawesome/capacitor-google-sign-in no Android nativo (evita disallowed_useragent e localhost redirect)
+    if (isNativeOrAndroidWebView()) {
+      initializeGoogleSignInNative().catch(() => {});
+    }
 
     const unsubscribe = onAuthStateChanged(auth, (fbUser) => {
       const isExplicitLoggedOut = localStorage.getItem('haspaho_explicit_logout') === 'true';
@@ -1483,6 +1495,49 @@ export default function App() {
       product: overdueInst ? overdueInst.product : 'Smart TV 55 polegadas',
       dueDate: overdueInst ? overdueInst.dueDate : '10/09/2026',
     });
+  };
+
+  // Aplica mutações financeiras vindas da Automação Inteligente Gemini
+  const handleApplyGeminiMutations = (mutations: NonNullable<GeminiAutomationResult['mutations']>) => {
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+
+    if (mutations.updatedDebtor) {
+      setDebtors((prev) => {
+        const next = [...prev];
+        const idx = next.findIndex((d) => d.id === mutations.updatedDebtor!.id);
+        if (idx >= 0) {
+          next[idx] = { ...next[idx], ...mutations.updatedDebtor };
+        } else {
+          next.unshift(mutations.updatedDebtor!);
+        }
+        if (activeUserId) {
+          saveDebtorsToFirestore(activeUserId, next).catch((e) => console.warn('Save debtors from Gemini note:', e));
+        }
+        return next;
+      });
+    }
+
+    if (mutations.updatedInstallments && mutations.updatedInstallments.length > 0) {
+      setInstallments((prev) => {
+        const next = [...prev];
+        for (const updated of mutations.updatedInstallments!) {
+          const idx = next.findIndex((i) => i.id === updated.id);
+          if (idx >= 0) {
+            next[idx] = { ...next[idx], ...updated };
+          }
+        }
+        if (activeUserId) {
+          saveInstallmentsToFirestore(activeUserId, next).catch((e) => console.warn('Save installments from Gemini note:', e));
+        }
+        return next;
+      });
+    }
+
+    if (mutations.newTransaction) {
+      setTransactions((prev) => [mutations.newTransaction!, ...prev]);
+    }
+
+    showToast('✨ Operação executada com sucesso pelo Gemini e sincronizada com o banco de dados!');
   };
 
   // Settle installment handler
@@ -2661,6 +2716,7 @@ export default function App() {
         onToast={showToast}
         onSettleInstallment={handleSettleInstallment}
         onOpenCredorScore={() => setIsCredorScoreOpen(true)}
+        onOpenPresentation={() => setIsTourModalOpen(true)}
         onNudgeWhatsApp={handleNudgeWhatsApp}
         onOpenNewDebtor={() => setIsNewDebtorModalOpen(true)}
         onEditDebtor={handleOpenEditDebtor}
@@ -2714,6 +2770,7 @@ export default function App() {
             }}
             onEnterDashboard={() => handleNavigate('dashboard')}
             onOpenGeminiScanner={() => setIsGeminiScannerOpen(true)}
+            onOpenPresentation={() => setIsTourModalOpen(true)}
             onLogout={handleLogout}
           />
         )}
@@ -2859,6 +2916,19 @@ export default function App() {
             onNavigate={handleNavigate}
             onToast={showToast}
             onUpdateCurrentUser={setCurrentUser}
+          />
+        )}
+
+        {currentTab === 'gemini-automacao' && (
+          <GeminiAutomationView
+            currentUser={currentUser}
+            debtors={debtors}
+            purchases={purchases}
+            installments={installments}
+            transactions={transactions}
+            onApplyMutations={handleApplyGeminiMutations}
+            onNavigateToDebtor={(debtorId) => handleNavigate('devedores', debtorId)}
+            onClose={() => handleNavigate('dashboard')}
           />
         )}
         </ErrorBoundary>
@@ -3076,7 +3146,7 @@ export default function App() {
         isOpen={isAuthLookupOpen}
         onClose={() => setIsAuthLookupOpen(false)}
         installments={installments}
-        transactions={INITIAL_TRANSACTIONS}
+        transactions={transactions}
         onOpenProof={(payer, amount, date, dest, auth, item) => {
           setProofData({
             isOpen: true,
@@ -3143,6 +3213,15 @@ export default function App() {
         onClose={() => setIsHealthAlertOpen(false)}
         onToast={showToast}
         detectedError={detectedSentinelError}
+      />
+
+      {/* Apresentação Automatizada do Sistema (Slides Interativos HASPAHO) */}
+      <HaspahoAutomatedTourModal
+        isOpen={isTourModalOpen}
+        onClose={() => setIsTourModalOpen(false)}
+        currentUser={currentUser}
+        onNavigateToTab={handleNavigate}
+        isDarkMode={theme === 'dark'}
       />
 
 

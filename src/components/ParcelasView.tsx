@@ -1476,34 +1476,33 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               <thead>
                 <tr className="bg-slate-50/95 text-slate-700 font-extrabold uppercase text-[9px] sm:text-[10px] tracking-wider border-b border-slate-200/80 select-none shadow-2xs">
                   {/* Col 1: PARCELAS / VENC. */}
-                  <th className="py-2.5 px-2 text-center w-[20%] sm:w-28 whitespace-nowrap text-cyan-800">
+                  <th className="py-2.5 px-2 text-center w-[18%] sm:w-28 whitespace-nowrap text-cyan-800">
                     <span className="sm:hidden">PARC. / VENC.</span>
                     <span className="hidden sm:inline">PARCELAS / VENC.</span>
                   </th>
                   {/* Col 2: DEVEDOR */}
-                  <th className="py-2.5 px-2 text-center w-[22%] sm:w-36 whitespace-nowrap text-slate-800">
+                  <th className="py-2.5 px-2 text-center w-[18%] sm:w-32 whitespace-nowrap text-slate-800">
                     DEVEDOR
                   </th>
-                  {/* Col 3: ITEM */}
-                  <th className="py-2.5 px-2 text-center w-[28%] sm:w-40 whitespace-nowrap text-cyan-800">
-                    <span className="sm:hidden">ITENS/STATUS</span>
-                    <span className="hidden sm:inline">ITENS, STATUS &amp; VALOR</span>
+                  {/* Col 3: ITEM / PRODUTO */}
+                  <th className="py-2.5 px-2 text-center w-[20%] sm:w-36 whitespace-nowrap text-cyan-800">
+                    ITEM / PRODUTO
                   </th>
                   {/* Col 4: CARTÃO (Desktop) */}
                   <th className="hidden md:table-cell py-2.5 px-2 text-center md:w-36 whitespace-nowrap text-slate-700">
                     CARTÃO / FORMA
                   </th>
-                  {/* Col 5: QUITAR */}
-                  <th className="py-2.5 px-2 text-center w-[30%] sm:w-36 whitespace-nowrap text-emerald-800 font-black">
+                  {/* Col 5: QUITAR / RECIBO */}
+                  <th className="py-2.5 px-2 text-center w-[20%] sm:w-28 whitespace-nowrap text-emerald-800 font-black">
                     <span className="sm:hidden">QUITAR</span>
-                    <span className="hidden sm:inline">QUITAR / AÇÃO</span>
+                    <span className="hidden sm:inline">QUITAR / RECIBO</span>
                   </th>
-                  {/* Col 6: SITUAÇÃO (Desktop) */}
-                  <th className="hidden sm:table-cell py-2.5 px-2 text-center sm:w-28 whitespace-nowrap text-slate-700">
-                    SITUAÇÃO
+                  {/* Col 6: SITUAÇÃO & VALOR */}
+                  <th className="py-2.5 px-2 text-center w-[24%] sm:w-32 whitespace-nowrap text-slate-700">
+                    SITUAÇÃO &amp; VALOR
                   </th>
                   {/* Col 7: AÇÕES (Desktop) */}
-                  <th className="hidden sm:table-cell py-2.5 px-2 text-center sm:w-32 whitespace-nowrap text-cyan-800">
+                  <th className="hidden sm:table-cell py-2.5 px-2 text-center sm:w-28 whitespace-nowrap text-cyan-800">
                     AÇÕES
                   </th>
                 </tr>
@@ -1665,16 +1664,16 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </div>
                         </td>
 
-                        {/* Coluna 3: ITEM & STATUS COM VALOR A QUITAR DEBAIXO DO STATUS */}
+                        {/* Coluna 3: ITEM / PRODUTO */}
                         <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
-                          <div className="flex flex-col items-center justify-center leading-tight gap-1">
+                          <div className="flex items-center justify-center">
                             <button
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
                                 handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
                               }}
-                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1 rounded-lg bg-blue-50/90 hover:bg-blue-100 text-blue-900 border border-blue-200/90 font-bold text-[9.5px] sm:text-[11px] shadow-2xs leading-tight max-w-[110px] sm:max-w-[150px] transition-all cursor-pointer group active:scale-95"
+                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50/90 hover:bg-blue-100 text-blue-900 border border-blue-200/90 font-bold text-[9.5px] sm:text-[11px] shadow-2xs leading-tight max-w-[120px] sm:max-w-[160px] transition-all cursor-pointer group active:scale-95"
                               title={`Clique para visualizar o print da compra de ${item.product}`}
                             >
                               <span className="material-symbols-outlined text-[13px] sm:text-[14px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
@@ -1685,43 +1684,6 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                 photo_camera
                               </span>
                             </button>
-
-                            {/* Situação e Valor a quitar DEBAIXO DO STATUS */}
-                            <div className="flex flex-col items-center justify-center gap-0.5">
-                              {/* Status Badge */}
-                              {isPaid ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-emerald-100 text-emerald-800 text-[8px] sm:text-[8.5px] font-bold">
-                                  <span className="material-symbols-outlined text-[9px]">check_circle</span>
-                                  <span>PAGO</span>
-                                </span>
-                              ) : isOverdue ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-red-100 text-red-700 text-[8px] sm:text-[8.5px] font-black animate-pulse">
-                                  <span className="material-symbols-outlined text-[9px]">warning</span>
-                                  <span>ATRASO</span>
-                                </span>
-                              ) : isSoon ? (
-                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[8px] sm:text-[8.5px] font-bold">
-                                  <span className="material-symbols-outlined text-[9px]">schedule</span>
-                                  <span>A VENCER</span>
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-700 text-[8px] sm:text-[8.5px] font-medium">
-                                  <span>EM DIA</span>
-                                </span>
-                              )}
-
-                              {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
-                              <span
-                                className={`font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
-                                  isPaid
-                                    ? 'text-emerald-700 bg-emerald-50 border border-emerald-200'
-                                    : 'text-red-600 bg-red-50 border border-red-200 font-extrabold'
-                                }`}
-                                title={isPaid ? 'Valor pago / liquidado' : 'Valor a quitar'}
-                              >
-                                R$ {safeFormatCurrency(finalAmount)}
-                              </span>
-                            </div>
                           </div>
                         </td>
 
@@ -1781,8 +1743,8 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </div>
                         </td>
 
-                        {/* Coluna 6: SITUAÇÃO (Desktop com valor a quitar debaixo do status) */}
-                        <td className="hidden sm:table-cell py-2.5 px-2 text-center align-middle whitespace-nowrap">
+                        {/* Coluna 6: SITUAÇÃO & VALOR (Exibição única sem duplicidade) */}
+                        <td className="py-2.5 px-2 text-center align-middle whitespace-nowrap">
                           <div className="flex flex-col items-center justify-center gap-0.5">
                             {isPaid ? (
                               <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">

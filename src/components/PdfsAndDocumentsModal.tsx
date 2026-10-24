@@ -5,6 +5,7 @@ import { ExtratoTotalModal } from './ExtratoTotalModal';
 import { DigitalContractModal } from './DigitalContractModal';
 import { ProofModal } from './ProofModal';
 import { safeToFixed, safeFormatCurrency } from '../utils/numberUtils';
+import { generateReceiptTxt, generateStatementTxt, downloadTxtFile } from '../utils/receiptTxtHelper';
 
 interface PdfsAndDocumentsModalProps {
   isOpen: boolean;
@@ -329,6 +330,78 @@ export const PdfsAndDocumentsModal: React.FC<PdfsAndDocumentsModalProps> = ({
                   <span className="material-symbols-outlined text-[16px]">description</span>
                   <span>Abrir Contrato</span>
                 </button>
+              </div>
+
+              {/* 4. Opção: FORMATO TXT (NOVO FORMATO BLOCO DE NOTAS) */}
+              <div className="bg-white hover:bg-slate-50/80 border border-purple-300 hover:border-purple-400 p-3 sm:p-3.5 rounded-xl sm:rounded-2xl flex flex-col justify-between gap-2.5 sm:gap-3 transition-all shadow-xs group">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5 sm:gap-3">
+                  <div className="flex items-start gap-2.5 min-w-0 flex-1">
+                    <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-xl sm:rounded-2xl bg-purple-50 text-purple-700 border border-purple-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:bg-purple-100 transition-colors">
+                      <span className="material-symbols-outlined text-[20px] sm:text-[22px]">text_snippet</span>
+                    </div>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <h4 className="font-black text-xs sm:text-sm text-slate-900 leading-tight">
+                          Documentos em Formato TxT
+                        </h4>
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-purple-100 text-purple-900 border border-purple-300">
+                          NOVO .TXT
+                        </span>
+                      </div>
+                      <p className="text-[10.5px] text-slate-600 mt-0.5 leading-relaxed">
+                        Baixe ou copie o Recibo e Extrato consolidado em texto puro (.txt), ideal para envio via WhatsApp ou impressão térmica.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 w-full sm:w-auto shrink-0 flex-wrap">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const targetInst = targetReceiptInstallment || debtorInstallments[0];
+                        const amountVal = targetInst ? (targetInst.paidAmount || targetInst.amount || targetInst.originalAmount || 0) : debtor.totalOwed;
+                        const txtContent = generateReceiptTxt({
+                          payerName: debtor.name,
+                          payerCpf: debtor.cpfCnpj || debtor.documentNumber,
+                          payerPhone: debtor.phone,
+                          creditorName: currentUser?.name || 'Tiago Dias',
+                          creditorCompany: 'HASPAHO Tecnologia da Informação',
+                          creditorPix: userPixKey || '(14) 99733-9863',
+                          productName: targetInst?.product || primaryPurchase?.product || 'Parcela do Acordo',
+                          installmentNumber: targetInst?.installmentNumber || 1,
+                          totalInstallments: targetInst?.totalInstallments || debtorInstallments.length || 1,
+                          amount: amountVal,
+                          paymentDate: targetInst?.paidAt || targetInst?.dueDate || new Date().toLocaleDateString('pt-BR'),
+                          paymentMethod: 'PIX / Asaas',
+                          authCode: targetInst?.authCode || `AUT-HASPAHO-${debtor.id.slice(-4).toUpperCase()}`,
+                        });
+                        const safePayer = debtor.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
+                        downloadTxtFile(`recibo_${safePayer}.txt`, txtContent);
+                        if (onToast) onToast('📝 Recibo em formato TXT baixado com sucesso!');
+                      }}
+                      className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-extrabold text-xs flex items-center justify-center gap-1 shadow-xs active:scale-95 transition-all cursor-pointer"
+                      title="Baixar Recibo em TXT"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">download</span>
+                      <span>Recibo .TXT</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const txtContent = generateStatementTxt(debtor, debtorInstallments, purchases);
+                        const safePayer = debtor.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
+                        downloadTxtFile(`extrato_${safePayer}.txt`, txtContent);
+                        if (onToast) onToast('📋 Extrato consolidado em formato TXT baixado com sucesso!');
+                      }}
+                      className="flex-1 sm:flex-initial px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-white font-bold text-xs flex items-center justify-center gap-1 border border-purple-400/30 active:scale-95 transition-all cursor-pointer"
+                      title="Baixar Extrato Completo em TXT"
+                    >
+                      <span className="material-symbols-outlined text-[15px] text-purple-300">download</span>
+                      <span>Extrato .TXT</span>
+                    </button>
+                  </div>
+                </div>
               </div>
 
             </div>

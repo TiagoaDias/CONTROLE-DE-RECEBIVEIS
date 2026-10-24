@@ -1,0 +1,17 @@
+================================================================================
+HASPAHO TECNOLOGIA DA INFORMAÇÃO • CONTROLE DE RECEBÍVEIS
+FICHA CADASTRAL DO CLIENTE / COMPRADOR
+================================================================================
+CLIENTE: Fábio Dias
+ID DO CADASTRO: d-1
+DOCUMENTO / CPF: Não informado
+TELEFONE / WHATSAPP: Não informado
+VÍNCULO / RELAÇÃO: Cliente
+SCORE DE PONTUALIDADE: 850/1000 (BOM)
+PONTUALIDADE: 0 no prazo, 0 em atraso
+LIMITE CEDIDO: R$ 3.000,00
+CHAVE PIX: Não informada
+DATA DE CADASTRO: 24/10/2026
+ÚLTIMA SINCRONIZAÇÃO: 24/10/2026, 00:37:47
+OBSERVAÇÕES: Sem observações adicionais
+================================================================================

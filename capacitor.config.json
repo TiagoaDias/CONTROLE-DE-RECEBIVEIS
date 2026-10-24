@@ -10,6 +10,7 @@
   },
   "plugins": {
     "GoogleSignIn": {
+      "clientId": "145625836080-0mg9vld3ao82khqnkf0cr19c6jl7kqqk.apps.googleusercontent.com",
       "scopes": ["profile", "email"],
       "forceCodeForRefreshToken": true
     }

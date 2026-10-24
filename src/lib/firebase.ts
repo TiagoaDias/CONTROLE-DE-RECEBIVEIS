@@ -1,11 +1,15 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { Capacitor } from '@capacitor/core';
 import {
+  GoogleSignIn,
+  type SignInResult,
+  type InitializeOptions,
+  ErrorCode,
+} from '@capawesome/capacitor-google-sign-in';
+import {
   getAuth,
   signInWithPopup,
-  signInWithRedirect,
   signInWithCredential,
-  getRedirectResult,
   GoogleAuthProvider,
   FacebookAuthProvider,
   signOut,
@@ -50,7 +54,10 @@ export const activeFirebaseConfig = {
   messagingSenderId: getEnvVar('VITE_FIREBASE_MESSAGING_SENDER_ID') || firebaseConfig.messagingSenderId,
   appId: getEnvVar('VITE_FIREBASE_APP_ID') || firebaseConfig.appId,
   firestoreDatabaseId: getEnvVar('VITE_FIREBASE_DATABASE_ID') || firebaseConfig.firestoreDatabaseId,
-  oAuthClientId: getEnvVar('VITE_FIREBASE_OAUTH_CLIENT_ID') || (firebaseConfig as any).oAuthClientId,
+  oAuthClientId:
+    getEnvVar('VITE_FIREBASE_OAUTH_CLIENT_ID') ||
+    (firebaseConfig as any).oAuthClientId ||
+    '145625836080-0mg9vld3ao82khqnkf0cr19c6jl7kqqk.apps.googleusercontent.com',
 };
 
 // Initialize Firebase App instance
@@ -69,132 +76,180 @@ const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: 'select_account' });
 
 /**
- * Inicialização oficial do plugin @capawesome/capacitor-google-sign-in no Android/iOS.
- * Força o uso das APIs do sistema e do navegador nativo do sistema operacional,
- * evitando bloqueios por políticas de WebView (disallowed_useragent) e garantindo
- * compatibilidade OAuth oficial do Google.
+ * Detecta se o aplicativo está rodando em ambiente nativo Capacitor (Android/iOS)
+ * ou dentro de uma WebView Android, onde WebViews embutidas causam `disallowed_useragent`
+ * ou redirecionamento inválido para `localhost`.
  */
-export async function initializeGoogleSignInNative(): Promise<void> {
-  if (Capacitor.isNativePlatform()) {
-    try {
-      const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
-      const clientId = activeFirebaseConfig.oAuthClientId || (firebaseConfig as any).oAuthClientId;
-      if (clientId) {
-        await GoogleSignIn.initialize({
-          clientId,
-          scopes: ['profile', 'email'],
-        });
-        console.log('[Firebase:GoogleSignIn] Plugin nativo @capawesome/capacitor-google-sign-in inicializado com clientId:', clientId);
-      }
-    } catch (e) {
-      console.warn('[Firebase:GoogleSignIn] Aviso ao inicializar plugin nativo:', e);
+export function isNativeOrAndroidWebView(): boolean {
+  try {
+    if (Capacitor.isNativePlatform()) {
+      return true;
     }
-  }
+    const platform = Capacitor.getPlatform();
+    if (platform === 'android' || platform === 'ios') {
+      return true;
+    }
+    if (typeof navigator !== 'undefined' && navigator.userAgent) {
+      const ua = navigator.userAgent;
+      if (/; wv\)|Capacitor|Android.*Version\/[0-9]/i.test(ua)) {
+        return true;
+      }
+    }
+  } catch {}
+  return false;
 }
 
 /**
- * Autenticação Google Nativa Oficial com suporte a Google Play Services / Sistema Android
+ * Retorna uma URL de callback OAuth segura que NUNCA aponta para `localhost` ou `127.0.0.1`.
+ */
+export function getSafeOAuthRedirectUrl(): string {
+  const fallbackAuthDomainUrl = `https://${activeFirebaseConfig.authDomain}`;
+  if (typeof window === 'undefined' || !window.location) {
+    return fallbackAuthDomainUrl;
+  }
+  const { protocol, hostname, origin } = window.location;
+  const isLocalhost =
+    hostname === 'localhost' ||
+    hostname === '127.0.0.1' ||
+    hostname === '0.0.0.0' ||
+    hostname.endsWith('.localhost') ||
+    !protocol.startsWith('http');
+
+  if (isLocalhost || isNativeOrAndroidWebView()) {
+    return fallbackAuthDomainUrl;
+  }
+  return origin;
+}
+
+let googleSignInInitialized = false;
+let googleSignInInitPromise: Promise<void> | null = null;
+
+/**
+ * Inicialização oficial do plugin `@capawesome/capacitor-google-sign-in`.
+ * Força o uso do Credential Manager / navegador nativo do sistema Android,
+ * evitando o erro `disallowed_useragent` em WebViews e impedindo qualquer
+ * redirecionamento para `localhost` em dispositivos móveis.
+ */
+export async function initializeGoogleSignInNative(): Promise<void> {
+  if (googleSignInInitialized) {
+    return;
+  }
+  if (googleSignInInitPromise) {
+    return googleSignInInitPromise;
+  }
+
+  googleSignInInitPromise = (async () => {
+    try {
+      const clientId = activeFirebaseConfig.oAuthClientId;
+      if (!clientId) {
+        throw new Error('OAuth Web Client ID ausente na configuração do Firebase.');
+      }
+
+      const initOptions: InitializeOptions = {
+        clientId,
+        scopes: ['profile', 'email'],
+      };
+
+      // Em ambiente Web não-nativo, garante que redirectUrl nunca seja localhost
+      if (!Capacitor.isNativePlatform()) {
+        initOptions.redirectUrl = getSafeOAuthRedirectUrl();
+      }
+
+      await GoogleSignIn.initialize(initOptions);
+      googleSignInInitialized = true;
+      console.log(
+        '[Firebase:GoogleSignIn] Plugin @capawesome/capacitor-google-sign-in inicializado com sucesso (clientId configurado, sem redirect para localhost).'
+      );
+    } catch (error) {
+      googleSignInInitPromise = null;
+      console.warn('[Firebase:GoogleSignIn] Aviso ao inicializar @capawesome/capacitor-google-sign-in:', error);
+    }
+  })();
+
+  return googleSignInInitPromise;
+}
+
+// Dispara a inicialização automaticamente no carregamento do módulo em plataformas nativas/mobile
+if (isNativeOrAndroidWebView()) {
+  initializeGoogleSignInNative().catch(() => {});
+}
+
+/**
+ * Autenticação Google via `@capawesome/capacitor-google-sign-in` e `signInWithCredential`.
+ * - No Android/iOS nativo: dispara `GoogleSignIn.signIn()` usando o navegador nativo / Credential Manager do sistema,
+ *   captura o `idToken` resultante e autentica no Firebase Auth com `signInWithCredential(auth, credential)`,
+ *   garantindo que o callback nunca redirecione para `localhost` e evitando `disallowed_useragent`.
+ * - Na Web: utiliza `signInWithPopup` sem jamais redirecionar para `localhost`.
  */
 export async function signInWithGoogleNative(): Promise<UserAccount> {
-  if (Capacitor.isNativePlatform()) {
+  if (isNativeOrAndroidWebView()) {
+    await initializeGoogleSignInNative();
+
     try {
-      await initializeGoogleSignInNative();
-      const { GoogleSignIn } = await import('@capawesome/capacitor-google-sign-in');
-      const result: any = await GoogleSignIn.signIn();
-      console.log('[Firebase:GoogleSignIn] Resultado obtido do Google Sign-In nativo:', result);
+      const result: SignInResult = await GoogleSignIn.signIn();
+      console.log('[Firebase:GoogleSignIn] Resposta recebida do navegador/sistema nativo Android:', {
+        email: result?.email,
+        userId: result?.userId,
+        hasIdToken: Boolean(result?.idToken),
+      });
 
-      const userEmail = (
-        result?.email ||
-        result?.user?.email ||
-        result?.profile?.email ||
-        ''
-      ).toLowerCase();
+      const idToken = result?.idToken;
+      const accessToken = result?.accessToken ?? undefined;
 
-      const userId =
-        result?.userId ||
-        result?.user?.id ||
-        result?.id ||
-        result?.uid ||
-        (userEmail ? `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}` : '');
-
-      const displayName =
-        result?.displayName ||
-        result?.user?.displayName ||
-        result?.user?.givenName ||
-        result?.givenName ||
-        (userEmail ? userEmail.split('@')[0] : '');
-
-      const photoURL =
-        result?.imageUrl ||
-        result?.user?.imageUrl ||
-        result?.photoUrl ||
-        '';
-
-      const idToken =
-        result?.idToken ||
-        result?.user?.idToken ||
-        result?.authentication?.idToken;
-
-      if (idToken) {
-        try {
-          const credential = GoogleAuthProvider.credential(idToken);
-          const userCredential = await signInWithCredential(auth, credential);
-          const userAccount = await processFirebaseUserResult(userCredential.user);
-          setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
-          localStorage.removeItem('haspaho_explicit_logout');
-          return userAccount;
-        } catch (credErr) {
-          console.warn('[Firebase:GoogleSignIn] Credencial nativa recebida, autenticando via dados de perfil:', credErr);
-        }
+      if (!idToken) {
+        throw new Error('ID Token não retornado pelo Google Sign-In nativo.');
       }
 
-      if (userEmail || userId) {
-        const userAccount = await processFirebaseUserResult({
-          uid: userId || `usr_google_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`,
-          email: userEmail,
-          displayName,
-          photoURL,
-        });
-        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
-        localStorage.removeItem('haspaho_explicit_logout');
-        return userAccount;
-      }
+      // Constrói a credencial oficial do Google e autentica no Firebase Auth via signInWithCredential
+      const credential = GoogleAuthProvider.credential(idToken, accessToken);
+      const userCredential = await signInWithCredential(auth, credential);
+      const userAccount = await processFirebaseUserResult(userCredential.user);
 
-      throw new Error('Nenhuma conta obtida no seletor do dispositivo.');
+      setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
+      removeSafeLocalStorage('haspaho_explicit_logout');
+      return userAccount;
     } catch (err: any) {
-      console.warn('[Firebase:GoogleSignIn] Erro no plugin nativo, tentando fallback com Firebase Auth Popup...', err);
-      try {
-        const popupResult = await signInWithPopup(auth, googleProvider);
-        const userAccount = await processFirebaseUserResult(popupResult.user);
-        setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
-        localStorage.removeItem('haspaho_explicit_logout');
-        return userAccount;
-      } catch (popupErr) {
-        console.warn('[Firebase:GoogleSignIn] Fallback de popup indisponível ou bloqueado:', popupErr);
+      const errCode = err?.code || err?.message || '';
+      if (
+        errCode === ErrorCode.SignInCanceled ||
+        String(errCode).includes('SIGN_IN_CANCELED') ||
+        String(errCode).includes('canceled')
+      ) {
+        throw new Error('Autenticação com o Google cancelada pelo usuário.');
       }
+      console.error('[Firebase:GoogleSignIn] Falha na autenticação nativa com @capawesome/capacitor-google-sign-in:', err);
+      // Nunca executa fallback para signInWithRedirect ou WebView localhost no Android
       throw new Error('NEEDS_ACCOUNT_PICKER');
     }
   }
 
-  // Web Browser Fallback: usa popup no desktop ou signInWithRedirect quando bloqueado
+  // Fluxo para navegadores Web padrão (Desktop / Chrome Web fora de WebView)
+  // Nunca utiliza signInWithRedirect para localhost a fim de impedir redirecionamentos inválidos.
   try {
-    const result = await signInWithPopup(auth, googleProvider);
-    const userAccount = await processFirebaseUserResult(result.user);
+    const popupResult = await signInWithPopup(auth, googleProvider);
+    const userAccount = await processFirebaseUserResult(popupResult.user);
     setSafeLocalStorage('haspaho_auth_user', JSON.stringify(userAccount));
-    localStorage.removeItem('haspaho_explicit_logout');
+    removeSafeLocalStorage('haspaho_explicit_logout');
     return userAccount;
   } catch (err: any) {
-    if (
-      err?.code === 'auth/popup-blocked' ||
-      err?.code === 'auth/popup-closed-by-user' ||
-      err?.code === 'auth/operation-not-supported-in-this-environment'
-    ) {
-      console.info('[Firebase:GoogleSignIn] Popup bloqueado ou não suportado, redirecionando com signInWithRedirect...');
-      await signInWithRedirect(auth, googleProvider);
-      throw new Error('Redirecionando para autenticação com o Google...');
-    }
+    console.warn('[Firebase:GoogleSignIn] Aviso no login via popup Web:', err?.code || err?.message);
     throw err;
   }
+}
+
+/**
+ * Encerra a sessão no plugin nativo GoogleSignIn e no Firebase Auth.
+ */
+export async function signOutGoogleNative(): Promise<void> {
+  if (isNativeOrAndroidWebView()) {
+    try {
+      await initializeGoogleSignInNative();
+      await GoogleSignIn.signOut();
+    } catch (e) {
+      console.warn('[Firebase:GoogleSignIn] Aviso ao encerrar sessão no plugin nativo:', e);
+    }
+  }
+  await signOut(auth);
 }
 
 // Facebook OAuth Provider

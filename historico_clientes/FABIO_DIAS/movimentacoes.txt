@@ -1,0 +1,41 @@
+================================================================================
+HASPAHO TECNOLOGIA DA INFORMAÇÃO • LIVRO DE MOVIMENTAÇÕES
+CLIENTE: Fábio Dias
+================================================================================
+
+[24/10/2026 às 00:13:19] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792800661141-8613
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário via comando Gemini. Observação: Pagamento informado pelo usuário, aguardando conferência bancária.. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------
+[24/10/2026 às 00:26:37] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792801542508-6250
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário via comando Gemini. Observação: Pagamento informado pelo usuário. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------
+[24/10/2026 às 00:27:26] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792801602647-3308
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário via comando Gemini. Observação: Pagamento informado pelo usuário. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------
+[24/10/2026 às 00:29:06] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792801645711-1962
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário via comando Gemini. Observação: Pagamento informado pelo usuário, aguardando confirmação/conferência.. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------
+[24/10/2026 às 00:30:09] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792801807211-5650
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------
+[24/10/2026 às 00:37:47] [PAGAMENTO INFORMADO]
+ORIGEM: Comando enviado ao Gemini
+ID: OP-1792802264661-3952
+VALOR: R$ 150,00
+DETALHES: Pagamento de R$ 150.00 informado pelo usuário. Status: Aguardando confirmação.
+--------------------------------------------------------------------------------

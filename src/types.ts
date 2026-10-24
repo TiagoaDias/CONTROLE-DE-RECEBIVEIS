@@ -8,7 +8,8 @@ export type ScreenTab =
   | 'detalhe-atraso'
   | 'detalhe-parcela'
   | 'erp-legacy'
-  | 'admin-forum';
+  | 'admin-forum'
+  | 'gemini-automacao';
 
 export interface UserAccount {
   id: string;
@@ -269,5 +270,60 @@ export interface GeminiParsedPaymentDistribution {
   distribution: GeminiDistributionItem[];
   settledPurchasesCount: number;
   unsettledPurchasesCount: number;
+}
+
+export interface GeminiAutomationResult {
+  reply: string;
+  intent: 'A_OBSERVACAO' | 'B_PROMESSA' | 'C_PAGAMENTO_INFORMADO' | 'D_PAGAMENTO_CONFIRMADO' | 'E_PARCIAL' | 'F_QUITADA' | 'G_CONSULTA' | 'H_CORRECAO_CANCELAMENTO' | 'OUTRO';
+  intentLabel: string;
+  clientIdentified?: {
+    id: string;
+    name: string;
+    phone?: string;
+    totalOwed: number;
+    totalPaid: number;
+  };
+  operation?: {
+    type: string;
+    amount?: number;
+    date?: string;
+    status: string;
+    description: string;
+    divergenceWarning?: string;
+    operationId: string;
+  };
+  requiresUserConfirmation?: boolean;
+  confirmationPrompt?: string;
+  txtUpdated?: boolean;
+  txtFiles?: Array<{
+    fileName: string;
+    clientFolder: string;
+    preview: string;
+  }>;
+  mutations?: {
+    updatedDebtor?: Debtor;
+    updatedInstallments?: Installment[];
+    newTransaction?: TransactionRecord;
+  };
+}
+
+export interface GeminiAutomationMessage {
+  id: string;
+  sender: 'user' | 'gemini';
+  text: string;
+  timestamp: string;
+  result?: GeminiAutomationResult;
+  isProcessing?: boolean;
+}
+
+export interface GeminiTxtFileInfo {
+  clientName: string;
+  folderName: string;
+  files: {
+    name: string;
+    size: number;
+    updatedAt: string;
+    content?: string;
+  }[];
 }
 

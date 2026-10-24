@@ -87,6 +87,7 @@ interface HeaderProps {
   onToast?: (msg: string) => void;
   onSettleInstallment?: (inst: Installment) => void;
   onOpenCredorScore?: () => void;
+  onOpenPresentation?: () => void;
   onNudgeWhatsApp?: (
     debtorName: string,
     amount: string,
@@ -126,6 +127,7 @@ export const Header: React.FC<HeaderProps> = ({
   onToast,
   onSettleInstallment,
   onOpenCredorScore,
+  onOpenPresentation,
   onNudgeWhatsApp,
 }) => {
   const [isTestingFirebase, setIsTestingFirebase] = useState(false);
@@ -160,6 +162,7 @@ export const Header: React.FC<HeaderProps> = ({
       case 'detalhe-parcela': return 'Liquidação & Contrato';
       case 'erp-legacy': return 'Sistema ERP Enterprise • Delphi Desktop';
       case 'admin-forum': return '👑 Painel Admin Master & Fórum';
+      case 'gemini-automacao': return 'Automação Inteligente Gemini • Comandos Naturais';
       default: return 'Financeiro';
     }
   };
@@ -199,11 +202,6 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
-            <ThemeToggleCrossFade
-              isDarkMode={isDarkMode}
-              onToggleTheme={onToggleTheme}
-              size="sm"
-            />
             {/* Avatar do Usuário */}
             <button
               onClick={() => onNavigate('perfil')}
@@ -232,9 +230,23 @@ export const Header: React.FC<HeaderProps> = ({
         <div className="hidden md:flex items-center justify-between h-16 gap-4">
           {/* Official HASPAHO Logo & Brand */}
           <div
-            onClick={() => onNavigate('inicio')}
+            onClick={() => {
+              if (currentUser && (currentUser.id || currentUser.email)) {
+                if (onOpenPresentation) {
+                  onOpenPresentation();
+                } else {
+                  onNavigate('dashboard');
+                }
+              } else {
+                onNavigate('inicio');
+              }
+            }}
             className="flex items-center gap-3 cursor-pointer shrink-0 group"
-            title="Ir para o Início / Tela Inicial HASPAHO"
+            title={
+              currentUser && (currentUser.id || currentUser.email)
+                ? 'Apresentação Automatizada do Sistema • Slides Explicativos'
+                : 'Ir para o Início / Tela Inicial HASPAHO'
+            }
           >
             <HaspahoLogo
               size="sm"
@@ -265,12 +277,6 @@ export const Header: React.FC<HeaderProps> = ({
               </button>
             )}
 
-            <ThemeToggleCrossFade
-              isDarkMode={isDarkMode}
-              onToggleTheme={onToggleTheme}
-              size="md"
-            />
-
             <button
               onClick={() => onNavigate('perfil')}
               aria-label="Perfil do usuário"
@@ -288,8 +294,23 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Mobile View Header (< md:) */}
         <div className="md:hidden flex items-center justify-between h-14 gap-2 w-full">
           <div
-            onClick={() => onNavigate('inicio')}
+            onClick={() => {
+              if (currentUser && (currentUser.id || currentUser.email)) {
+                if (onOpenPresentation) {
+                  onOpenPresentation();
+                } else {
+                  onNavigate('dashboard');
+                }
+              } else {
+                onNavigate('inicio');
+              }
+            }}
             className="flex items-center gap-2 cursor-pointer min-w-0 flex-1"
+            title={
+              currentUser && (currentUser.id || currentUser.email)
+                ? 'Apresentação Automatizada do Sistema • Slides Explicativos'
+                : 'Ir para o Início / Tela Inicial HASPAHO'
+            }
           >
             <div className="shrink-0">
               <HaspahoLogo size="xs" variant="icon" darkTheme={isDarkMode} />
@@ -323,11 +344,6 @@ export const Header: React.FC<HeaderProps> = ({
               onSettleInstallment={onSettleInstallment}
               onNudgeWhatsApp={onNudgeWhatsApp}
               isDarkMode={isDarkMode}
-            />
-            <ThemeToggleCrossFade
-              isDarkMode={isDarkMode}
-              onToggleTheme={onToggleTheme}
-              size="sm"
             />
             <button
               onClick={() => onNavigate('perfil')}

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Debtor, Purchase, Installment } from '../types';
 import { downloadIndividualReceiptPdf } from '../utils/receiptPdfHelper';
+import { generateReceiptTxt, generateStatementTxt, downloadTxtFile } from '../utils/receiptTxtHelper';
 import { getCleanDebtorAvatar } from './DebtorsMasterSpreadsheet';
 import { getProductIcon } from '../utils/debtorItemsUtils';
 
@@ -44,7 +45,8 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
     }
   }, [initialDebtorId]);
   const [selectedProductId, setSelectedProductId] = useState<string>('all');
-  const [activeDocType, setActiveDocType] = useState<'extrato' | 'recibo' | 'contrato'>('extrato');
+  const [activeDocType, setActiveDocType] = useState<'extrato' | 'recibo' | 'contrato' | 'txt'>('extrato');
+  const [txtSubDocType, setTxtSubDocType] = useState<'recibo' | 'extrato'>('recibo');
   const [isDebtorPickerOpen, setIsDebtorPickerOpen] = useState(false);
   const [isProductPickerOpen, setIsProductPickerOpen] = useState(false);
 
@@ -198,6 +200,107 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
       );
     }
   };
+
+  // Handler para download do recibo em formato TXT
+  const handleDownloadReceiptTxt = () => {
+    if (!activePaidInstallment || !currentDebtor) {
+      if (onToast) onToast('Selecione uma parcela quitada para emitir o recibo em TXT.');
+      return;
+    }
+    const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
+    const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+    const txtContent = generateReceiptTxt({
+      payerName: currentDebtor.name,
+      payerPhone: currentDebtor.phone,
+      payerCpf: currentDebtor.cpfCnpj || currentDebtor.documentNumber,
+      creditorName: 'Tiago Dias',
+      creditorCompany: 'HASPAHO Tecnologia da Informação',
+      creditorPix: '(14) 99733-9863',
+      productName: activePaidInstallment.product,
+      installmentNumber: activePaidInstallment.installmentNumber,
+      totalInstallments: activePaidInstallment.totalInstallments,
+      amount: finalAmount,
+      paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
+      paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+      authCode: auth,
+    });
+    const safePayer = currentDebtor.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
+    downloadTxtFile(`recibo_${safePayer}_parc_${activePaidInstallment.installmentNumber}.txt`, txtContent);
+    if (onToast) onToast(`📝 Recibo TXT da Parcela #${activePaidInstallment.installmentNumber} baixado com sucesso!`);
+  };
+
+  // Handler para download do extrato em formato TXT
+  const handleDownloadStatementTxt = () => {
+    if (!currentDebtor) return;
+    const txtContent = generateStatementTxt(currentDebtor, activeInstallmentsList, purchases);
+    const safePayer = currentDebtor.name.trim().replace(/[^a-zA-Z0-9]/g, '_');
+    downloadTxtFile(`extrato_${safePayer}_haspaho.txt`, txtContent);
+    if (onToast) onToast(`📋 Extrato consolidado em TXT baixado com sucesso!`);
+  };
+
+  // Handler para copiar TXT para a área de transferência
+  const handleCopyTxtToClipboard = (type: 'recibo' | 'extrato') => {
+    if (!currentDebtor) return;
+    let txt = '';
+    if (type === 'recibo') {
+      if (!activePaidInstallment) {
+        if (onToast) onToast('Selecione uma parcela quitada para copiar.');
+        return;
+      }
+      const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
+      const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+      txt = generateReceiptTxt({
+        payerName: currentDebtor.name,
+        payerPhone: currentDebtor.phone,
+        payerCpf: currentDebtor.cpfCnpj || currentDebtor.documentNumber,
+        creditorName: 'Tiago Dias',
+        creditorCompany: 'HASPAHO Tecnologia da Informação',
+        creditorPix: '(14) 99733-9863',
+        productName: activePaidInstallment.product,
+        installmentNumber: activePaidInstallment.installmentNumber,
+        totalInstallments: activePaidInstallment.totalInstallments,
+        amount: finalAmount,
+        paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
+        paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+        authCode: auth,
+      });
+    } else {
+      txt = generateStatementTxt(currentDebtor, activeInstallmentsList, purchases);
+    }
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(txt);
+      if (onToast) onToast('📋 Texto TXT copiado para a área de transferência!');
+    }
+  };
+
+  // Preview ativo de TXT para visualização na tela
+  const currentTxtPreview = useMemo(() => {
+    if (!currentDebtor) return 'Nenhum devedor selecionado.';
+    if (txtSubDocType === 'recibo') {
+      if (!activePaidInstallment) {
+        return 'Nenhuma parcela quitada selecionada para exibir o recibo TXT.';
+      }
+      const finalAmount = activePaidInstallment.amount || activePaidInstallment.originalAmount;
+      const auth = activePaidInstallment.authCode || `AUTH-${Date.now().toString(36).toUpperCase()}`;
+      return generateReceiptTxt({
+        payerName: currentDebtor.name,
+        payerPhone: currentDebtor.phone,
+        payerCpf: currentDebtor.cpfCnpj || currentDebtor.documentNumber,
+        creditorName: 'Tiago Dias',
+        creditorCompany: 'HASPAHO Tecnologia da Informação',
+        creditorPix: '(14) 99733-9863',
+        productName: activePaidInstallment.product,
+        installmentNumber: activePaidInstallment.installmentNumber,
+        totalInstallments: activePaidInstallment.totalInstallments,
+        amount: finalAmount,
+        paymentDate: activePaidInstallment.paidAt || activePaidInstallment.dueDate,
+        paymentMethod: activePaidInstallment.paymentMethod || 'PIX / Asaas',
+        authCode: auth,
+      });
+    } else {
+      return generateStatementTxt(currentDebtor, activeInstallmentsList, purchases);
+    }
+  }, [currentDebtor, txtSubDocType, activePaidInstallment, activeInstallmentsList, purchases]);
 
   return (
     <div className="fixed inset-0 z-[120] bg-slate-950 flex items-center justify-center animate-in fade-in duration-200">
@@ -468,13 +571,13 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
         </div>
 
         {/* ============================================================ */}
-        {/* 3. TABS DOS TIPOS DE DOCUMENTO (Extrato, Recibo, Contrato)   */}
+        {/* 3. TABS DOS TIPOS DE DOCUMENTO (Extrato, Recibo, Contrato, TxT) */}
         {/* ============================================================ */}
-        <div className="shrink-0 grid grid-cols-3 gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-slate-950/70 border-b border-white/10">
+        <div className="shrink-0 grid grid-cols-4 gap-1 sm:gap-1.5 p-1 sm:p-1.5 bg-slate-950/70 border-b border-white/10">
           <button
             type="button"
             onClick={() => setActiveDocType('extrato')}
-            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
+            className={`py-2 px-1 sm:px-2 rounded-xl text-[10.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeDocType === 'extrato'
                 ? 'bg-gradient-to-r from-amber-600 to-amber-700 text-white shadow-md ring-1 ring-amber-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -487,7 +590,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveDocType('recibo')}
-            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
+            className={`py-2 px-1 sm:px-2 rounded-xl text-[10.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeDocType === 'recibo'
                 ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md ring-1 ring-emerald-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -503,7 +606,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
           <button
             type="button"
             onClick={() => setActiveDocType('contrato')}
-            className={`py-2 px-1 sm:px-2.5 rounded-xl text-[11px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 sm:gap-1.5 min-w-0 ${
+            className={`py-2 px-1 sm:px-2 rounded-xl text-[10.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
               activeDocType === 'contrato'
                 ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white shadow-md ring-1 ring-cyan-400/40'
                 : 'text-slate-400 hover:text-white hover:bg-white/5'
@@ -511,6 +614,22 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
           >
             <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">history_edu</span>
             <span className="truncate">Contrato</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveDocType('txt')}
+            className={`py-2 px-1 sm:px-2 rounded-xl text-[10.5px] sm:text-xs font-black transition-all cursor-pointer flex items-center justify-center gap-1 min-w-0 ${
+              activeDocType === 'txt'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md ring-1 ring-purple-400/40'
+                : 'text-slate-400 hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <span className="material-symbols-outlined text-[15px] sm:text-[16px] shrink-0">text_snippet</span>
+            <span className="truncate">Formato TxT</span>
+            <span className="text-[8.5px] px-1 py-0.1 rounded bg-purple-950 text-purple-300 border border-purple-400/30 font-bold shrink-0 hidden xs:inline">
+              NOVO
+            </span>
           </button>
         </div>
 
@@ -558,17 +677,28 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 </div>
               </div>
 
-              <button
-                type="button"
-                onClick={() => {
-                  onClose();
-                  onOpenExtratoTotal(selectedProductId !== 'all' ? selectedProductId : undefined, currentDebtor?.id);
-                }}
-                className="w-full h-11 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-[18px]">visibility</span>
-                <span>Visualizar &amp; Baixar Extrato Total em PDF</span>
-              </button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenExtratoTotal(selectedProductId !== 'all' ? selectedProductId : undefined, currentDebtor?.id);
+                  }}
+                  className="h-11 rounded-2xl bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-500 hover:to-amber-600 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-900/30 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">visibility</span>
+                  <span>Baixar Extrato (PDF)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={handleDownloadStatementTxt}
+                  className="h-11 rounded-2xl bg-amber-950/80 hover:bg-amber-900 active:scale-95 text-amber-200 border border-amber-500/40 font-black text-xs flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px]">text_snippet</span>
+                  <span>Baixar Extrato (.TXT)</span>
+                </button>
+              </div>
             </div>
           )}
 
@@ -629,7 +759,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
                                 <span className="font-extrabold text-xs text-white truncate">
-                                  {inst.product}
+                                   {inst.product}
                                 </span>
                                 <span className="text-[10px] font-mono font-bold text-emerald-300 bg-emerald-950/80 px-1.5 py-0.2 rounded border border-emerald-500/30 shrink-0">
                                   Parc. {inst.installmentNumber}/{inst.totalInstallments}
@@ -654,14 +784,23 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                     })}
                   </div>
 
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                     <button
                       type="button"
                       onClick={handleDownloadReceiptDirect}
                       className="h-11 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/40 transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[18px]">download</span>
-                      <span>Baixar Recibo (PDF)</span>
+                      <span>Baixar (PDF)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleDownloadReceiptTxt}
+                      className="h-11 rounded-2xl bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-300 font-bold text-xs flex items-center justify-center gap-1.5 transition-all cursor-pointer active:scale-95 shadow-md"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">text_snippet</span>
+                      <span>Baixar (.TXT)</span>
                     </button>
 
                     <button
@@ -683,7 +822,7 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                       className="h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 border border-white/10 transition-all cursor-pointer"
                     >
                       <span className="material-symbols-outlined text-[18px]">visibility</span>
-                      <span>Visualizar na Tela</span>
+                      <span>Visualizar</span>
                     </button>
                   </div>
                 </div>
@@ -740,6 +879,122 @@ export const PdfDocumentsHubModal: React.FC<PdfDocumentsHubModalProps> = ({
                 <span className="material-symbols-outlined text-[18px]">assignment</span>
                 <span>Abrir Contrato Digital para Assinar &amp; Baixar (A4)</span>
               </button>
+            </div>
+          )}
+
+          {/* ABA 4: NOVO FORMATO TXT (BLOCO DE NOTAS / TEXTO PURO) */}
+          {activeDocType === 'txt' && (
+            <div className="space-y-4 animate-in fade-in duration-150">
+              <div className="p-4 rounded-2xl bg-purple-950/30 border border-purple-500/30 flex items-start gap-3">
+                <span className="w-10 h-10 rounded-xl bg-purple-600/30 text-purple-300 border border-purple-400/30 flex items-center justify-center shrink-0 shadow-md">
+                  <span className="material-symbols-outlined text-[22px]">text_snippet</span>
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <h4 className="font-black text-sm text-purple-300">
+                      Documentos em Formato TxT (Texto Puro .txt)
+                    </h4>
+                    <span className="text-[9px] px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-200 border border-purple-400/40 font-bold uppercase">
+                      Novo Formato
+                    </span>
+                  </div>
+                  <p className="text-xs text-slate-300 mt-1 leading-relaxed">
+                    Gere e baixe recibos e extratos em arquivo .TXT para compartilhamento rápido no WhatsApp, impressão direta ou abertura no Bloco de Notas.
+                  </p>
+                </div>
+              </div>
+
+              {/* Sub-Seletor TxT: Recibo vs Extrato */}
+              <div className="flex items-center gap-1.5 p-1 bg-slate-900 rounded-xl border border-white/10">
+                <button
+                  type="button"
+                  onClick={() => setTxtSubDocType('recibo')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    txtSubDocType === 'recibo'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">verified</span>
+                  <span>1. Recibo em TxT</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTxtSubDocType('extrato')}
+                  className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 ${
+                    txtSubDocType === 'extrato'
+                      ? 'bg-purple-600 text-white shadow-xs'
+                      : 'text-slate-400 hover:text-white hover:bg-white/5'
+                  }`}
+                >
+                  <span className="material-symbols-outlined text-[15px]">receipt_long</span>
+                  <span>2. Extrato em TxT</span>
+                </button>
+              </div>
+
+              {/* Seletor de parcela quando em modo recibo TxT */}
+              {txtSubDocType === 'recibo' && paidInstallments.length > 0 && (
+                <div className="flex items-center justify-between gap-2 p-2.5 bg-slate-900/60 rounded-xl border border-white/10 text-xs">
+                  <span className="text-slate-300 font-bold text-[11px] flex items-center gap-1">
+                    <span className="material-symbols-outlined text-[14px] text-purple-400">tune</span>
+                    <span>Parcela para o Recibo TxT:</span>
+                  </span>
+                  <select
+                    value={selectedInstallmentId || activePaidInstallment?.id || ''}
+                    onChange={(e) => setSelectedInstallmentId(e.target.value)}
+                    className="h-8 px-2.5 rounded-lg bg-slate-950 border border-purple-500/40 text-purple-200 text-xs font-mono font-bold focus:outline-none focus:border-purple-400 cursor-pointer shadow-xs max-w-[220px] truncate"
+                  >
+                    {paidInstallments.map((inst) => (
+                      <option key={inst.id} value={inst.id}>
+                        Parc. #{inst.installmentNumber}/{inst.totalInstallments} • R$ {(inst.amount || inst.originalAmount).toFixed(2).replace('.', ',')}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {/* Caixa de Visualização Prévia do Arquivo TXT */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between text-xs text-slate-400 px-1">
+                  <span className="flex items-center gap-1 font-mono text-[11px] text-purple-300">
+                    <span className="material-symbols-outlined text-[14px]">terminal</span>
+                    <span>Prévia do Arquivo .TXT ({txtSubDocType === 'recibo' ? 'Recibo' : 'Extrato'}):</span>
+                  </span>
+                  <span className="text-[10px] text-slate-500 font-mono">
+                    ASCII / UTF-8
+                  </span>
+                </div>
+
+                <div className="relative rounded-2xl overflow-hidden border border-purple-500/30 bg-slate-950 shadow-inner">
+                  <pre className="p-3 sm:p-4 text-[10.5px] sm:text-[11px] font-mono leading-relaxed text-emerald-300 max-h-56 overflow-y-auto overflow-x-auto custom-scrollbar select-text whitespace-pre">
+                    {currentTxtPreview}
+                  </pre>
+                </div>
+              </div>
+
+              {/* Botões de Ação para o TXT */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (txtSubDocType === 'recibo') handleDownloadReceiptTxt();
+                    else handleDownloadStatementTxt();
+                  }}
+                  className="h-11 rounded-2xl bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 active:scale-95 text-white font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-lg shadow-purple-900/40 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[19px]">download</span>
+                  <span>Baixar Arquivo .TxT</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleCopyTxtToClipboard(txtSubDocType)}
+                  className="h-11 rounded-2xl bg-slate-800 hover:bg-slate-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 border border-purple-400/30 hover:border-purple-400 transition-all cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-[18px] text-purple-300">content_copy</span>
+                  <span>Copiar Texto TxT</span>
+                </button>
+              </div>
             </div>
           )}
 
