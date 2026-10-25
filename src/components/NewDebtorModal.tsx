@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { APP_IMAGES } from '../data/mockData';
 import { PaymentMethodSelector } from './PaymentMethodSelector';
 import { ImageCropperModal } from './ImageCropperModal';
@@ -19,21 +19,6 @@ function isValidCpf(str: string): boolean {
   return true;
 }
 
-function generateValidCpf(): string {
-  const rand = (n: number) => Math.floor(Math.random() * n);
-  const n = Array.from({ length: 9 }, () => rand(10));
-  let d1 = n.reduce((sum, digit, index) => sum + digit * (10 - index), 0);
-  d1 = 11 - (d1 % 11);
-  if (d1 >= 10) d1 = 0;
-  n.push(d1);
-  let d2 = n.reduce((sum, digit, index) => sum + digit * (11 - index), 0);
-  d2 = 11 - (d2 % 11);
-  if (d2 >= 10) d2 = 0;
-  n.push(d2);
-  const str = n.join('');
-  return `${str.slice(0, 3)}.${str.slice(3, 6)}.${str.slice(6, 9)}-${str.slice(9)}`;
-}
-
 const VINCULO_OPTIONS = [
   'Amigo(a)',
   'Família',
@@ -52,6 +37,13 @@ const CARD_OPTIONS = [
   'Santander Unlimited',
   'Outro Cartão Particular',
 ];
+
+function getDefaultFirstDueDate(): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() + 1);
+  d.setDate(10);
+  return d.toISOString().split('T')[0];
+}
 
 interface NewDebtorModalProps {
   isOpen: boolean;
@@ -92,7 +84,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
 }) => {
   const [activeStep, setActiveStep] = useState<'dados' | 'compra' | 'pix' | 'credenciais'>('dados');
 
-  // Campos do Comprador
+  // Campos do Comprador (100% limpos a cada novo cadastro)
   const [name, setName] = useState('');
   const [cpf, setCpf] = useState('');
   const [email, setEmail] = useState('');
@@ -100,7 +92,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
   const [relation, setRelation] = useState('Amigo(a)');
   const [isCustomRelation, setIsCustomRelation] = useState(false);
   const [customRelationText, setCustomRelationText] = useState('');
-  const [avatar, setAvatar] = useState(APP_IMAGES.carlos);
+  const [avatar, setAvatar] = useState('');
   const [rawUploadImage, setRawUploadImage] = useState<string | null>(null);
   const [cropModalOpen, setCropModalOpen] = useState(false);
 
@@ -111,23 +103,57 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
   const [cardName, setCardName] = useState('Nubank Croma');
   const [totalAmount, setTotalAmount] = useState('');
   const [installmentsTotal, setInstallmentsTotal] = useState(10);
-  const [firstDueDate, setFirstDueDate] = useState(() => {
-    const d = new Date();
-    d.setMonth(d.getMonth() + 1);
-    d.setDate(10);
-    return d.toISOString().split('T')[0];
-  });
+  const [firstDueDate, setFirstDueDate] = useState(getDefaultFirstDueDate);
 
   // PIX do comprador
   const [debtorPixKey, setDebtorPixKey] = useState('');
 
   // Credenciais & Link
   const [username, setUsername] = useState('');
+  const [isUsernameManuallyEdited, setIsUsernameManuallyEdited] = useState(false);
   const [password, setPassword] = useState('123456');
   const [authMethod, setAuthMethod] = useState<'local' | 'gmail' | 'facebook' | 'whatsapp'>('gmail');
 
   const [isPreRegistrationSent, setIsPreRegistrationSent] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  const resetForm = useCallback(() => {
+    setActiveStep('dados');
+    setName('');
+    setCpf('');
+    setEmail('');
+    setPhone('');
+    setRelation('Amigo(a)');
+    setIsCustomRelation(false);
+    setCustomRelationText('');
+    setAvatar('');
+    setRawUploadImage(null);
+    setCropModalOpen(false);
+    setEnablePurchase(true);
+    setProduct('');
+    setStore('');
+    setCardName('Nubank Croma');
+    setTotalAmount('');
+    setInstallmentsTotal(10);
+    setFirstDueDate(getDefaultFirstDueDate());
+    setDebtorPixKey('');
+    setUsername('');
+    setIsUsernameManuallyEdited(false);
+    setPassword('123456');
+    setAuthMethod('gmail');
+    setIsPreRegistrationSent(false);
+    setFormError(null);
+  }, []);
+
+  // Garante que sempre que o modal abrir ou fechar, todos os campos estejam 100% limpos
+  useEffect(() => {
+    resetForm();
+  }, [isOpen, resetForm]);
+
+  const handleCloseClean = () => {
+    resetForm();
+    onClose();
+  };
 
   if (!isOpen) return null;
 
@@ -148,7 +174,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
       return;
     }
 
-    const validDocumentNumber = isValidCpf(cpf) ? cpf : generateValidCpf();
+    const cleanCpf = cpf.trim();
     const finalRelation = isCustomRelation ? customRelationText.trim() || 'Outro' : relation;
 
     // Compra inicial se preenchida
@@ -172,16 +198,17 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
       };
     }
 
+    const submittedName = name.trim();
     onAddDebtor({
-      name: name.trim(),
-      phone: phone || '(11) 99999-9999',
+      name: submittedName,
+      phone: phone.trim(),
       relation: finalRelation,
-      pixKey: debtorPixKey || phone || email || 'pix@banco.com.br',
-      email: email || `${finalUsername}@gmail.com`,
-      avatar: avatar || APP_IMAGES.carlos,
-      documentNumber: validDocumentNumber,
-      cpfCnpj: validDocumentNumber,
-      debtorPixKey,
+      pixKey: (debtorPixKey || phone || email).trim(),
+      email: email.trim(),
+      avatar: avatar || '',
+      documentNumber: cleanCpf,
+      cpfCnpj: cleanCpf,
+      debtorPixKey: debtorPixKey.trim(),
       username: finalUsername,
       password: password || '123456',
       authMethod,
@@ -191,11 +218,12 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
 
     if (onToast) {
       if (initialPurchaseData) {
-        onToast(`✨ Comprador "${name}" e compra "${initialPurchaseData.product}" cadastrados juntos com sucesso!`);
+        onToast(`✨ Comprador "${submittedName}" e compra "${initialPurchaseData.product}" cadastrados juntos com sucesso!`);
       } else {
-        onToast(`✨ Comprador "${name}" cadastrado com sucesso!`);
+        onToast(`✨ Comprador "${submittedName}" cadastrado com sucesso!`);
       }
     }
+    resetForm();
     onClose();
   };
 
@@ -257,7 +285,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
         <div className="flex items-center justify-between px-3.5 py-2.5 sm:px-4 sm:py-3 border-b border-white/10 bg-[#09152b]/95 shrink-0 gap-2">
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseClean}
             className="h-7 sm:h-8 px-2.5 rounded-xl bg-white/10 hover:bg-white/20 active:scale-95 text-white text-xs font-bold flex items-center gap-1 transition-all cursor-pointer border border-white/10"
             title="Voltar"
           >
@@ -276,7 +304,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
 
           <button
             type="button"
-            onClick={onClose}
+            onClick={handleCloseClean}
             className="w-7 h-7 sm:w-8 sm:h-8 rounded-xl bg-white/10 hover:bg-red-500/20 hover:text-red-300 text-slate-300 flex items-center justify-center transition-colors cursor-pointer border border-white/10 shrink-0"
             title="Fechar (X)"
           >
@@ -340,7 +368,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
         </div>
 
         {/* 3. CORPO DO FORMULÁRIO */}
-        <form onSubmit={handleSubmit} className="overflow-y-auto px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col gap-3 flex-1 scrollbar-thin">
+        <form onSubmit={handleSubmit} autoComplete="off" className="overflow-y-auto px-3.5 py-3 sm:px-5 sm:py-4 flex flex-col gap-3 flex-1 scrollbar-thin">
           {formError && (
             <div className="p-2.5 bg-red-500/20 border border-red-500/40 rounded-xl text-xs text-red-200 font-semibold flex items-center gap-2">
               <span className="material-symbols-outlined text-[16px] text-red-400 shrink-0">error</span>
@@ -361,12 +389,16 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
               {/* Foto do Comprador com Recorte Manual */}
               <div className="flex items-center justify-between gap-3 bg-white/5 p-2.5 rounded-2xl border border-white/10">
                 <div className="flex items-center gap-3">
-                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-cyan-400/50 bg-slate-900 shrink-0 shadow-md">
-                    <img
-                      src={avatar || APP_IMAGES.carlos}
-                      alt="Avatar Comprador"
-                      className="w-full h-full object-cover"
-                    />
+                  <div className="relative w-12 h-12 rounded-xl overflow-hidden border border-cyan-400/50 bg-slate-900 shrink-0 shadow-md flex items-center justify-center">
+                    {avatar ? (
+                      <img
+                        src={avatar}
+                        alt="Avatar Comprador"
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="material-symbols-outlined text-cyan-400 text-[26px]">person_add</span>
+                    )}
                   </div>
                   <div className="flex flex-col">
                     <span className="text-xs font-bold text-slate-100">Foto do Comprador</span>
@@ -375,7 +407,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
                 </div>
 
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {avatar && avatar !== APP_IMAGES.carlos && (
+                  {avatar && (
                     <button
                       type="button"
                       onClick={() => {
@@ -392,7 +424,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
 
                   <label className="px-3 py-1.5 rounded-xl bg-cyan-500/20 hover:bg-cyan-500/30 text-cyan-200 text-xs font-bold border border-cyan-400/40 cursor-pointer transition-colors flex items-center gap-1.5 shrink-0">
                     <span className="material-symbols-outlined text-sm">photo_camera</span>
-                    <span>{avatar && avatar !== APP_IMAGES.carlos ? '📷 Trocar' : '📷 Adicionar'}</span>
+                    <span>{avatar ? '📷 Trocar' : '📷 Adicionar'}</span>
                     <input
                       type="file"
                       accept="image/*"
@@ -424,12 +456,15 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
                 </label>
                 <input
                   type="text"
+                  name="new_debtor_full_name"
+                  autoComplete="off"
                   placeholder="Nome completo do comprador"
                   value={name}
                   onChange={(e) => {
-                    setName(e.target.value);
-                    if (!username) {
-                      setUsername(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ''));
+                    const nextName = e.target.value;
+                    setName(nextName);
+                    if (!isUsernameManuallyEdited) {
+                      setUsername(nextName.toLowerCase().replace(/[^a-z0-9]/g, ''));
                     }
                   }}
                   className="w-full h-9 px-3 bg-white/10 border border-cyan-500/40 rounded-xl text-xs font-medium text-white placeholder-slate-400 focus:bg-white/15 focus:border-cyan-400 outline-none transition-all"
@@ -796,9 +831,13 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
                     <label className="text-[10.5px] font-semibold text-slate-300">Login / Nome de Usuário</label>
                     <input
                       type="text"
+                      autoComplete="off"
                       placeholder="ex: beatriz_lima"
                       value={username}
-                      onChange={(e) => setUsername(e.target.value)}
+                      onChange={(e) => {
+                        setIsUsernameManuallyEdited(true);
+                        setUsername(e.target.value);
+                      }}
                       className="w-full h-8 px-2.5 bg-white/10 border border-purple-400/40 rounded-xl text-xs font-medium text-white placeholder-slate-400 focus:border-purple-400 outline-none font-mono"
                     />
                   </div>
@@ -914,7 +953,7 @@ export const NewDebtorModal: React.FC<NewDebtorModalProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="button"
-                onClick={onClose}
+                onClick={handleCloseClean}
                 className="w-1/3 h-9 rounded-xl bg-white/10 hover:bg-white/20 text-slate-200 font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1"
               >
                 <span className="material-symbols-outlined text-[15px]">arrow_back</span>

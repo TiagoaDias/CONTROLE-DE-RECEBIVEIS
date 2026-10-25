@@ -137,9 +137,18 @@ export function readMergedLocalRecords<T extends { id?: string }>(
   userId?: string,
   emailHint?: string
 ): T[] {
+  const rawId = (userId || '').trim();
+  const rawEmail = (emailHint || '').trim().toLowerCase();
+  if (!rawId && !rawEmail) return [];
+
   const map = new Map<string, T>();
-  const suffixes = getLocalCandidateSuffixes(userId, emailHint);
-  const keysToTry = [...suffixes.map((s) => `${baseKey}_${s}`), baseKey];
+  const canonical = resolveCanonicalUserId(rawId, rawEmail);
+  const isMaster = canonical === 'usr_thiago_dias' || rawEmail === 'tiagodias8888@gmail.com';
+  const suffixes = getLocalCandidateSuffixes(rawId, rawEmail);
+  const keysToTry = isMaster
+    ? [...suffixes.map((s) => `${baseKey}_${s}`), baseKey]
+    : suffixes.map((s) => `${baseKey}_${s}`);
+
   for (const key of keysToTry) {
     try {
       const raw = localStorage.getItem(key);
@@ -212,25 +221,10 @@ export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): str
   if (currentAvatar && currentAvatar.trim().length > 10) {
     return currentAvatar.trim();
   }
-  try {
-    const stored = localStorage.getItem('haspaho_debtors');
-    if (stored) {
-      const debtorsList = JSON.parse(stored);
-      const matched = debtorsList.find((d: any) => 
-        d.name && name && d.name.toLowerCase().trim() === name.toLowerCase().trim()
-      );
-      if (matched && matched.avatar && matched.avatar.trim().length > 10) {
-        return matched.avatar.trim();
-      }
-    }
-  } catch (e) {
-    // silent
-  }
-
   const n = (name || '').toLowerCase();
   if (n.includes('mariana') || n.includes('maria')) return APP_IMAGES.maria;
   if (n.includes('carlos')) return APP_IMAGES.carlos;
-  return APP_IMAGES.carlos;
+  return '';
 };
 
 export default function App() {
@@ -587,7 +581,9 @@ export default function App() {
         setDebtors(cleanedDebtors);
         try {
           localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(cleanedDebtors));
-          localStorage.setItem('haspaho_debtors', JSON.stringify(cleanedDebtors));
+          if (canonicalId === 'usr_thiago_dias') {
+            localStorage.setItem('haspaho_debtors', JSON.stringify(cleanedDebtors));
+          }
         } catch {}
 
         if (cleanedDebtors.length > 0 && !isFirestoreQuotaExhausted()) {
@@ -634,7 +630,9 @@ export default function App() {
         setPurchases(finalPurchases);
         try {
           localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(finalPurchases));
-          localStorage.setItem('haspaho_purchases', JSON.stringify(finalPurchases));
+          if (canonicalId === 'usr_thiago_dias') {
+            localStorage.setItem('haspaho_purchases', JSON.stringify(finalPurchases));
+          }
         } catch {}
 
         if (finalPurchases.length > 0 && !isFirestoreQuotaExhausted()) {
@@ -722,7 +720,9 @@ export default function App() {
         setInstallments(cleanedInsts);
         try {
           localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(cleanedInsts));
-          localStorage.setItem('haspaho_installments', JSON.stringify(cleanedInsts));
+          if (canonicalId === 'usr_thiago_dias') {
+            localStorage.setItem('haspaho_installments', JSON.stringify(cleanedInsts));
+          }
         } catch {}
 
         if (cleanedInsts.length > 0 && !isFirestoreQuotaExhausted()) {
@@ -753,10 +753,44 @@ export default function App() {
     const activeUser = currentUser;
     if (!activeUser || !activeUser.id) {
       isInitialLoadRef.current = false;
+      setDebtors([]);
+      setPurchases([]);
+      setInstallments([]);
+      setDeletedDebtors([]);
       return;
     }
 
+    isInitialLoadRef.current = true;
     const canonicalId = resolveCanonicalUserId(activeUser.id, activeUser.email);
+
+    // Carrega imediatamente apenas os registros locais pertencentes a este usuário (ou vazio se for usuário novo),
+    // evitando que dados em memória de uma sessão anterior vazem para a conta atual
+    try {
+      const scopedDeleted = readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', canonicalId, activeUser.email);
+      const deletedIds = new Set<string>(scopedDeleted.map((d) => d.id));
+      getPermanentTombstones(canonicalId).forEach((id) => deletedIds.add(id));
+
+      const scopedDebtors = readMergedLocalRecords<Debtor>('haspaho_debtors', canonicalId, activeUser.email).filter(
+        (d) => d && d.id && !deletedIds.has(d.id)
+      );
+      const scopedPurchases = readMergedLocalRecords<Purchase>('haspaho_purchases', canonicalId, activeUser.email).filter(
+        (p) => p && p.id && !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))
+      );
+      const scopedInsts = readMergedLocalRecords<Installment>('haspaho_installments', canonicalId, activeUser.email).filter(
+        (i) =>
+          i &&
+          i.id &&
+          !deletedIds.has(i.id) &&
+          (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+          (!i.debtorId || !deletedIds.has(i.debtorId))
+      );
+
+      setDeletedDebtors(scopedDeleted);
+      setDebtors(scopedDebtors);
+      setPurchases(scopedPurchases);
+      setInstallments(scopedInsts);
+    } catch {}
+
     syncWithCloudDatabase({ ...activeUser, id: canonicalId }, false);
 
     // Listener em tempo real (onSnapshot) para refletir mudanças feitas em outro aparelho/navegador
@@ -782,7 +816,9 @@ export default function App() {
           const next = Array.from(map.values());
           try {
             localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(next));
-            localStorage.setItem('haspaho_debtors', JSON.stringify(next));
+            if (canonicalId === 'usr_thiago_dias') {
+              localStorage.setItem('haspaho_debtors', JSON.stringify(next));
+            }
           } catch {}
           return next;
         });
@@ -808,7 +844,9 @@ export default function App() {
           const next = Array.from(map.values());
           try {
             localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(next));
-            localStorage.setItem('haspaho_purchases', JSON.stringify(next));
+            if (canonicalId === 'usr_thiago_dias') {
+              localStorage.setItem('haspaho_purchases', JSON.stringify(next));
+            }
           } catch {}
           return next;
         });
@@ -841,7 +879,9 @@ export default function App() {
           const next = Array.from(map.values());
           try {
             localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(next));
-            localStorage.setItem('haspaho_installments', JSON.stringify(next));
+            if (canonicalId === 'usr_thiago_dias') {
+              localStorage.setItem('haspaho_installments', JSON.stringify(next));
+            }
           } catch {}
           return next;
         });
@@ -857,16 +897,20 @@ export default function App() {
   useEffect(() => {
     const activeUserId = currentUser?.id;
     if (!activeUserId) return;
+    const canonicalId = resolveCanonicalUserId(activeUserId, currentUser?.email);
 
-    // Salvar sempre imediatamente no LocalStorage
+    // Salvar sempre imediatamente no LocalStorage isolado do usuário
     try {
-      localStorage.setItem('haspaho_debtors', JSON.stringify(debtors));
-      localStorage.setItem('haspaho_purchases', JSON.stringify(purchases));
-      localStorage.setItem('haspaho_installments', JSON.stringify(installments));
-      localStorage.setItem('haspaho_deleted_debtors', JSON.stringify(deletedDebtors));
-      localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(debtors));
-      localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(purchases));
-      localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(installments));
+      localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(debtors));
+      localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(purchases));
+      localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(installments));
+      localStorage.setItem(`haspaho_deleted_debtors_${canonicalId}`, JSON.stringify(deletedDebtors));
+      if (canonicalId === 'usr_thiago_dias') {
+        localStorage.setItem('haspaho_debtors', JSON.stringify(debtors));
+        localStorage.setItem('haspaho_purchases', JSON.stringify(purchases));
+        localStorage.setItem('haspaho_installments', JSON.stringify(installments));
+        localStorage.setItem('haspaho_deleted_debtors', JSON.stringify(deletedDebtors));
+      }
     } catch (e) {
       console.error('LocalStorage error:', e);
     }
@@ -879,7 +923,7 @@ export default function App() {
       return;
     }
 
-    const currentSignature = `${activeUserId}_d:${debtors.length}_p:${purchases.length}_i:${installments.length}_${installments.map((i) => i.id + i.status).join(',')}`;
+    const currentSignature = `${canonicalId}_d:${debtors.length}_p:${purchases.length}_i:${installments.length}_${installments.map((i) => i.id + i.status).join(',')}`;
     if (lastSyncSignatureRef.current === currentSignature) {
       return;
     }
@@ -887,10 +931,10 @@ export default function App() {
     const timer = setTimeout(() => {
       if (isFirestoreQuotaExhausted()) return;
       lastSyncSignatureRef.current = currentSignature;
-      console.log(`[Firestore:AUTO_SYNC] Syncing current state to Firestore for user: ${activeUserId}...`);
-      saveDebtorsToFirestore(activeUserId, debtors).catch((err) => console.warn('[Firestore:AUTO_SYNC_DEBTORS_NOTE]', err));
-      savePurchasesToFirestore(activeUserId, purchases).catch((err) => console.warn('[Firestore:AUTO_SYNC_PURCHASES_NOTE]', err));
-      saveInstallmentsToFirestore(activeUserId, installments).catch((err) => console.warn('[Firestore:AUTO_SYNC_INSTALLMENTS_NOTE]', err));
+      console.log(`[Firestore:AUTO_SYNC] Syncing current state to Firestore for user: ${canonicalId}...`);
+      saveDebtorsToFirestore(canonicalId, debtors).catch((err) => console.warn('[Firestore:AUTO_SYNC_DEBTORS_NOTE]', err));
+      savePurchasesToFirestore(canonicalId, purchases).catch((err) => console.warn('[Firestore:AUTO_SYNC_PURCHASES_NOTE]', err));
+      saveInstallmentsToFirestore(canonicalId, installments).catch((err) => console.warn('[Firestore:AUTO_SYNC_INSTALLMENTS_NOTE]', err));
     }, 2500);
 
     return () => clearTimeout(timer);

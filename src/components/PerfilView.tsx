@@ -42,8 +42,12 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
   onToast,
   onClearAllData,
 }) => {
+  const isMaster =
+    currentUser?.id === 'usr_thiago_dias' ||
+    currentUser?.email?.toLowerCase() === 'tiagodias8888@gmail.com';
+
   const [pixKey, setPixKey] = useState(
-    currentUser?.pixKey || '(14) 99733-9863'
+    currentUser?.pixKey || (isMaster ? '(14) 99733-9863' : '')
   );
   const [lastBackupMeta, setLastBackupMeta] = useState<FullBackupMetadata | null>(() =>
     getLastBackupMetadata(currentUser?.id)
@@ -68,7 +72,7 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
 
   // Photo editing states
   const [currentAvatar, setCurrentAvatar] = useState(
-    currentUser?.avatar || APP_IMAGES.currentUser || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
+    currentUser?.avatar || (isMaster ? APP_IMAGES.currentUser : '') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80'
   );
   const [zoom, setZoom] = useState(1);
   const [cropShape, setCropShape] = useState<'circle' | 'square'>('circle');
@@ -79,8 +83,11 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
   // Sincroniza estado quando o usuário ativo muda
   useEffect(() => {
     if (currentUser) {
-      setPixKey(currentUser.pixKey || '(14) 99733-9863');
-      setCurrentAvatar(currentUser.avatar || APP_IMAGES.currentUser || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80');
+      const master =
+        currentUser.id === 'usr_thiago_dias' ||
+        currentUser.email?.toLowerCase() === 'tiagodias8888@gmail.com';
+      setPixKey(currentUser.pixKey || (master ? '(14) 99733-9863' : ''));
+      setCurrentAvatar(currentUser.avatar || (master ? APP_IMAGES.currentUser : '') || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80');
     }
   }, [currentUser]);
 
@@ -90,16 +97,18 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
     'Olá Tiago Dias, estou utilizando o sistema HASPAHO de controle de devedores e parcelamentos!'
   )}`;
 
-  const displayName = currentUser?.name || 'Tiago Dias';
-  const displayEmail = currentUser?.email || 'tiagodias8888@gmail.com';
-  const displayPhone = currentUser?.phoneWhatsapp || '(14) 99733-9863';
+  const displayName = currentUser?.name || (isMaster ? 'Tiago Dias' : 'Usuário');
+  const displayEmail = currentUser?.email || (isMaster ? 'tiagodias8888@gmail.com' : 'Não informado');
+  const displayPhone = currentUser?.phoneWhatsapp || (isMaster ? '(14) 99733-9863' : 'Não informado');
   const displayProvider = currentUser?.authProvider || 'local';
   const displayCpf = currentUser?.cpfCnpj || 'Não informado';
-  const displayCompany = currentUser?.companyName || 'HASPAHO Tecnologia da Informação';
-  const displayRole = currentUser?.role || 'Desenvolvedor Full Stack';
+  const displayCompany = currentUser?.companyName || (isMaster ? 'HASPAHO Tecnologia da Informação' : 'HASPAHO Gestão');
+  const displayRole = currentUser?.role || (isMaster ? 'Desenvolvedor Full Stack' : 'Usuário Gestor');
   const displayAddress = currentUser?.address
-    ? `${currentUser.address}, ${currentUser.addressNumber || 'S/N'} - ${currentUser.neighborhood || ''}, ${currentUser.city || 'Mineiros do Tietê'}/${currentUser.state || 'SP'} (CEP: ${currentUser.cep || '17320-000'})`
-    : 'Mineiros do Tietê - SP';
+    ? `${currentUser.address}, ${currentUser.addressNumber || 'S/N'} - ${currentUser.neighborhood || ''}, ${currentUser.city || ''}/${currentUser.state || 'SP'} (CEP: ${currentUser.cep || ''})`
+    : isMaster
+    ? 'Mineiros do Tietê - SP'
+    : 'Não informado';
 
   const handleSavePhoto = () => {
     if (currentUser && onSaveUser) {

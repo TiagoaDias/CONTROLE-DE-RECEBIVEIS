@@ -1534,8 +1534,20 @@ export async function sendFirebasePasswordReset(email: string): Promise<void> {
  * caminho do Firestore, independentemente do método de login (Google OAuth, Credential Manager ou Gmail Direto).
  */
 export function resolveCanonicalUserId(userId?: string, emailHint?: string): string {
-  let detectedEmail = (emailHint || auth.currentUser?.email || '').trim().toLowerCase();
+  const rawId = (userId || '').trim();
+  let detectedEmail = (emailHint || '').trim().toLowerCase();
+
+  // Só recorre ao auth.currentUser ou localStorage se nenhum userId explícito foi informado,
+  // ou se o userId informado corresponde ao próprio usuário logado
   if (!detectedEmail) {
+    const currentAuthEmail = (auth.currentUser?.email || '').trim().toLowerCase();
+    const currentAuthUid = (auth.currentUser?.uid || '').trim();
+    if (!rawId || (currentAuthUid && rawId === currentAuthUid)) {
+      detectedEmail = currentAuthEmail;
+    }
+  }
+
+  if (!detectedEmail && !rawId) {
     try {
       const rawAuth = getSafeLocalStorage('haspaho_auth_user');
       if (rawAuth) {
@@ -1547,7 +1559,6 @@ export function resolveCanonicalUserId(userId?: string, emailHint?: string): str
     } catch {}
   }
 
-  const rawId = (userId || '').trim();
   const isMaster =
     detectedEmail === 'tiagodias8888@gmail.com' ||
     rawId === 'usr_thiago_dias' ||
@@ -1562,7 +1573,11 @@ export function resolveCanonicalUserId(userId?: string, emailHint?: string): str
     return `usr_google_${detectedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
   }
 
-  return rawId || auth.currentUser?.uid || TIAGO_DIAS_USER.id;
+  if (rawId) {
+    return rawId;
+  }
+
+  return auth.currentUser?.uid || TIAGO_DIAS_USER.id;
 }
 
 // Cache em memória de IDs secundários descobertos no Firestore para o mesmo e-mail
@@ -1570,23 +1585,39 @@ const discoveredEmailUidsCache = new Map<string, string[]>();
 
 /**
  * Retorna todos os IDs candidatos nos quais os dados do usuário podem ter sido gravados
- * (ex: ID canônico 'usr_thiago_dias', UID do Firebase Auth de um login Google anterior, etc.)
+ * (ex: ID canônico 'usr_thiago_dias', UID do Firebase Auth do mesmo e-mail, etc.),
+ * mantendo isolamento absoluto entre usuários distintos.
  */
 export async function getCandidateUserIds(userId: string, emailHint?: string): Promise<string[]> {
   const candidates = new Set<string>();
-  const canonical = resolveCanonicalUserId(userId, emailHint);
+  const rawId = (userId || '').trim();
+  const canonical = resolveCanonicalUserId(rawId, emailHint);
   if (canonical) candidates.add(canonical);
-  if (userId && userId.trim()) candidates.add(userId.trim());
-  if (auth.currentUser?.uid) candidates.add(auth.currentUser.uid);
+  if (rawId) candidates.add(rawId);
 
-  let detectedEmail = (emailHint || auth.currentUser?.email || '').trim().toLowerCase();
+  let detectedEmail = (emailHint || '').trim().toLowerCase();
+  const currentAuthEmail = (auth.currentUser?.email || '').trim().toLowerCase();
+  const currentAuthUid = (auth.currentUser?.uid || '').trim();
+
+  if (!detectedEmail && currentAuthEmail) {
+    const currentAuthCanonical = resolveCanonicalUserId(currentAuthUid, currentAuthEmail);
+    if (!rawId || rawId === currentAuthUid || canonical === currentAuthCanonical) {
+      detectedEmail = currentAuthEmail;
+      if (currentAuthUid) candidates.add(currentAuthUid);
+    }
+  } else if (detectedEmail && currentAuthEmail && detectedEmail === currentAuthEmail && currentAuthUid) {
+    candidates.add(currentAuthUid);
+  }
+
   if (!detectedEmail) {
     try {
       const rawAuth = getSafeLocalStorage('haspaho_auth_user');
       if (rawAuth) {
         const parsed = JSON.parse(rawAuth);
-        if (parsed?.email) {
-          detectedEmail = String(parsed.email).trim().toLowerCase();
+        const savedId = String(parsed?.id || '').trim();
+        const savedEmail = String(parsed?.email || '').trim().toLowerCase();
+        if (savedEmail && (!rawId || savedId === rawId || savedId === canonical)) {
+          detectedEmail = savedEmail;
         }
       }
     } catch {}

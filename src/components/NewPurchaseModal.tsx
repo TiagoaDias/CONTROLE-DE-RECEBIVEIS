@@ -53,10 +53,20 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
   const [showSchedulePreview, setShowSchedulePreview] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
 
-  // Inicializar datas padrão ao abrir
+  // Inicializar datas padrão e limpar campos anteriores ao abrir
   useEffect(() => {
     if (isOpen) {
       setValidationError(null);
+      setProduct('');
+      setStore('');
+      setCardName('Nubank Croma');
+      setIsManualCard(false);
+      setManualCardInput('');
+      setTotalAmount('');
+      setInstallmentsTotal(12);
+      setNotes('');
+      setShowSchedulePreview(false);
+
       const today = new Date();
       const todayIso = today.toISOString().split('T')[0];
       setPurchaseDate(todayIso);
@@ -71,10 +81,13 @@ export const NewPurchaseModal: React.FC<NewPurchaseModalProps> = ({
       if (selectedDebtorId && selectedDebtorId !== 'all' && safeDebs.some((d) => d.id === selectedDebtorId)) {
         setDebtorId(selectedDebtorId);
         const currentDeb = safeDebs.find((d) => d.id === selectedDebtorId);
-        if (currentDeb?.relation) setRelation(currentDeb.relation);
+        setRelation(currentDeb?.relation || 'Amigo(a)');
       } else if (safeDebs.length > 0) {
         setDebtorId(safeDebs[0].id);
-        if (safeDebs[0].relation) setRelation(safeDebs[0].relation);
+        setRelation(safeDebs[0].relation || 'Amigo(a)');
+      } else {
+        setDebtorId('');
+        setRelation('Amigo(a)');
       }
     }
   }, [isOpen, selectedDebtorId, debtors]);

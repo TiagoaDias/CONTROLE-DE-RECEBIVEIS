@@ -29,22 +29,6 @@ export const PreRegistrationPortalModal: React.FC<PreRegistrationPortalModalProp
   const [urlUser, setUrlUser] = useState('');
   const [urlMethod, setUrlMethod] = useState('gmail');
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const params = new URLSearchParams(window.location.search);
-      const userParam = params.get('user') || '';
-      const methodParam = params.get('method') || 'gmail';
-      if (userParam) {
-        setUrlUser(userParam);
-        setName(userParam.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
-      }
-      if (methodParam) {
-        setUrlMethod(methodParam);
-        setSelectedAuthMethod(methodParam as any);
-      }
-    }
-  }, [isOpen]);
-
   const [selectedAuthMethod, setSelectedAuthMethod] = useState<'gmail' | 'whatsapp'>('gmail');
   const [verificationCode, setVerificationCode] = useState('');
   const [isCodeSent, setIsCodeSent] = useState(false);
@@ -60,13 +44,53 @@ export const PreRegistrationPortalModal: React.FC<PreRegistrationPortalModalProp
   // Purchase Details
   const [purchaseProduct, setPurchaseProduct] = useState('');
   const [purchaseInstallments, setPurchaseInstallments] = useState(12);
-  const [purchaseStore, setPurchaseStore] = useState('Mercado Livre');
+  const [purchaseStore, setPurchaseStore] = useState('');
   const [purchaseDate, setPurchaseDate] = useState(() => new Date().toISOString().split('T')[0]);
-  const [purchaseAmount, setPurchaseAmount] = useState('1200.00');
+  const [purchaseAmount, setPurchaseAmount] = useState('');
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [authSuccess, setAuthSuccess] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    setVerificationCode('');
+    setIsCodeSent(false);
+    setCpf('');
+    setEmail('');
+    setPhone('');
+    setRelation('Família');
+    setPixKey('');
+    setOptionalMessage('');
+    setPurchaseProduct('');
+    setPurchaseInstallments(12);
+    setPurchaseStore('');
+    setPurchaseDate(new Date().toISOString().split('T')[0]);
+    setPurchaseAmount('');
+    setIsSubmitting(false);
+    setAuthSuccess(false);
+    setFormError(null);
+
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const userParam = params.get('user') || '';
+      const methodParam = params.get('method') || 'gmail';
+      if (userParam) {
+        setUrlUser(userParam);
+        setName(userParam.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()));
+      } else {
+        setUrlUser('');
+        setName('');
+      }
+      if (methodParam) {
+        setUrlMethod(methodParam);
+        setSelectedAuthMethod(methodParam as any);
+      } else {
+        setUrlMethod('gmail');
+        setSelectedAuthMethod('gmail');
+      }
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

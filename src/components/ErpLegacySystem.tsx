@@ -110,7 +110,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
   // Selected Debtor for Form Editing
   const [selectedDebtorId, setSelectedDebtorId] = useState<string>(debtors[0]?.id || '');
   const activeDebtor = useMemo(() => {
-    return debtors.find((d) => d.id === selectedDebtorId) || debtors[0];
+    if (!selectedDebtorId || selectedDebtorId.startsWith('new_')) {
+      return null;
+    }
+    return debtors.find((d) => d.id === selectedDebtorId) || null;
   }, [debtors, selectedDebtorId]);
 
   // Form State for Debtor (Data Entry Form)
@@ -119,23 +122,23 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     name: activeDebtor?.name || '',
     apelido: activeDebtor?.relation || '',
     personType: 'F' as 'F' | 'J',
-    cpfCnpj: activeDebtor?.documentNumber || '123.456.789-00',
-    rgIe: '34.567.890-X',
+    cpfCnpj: activeDebtor?.documentNumber || activeDebtor?.cpfCnpj || '',
+    rgIe: '',
     orgaoExp: 'SSP/SP',
-    birthDate: '1988-05-14',
-    phone: activeDebtor?.phone || '(14) 99733-9863',
-    phoneSecondary: '(14) 3642-1234',
-    email: activeDebtor?.email || 'contato@cliente.com.br',
+    birthDate: '',
+    phone: activeDebtor?.phone || '',
+    phoneSecondary: '',
+    email: activeDebtor?.email || '',
     pixKey: activeDebtor?.pixKey || '',
-    cep: '17320-000',
-    logradouro: 'Rua Principal dos Bandeirantes',
-    numero: '450',
-    complemento: 'Sala 02',
-    bairro: 'Centro Comercial',
-    cidade: 'Mineiros do Tietê',
+    cep: '',
+    logradouro: '',
+    numero: '',
+    complemento: '',
+    bairro: '',
+    cidade: '',
     uf: 'SP',
     limiteCredito: activeDebtor?.creditLimit || 5000,
-    score: activeDebtor?.score || 850,
+    score: activeDebtor?.score || 800,
     taxaJurosMensal: 2.5,
     multaAtrasoFixa: 5.0,
     diasTolerancia: 3,
@@ -144,31 +147,34 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     bloqueioPreventivo: false,
     protestarApos30Dias: true,
     contratoAssinado: activeDebtor?.contractSigned ?? true,
-    observacoes: activeDebtor?.notes || 'Cliente cadastrado no sistema ERP corporativo HASPAHO.',
+    observacoes: activeDebtor?.notes || '',
   });
 
-  // Keep form data in sync when active debtor changes
+  // Keep form data in sync when active debtor changes (only for existing debtors, never overwrite a new registration)
   useEffect(() => {
+    if (selectedDebtorId && selectedDebtorId.startsWith('new_')) {
+      return;
+    }
     if (activeDebtor) {
       setFormData({
         id: activeDebtor.id,
         name: activeDebtor.name,
         apelido: activeDebtor.relation || 'Cliente',
         personType: activeDebtor.documentNumber?.length && activeDebtor.documentNumber.length > 14 ? 'J' : 'F',
-        cpfCnpj: activeDebtor.documentNumber || '123.456.789-00',
-        rgIe: '34.567.890-X',
+        cpfCnpj: activeDebtor.documentNumber || activeDebtor.cpfCnpj || '',
+        rgIe: '',
         orgaoExp: 'SSP/SP',
-        birthDate: '1988-05-14',
+        birthDate: '',
         phone: activeDebtor.phone || '',
-        phoneSecondary: '(14) 3642-1234',
+        phoneSecondary: '',
         email: activeDebtor.email || '',
         pixKey: activeDebtor.pixKey || activeDebtor.phone || '',
-        cep: '17320-000',
-        logradouro: 'Rua Principal dos Bandeirantes',
-        numero: '450',
-        complemento: 'Sala 02',
-        bairro: 'Centro',
-        cidade: 'Mineiros do Tietê',
+        cep: '',
+        logradouro: '',
+        numero: '',
+        complemento: '',
+        bairro: '',
+        cidade: '',
         uf: 'SP',
         limiteCredito: activeDebtor.creditLimit || 5000,
         score: activeDebtor.score || 800,
@@ -180,10 +186,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         bloqueioPreventivo: false,
         protestarApos30Dias: true,
         contratoAssinado: activeDebtor.contractSigned ?? true,
-        observacoes: activeDebtor.notes || 'Registro homologado no banco de dados.',
+        observacoes: activeDebtor.notes || '',
       });
     }
-  }, [activeDebtor?.id]);
+  }, [activeDebtor?.id, selectedDebtorId]);
 
   // Mapeamento sequencial de código numérico de cliente (#01, #02, #03...)
   const debtorCodeMap = useMemo(() => {
@@ -524,22 +530,22 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
     setFormData({
       id: tempId,
       name: '',
-      apelido: 'Cliente Comercial',
+      apelido: 'Amigo(a)',
       personType: 'F',
       cpfCnpj: '',
-      rgIe: '34.567.890-X',
+      rgIe: '',
       orgaoExp: 'SSP/SP',
-      birthDate: '1990-01-01',
+      birthDate: '',
       phone: '',
       phoneSecondary: '',
       email: '',
       pixKey: '',
-      cep: '17320-000',
+      cep: '',
       logradouro: '',
       numero: '',
       complemento: '',
-      bairro: 'Centro',
-      cidade: 'Mineiros do Tietê',
+      bairro: '',
+      cidade: '',
       uf: 'SP',
       limiteCredito: 5000,
       score: 800,
@@ -554,7 +560,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
       observacoes: '',
     });
     setActiveTab('cadastro');
-    onToast('[F2 - Novo] Formulário limpo! Digite o nome completo e os dados do devedor real.');
+    onToast('[F2 - Novo] Formulário limpo! Digite o nome completo e os dados do novo devedor.');
   };
 
   const handleSaveDebtor = () => {

@@ -54,28 +54,58 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
 }) => {
   if (!isOpen || !currentUser) return null;
 
+  const isMaster =
+    currentUser.id === 'usr_thiago_dias' ||
+    currentUser.email?.toLowerCase() === 'tiagodias8888@gmail.com';
+
   // Local form state
-  const [name, setName] = useState(currentUser.name || 'Tiago Dias');
-  const [email, setEmail] = useState(currentUser.email || 'tiagodias8888@gmail.com');
-  const [phone, setPhone] = useState(currentUser.phoneWhatsapp || '(14) 99733-9863');
+  const [name, setName] = useState(currentUser.name || (isMaster ? 'Tiago Dias' : ''));
+  const [email, setEmail] = useState(currentUser.email || (isMaster ? 'tiagodias8888@gmail.com' : ''));
+  const [phone, setPhone] = useState(currentUser.phoneWhatsapp || (isMaster ? '(14) 99733-9863' : ''));
   const [avatar, setAvatar] = useState(
     currentUser.avatar ||
       'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
   );
-  const [pixKey, setPixKey] = useState(currentUser.pixKey || '(14) 99733-9863');
-  const [cep, setCep] = useState(currentUser.cep || '17320-000');
-  const [address, setAddress] = useState(currentUser.address || 'Rua Principal');
-  const [addressNumber, setAddressNumber] = useState(currentUser.addressNumber || '100');
-  const [neighborhood, setNeighborhood] = useState(currentUser.neighborhood || 'Centro');
-  const [city, setCity] = useState(currentUser.city || 'Mineiros do Tietê');
-  const [state, setState] = useState(currentUser.state || 'SP');
-  const [cpfCnpj, setCpfCnpj] = useState(currentUser.cpfCnpj || '123.456.789-00');
+  const [pixKey, setPixKey] = useState(currentUser.pixKey || (isMaster ? '(14) 99733-9863' : ''));
+  const [cep, setCep] = useState(currentUser.cep || (isMaster ? '17320-000' : ''));
+  const [address, setAddress] = useState(currentUser.address || (isMaster ? 'Rua Principal' : ''));
+  const [addressNumber, setAddressNumber] = useState(currentUser.addressNumber || (isMaster ? '100' : ''));
+  const [neighborhood, setNeighborhood] = useState(currentUser.neighborhood || (isMaster ? 'Centro' : ''));
+  const [city, setCity] = useState(currentUser.city || (isMaster ? 'Mineiros do Tietê' : ''));
+  const [state, setState] = useState(currentUser.state || (isMaster ? 'SP' : ''));
+  const [cpfCnpj, setCpfCnpj] = useState(currentUser.cpfCnpj || (isMaster ? '123.456.789-00' : ''));
   const [companyName, setCompanyName] = useState(
-    currentUser.companyName || 'HASPAHO Tecnologia da Informação'
+    currentUser.companyName || (isMaster ? 'HASPAHO Tecnologia da Informação' : 'HASPAHO Gestão')
   );
-  const [role, setRole] = useState(currentUser.role || 'Desenvolvedor Full Stack');
+  const [role, setRole] = useState(currentUser.role || (isMaster ? 'Desenvolvedor Full Stack' : 'Usuário Gestor'));
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+
+  useEffect(() => {
+    if (!currentUser) return;
+    const master =
+      currentUser.id === 'usr_thiago_dias' ||
+      currentUser.email?.toLowerCase() === 'tiagodias8888@gmail.com';
+    setName(currentUser.name || (master ? 'Tiago Dias' : ''));
+    setEmail(currentUser.email || (master ? 'tiagodias8888@gmail.com' : ''));
+    setPhone(currentUser.phoneWhatsapp || (master ? '(14) 99733-9863' : ''));
+    setAvatar(
+      currentUser.avatar ||
+        'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80'
+    );
+    setPixKey(currentUser.pixKey || (master ? '(14) 99733-9863' : ''));
+    setCep(currentUser.cep || (master ? '17320-000' : ''));
+    setAddress(currentUser.address || (master ? 'Rua Principal' : ''));
+    setAddressNumber(currentUser.addressNumber || (master ? '100' : ''));
+    setNeighborhood(currentUser.neighborhood || (master ? 'Centro' : ''));
+    setCity(currentUser.city || (master ? 'Mineiros do Tietê' : ''));
+    setState(currentUser.state || (master ? 'SP' : ''));
+    setCpfCnpj(currentUser.cpfCnpj || (master ? '123.456.789-00' : ''));
+    setCompanyName(currentUser.companyName || (master ? 'HASPAHO Tecnologia da Informação' : 'HASPAHO Gestão'));
+    setRole(currentUser.role || (master ? 'Desenvolvedor Full Stack' : 'Usuário Gestor'));
+    setNewPassword('');
+    setConfirmPassword('');
+  }, [currentUser?.id, isOpen]);
 
   const [activeTab, setActiveTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira'>(
     initialTab || 'profile'

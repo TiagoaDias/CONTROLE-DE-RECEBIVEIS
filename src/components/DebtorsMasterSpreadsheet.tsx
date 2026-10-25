@@ -11,26 +11,10 @@ export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): str
   if (currentAvatar && currentAvatar.trim().length > 10) {
     return currentAvatar.trim();
   }
-  try {
-    const stored = localStorage.getItem('haspaho_debtors');
-    if (stored) {
-      const debtorsList = JSON.parse(stored);
-      const matched = debtorsList.find((d: any) => 
-        d.name && name && d.name.toLowerCase().trim() === name.toLowerCase().trim()
-      );
-      if (matched && matched.avatar && matched.avatar.trim().length > 10) {
-        return matched.avatar.trim();
-      }
-    }
-  } catch (e) {
-    // silent
-  }
-
-  // 2. Fallback por nome para os dois devedores de demonstração
   const n = (name || '').toLowerCase();
   if (n.includes('mariana') || n.includes('maria')) return APP_IMAGES.maria;
   if (n.includes('carlos')) return APP_IMAGES.carlos;
-  return APP_IMAGES.carlos;
+  return '';
 };
 
 interface DebtorsMasterSpreadsheetProps {
