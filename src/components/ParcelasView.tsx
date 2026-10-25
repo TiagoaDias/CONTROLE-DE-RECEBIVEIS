@@ -57,6 +57,13 @@ interface ParcelasViewProps {
   userPixKey?: string;
   onDeleteInstallment?: (id: string) => void;
   onRequestDeleteDebtor?: (debtor: Debtor) => void;
+  onEditPurchase?: (target: {
+    purchaseId?: string;
+    productName?: string;
+    debtorId?: string;
+    installment?: Installment;
+  }) => void;
+  onDeletePurchase?: (purchaseId?: string, productName?: string, debtorId?: string) => void;
 }
 
 // Helper para abreviar data no mobile (ex: 10/08/2026 -> 10/08)
@@ -165,6 +172,8 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
   userPixKey,
   onDeleteInstallment,
   onRequestDeleteDebtor,
+  onEditPurchase,
+  onDeletePurchase,
 }) => {
   // Modal de Detalhes dos Itens Unitários
   const [isUnitaryModalOpen, setIsUnitaryModalOpen] = useState(false);
@@ -1425,9 +1434,44 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                               title={`Filtrar planilha por ${item.productName}`}
                             >
                               <span className="material-symbols-outlined text-[14px]">{item.icon}</span>
-                              <span className="truncate max-w-[110px]">{item.shortName || item.productName}</span>
+                              <span className="truncate max-w-[100px]">{item.shortName || item.productName}</span>
                               <span className="text-[9.5px] opacity-80 font-mono">({item.installments.length}x)</span>
                             </button>
+                            {onEditPurchase && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onEditPurchase({
+                                    purchaseId: item.purchaseId,
+                                    productName: item.productName,
+                                    debtorId: activeDebtor.id,
+                                    installment: item.installments[0],
+                                  });
+                                }}
+                                className={`p-0.5 rounded hover:bg-black/10 active:scale-95 transition-all cursor-pointer ${
+                                  isSelected ? 'text-amber-200' : 'text-amber-600'
+                                }`}
+                                title={`Editar compra / data da 1ª parcela de ${item.productName}`}
+                              >
+                                <span className="material-symbols-outlined text-[13px]">edit</span>
+                              </button>
+                            )}
+                            {onDeletePurchase && (
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onDeletePurchase(item.purchaseId, item.productName, activeDebtor.id);
+                                }}
+                                className={`p-0.5 rounded hover:bg-black/10 active:scale-95 transition-all cursor-pointer ${
+                                  isSelected ? 'text-red-200' : 'text-red-600'
+                                }`}
+                                title={`Excluir compra inteira (${item.productName})`}
+                              >
+                                <span className="material-symbols-outlined text-[13px]">delete</span>
+                              </button>
+                            )}
                             <button
                               type="button"
                               onClick={(e) => {
@@ -1474,19 +1518,31 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     </button>
                   </div>
 
-                  {onEditDebtor && (
-                    <button
-                      type="button"
-                      onClick={() => onEditDebtor(activeDebtor)}
-                      className="w-full py-1.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 border border-slate-200 transition-all cursor-pointer shadow-2xs"
-                      title="Editar cadastro da pessoa"
-                    >
-                      <span className="material-symbols-outlined text-[15px]">edit</span>
-                      <span>Editar Cadastro</span>
-                    </button>
-                  )}
+                  <div className="grid grid-cols-2 gap-2">
+                    {onEditDebtor && (
+                      <button
+                        type="button"
+                        onClick={() => onEditDebtor(activeDebtor)}
+                        className="py-1.5 px-2.5 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center gap-1 border border-slate-200 transition-all cursor-pointer shadow-2xs"
+                        title="Editar cadastro da pessoa"
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-blue-600">edit</span>
+                        <span>Editar Pessoa</span>
+                      </button>
+                    )}
 
-
+                    {onRequestDeleteDebtor && (
+                      <button
+                        type="button"
+                        onClick={() => onRequestDeleteDebtor(activeDebtor)}
+                        className="py-1.5 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-xs flex items-center justify-center gap-1 border border-red-200 transition-all cursor-pointer shadow-2xs"
+                        title="Excluir esta pessoa e seus itens caso tenha adicionado por engano"
+                      >
+                        <span className="material-symbols-outlined text-[15px] text-red-600">delete</span>
+                        <span>Excluir Pessoa</span>
+                      </button>
+                    )}
+                  </div>
                  </div>
               </div>
             </div>
@@ -1878,6 +1934,25 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                 <span className="text-[11px] font-bold">WhatsApp</span>
                               </button>
                             )}
+
+                              {onEditPurchase && (
+                                <button
+                                  type="button"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    onEditPurchase({
+                                      purchaseId: item.purchaseId,
+                                      productName: item.product,
+                                      debtorId: item.debtorId,
+                                      installment: item,
+                                    });
+                                  }}
+                                  className="w-8 h-8 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center justify-center transition-colors cursor-pointer shadow-2xs active:scale-95 shrink-0"
+                                  title="Editar compra, nome do produto, valor ou data da 1ª parcela"
+                                >
+                                  <span className="material-symbols-outlined text-[17px]">edit</span>
+                                </button>
+                              )}
 
                               <button
                                 type="button"
@@ -2362,6 +2437,37 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                             </button>
                           </>
                         )}
+                        {onEditPurchase && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onEditPurchase({
+                                purchaseId: item.purchaseId,
+                                productName: item.product,
+                                debtorId: item.debtorId,
+                                installment: item,
+                              });
+                            }}
+                            className="h-5 w-5 rounded bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 flex items-center justify-center active:scale-95 shadow-2xs transition-all cursor-pointer"
+                            title="Editar compra / data"
+                          >
+                            <span className="material-symbols-outlined text-[10px]">edit</span>
+                          </button>
+                        )}
+                        {onDeleteInstallment && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              onDeleteInstallment(item.id);
+                            }}
+                            className="h-5 w-5 rounded bg-red-50 hover:bg-red-100 text-red-600 border border-red-200 flex items-center justify-center active:scale-95 shadow-2xs transition-all cursor-pointer"
+                            title="Excluir parcela"
+                          >
+                            <span className="material-symbols-outlined text-[10px]">delete</span>
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -2841,6 +2947,60 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                   </button>
                 )}
 
+                {onEditPurchase && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const instToEdit = selectedInstallmentForDetail;
+                      setSelectedInstallmentForDetail(null);
+                      onEditPurchase({
+                        purchaseId: instToEdit.purchaseId,
+                        productName: instToEdit.product,
+                        debtorId: instToEdit.debtorId,
+                        installment: instToEdit,
+                      });
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-900 font-bold text-xs border border-amber-300 flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 transition-all shadow-2xs"
+                  >
+                    <span className="material-symbols-outlined text-[16px] text-amber-700">edit_calendar</span>
+                    <span>Editar Compra / Data da 1ª Parcela</span>
+                  </button>
+                )}
+
+                <div className="grid grid-cols-2 gap-2">
+                  {onDeletePurchase && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const instToDel = selectedInstallmentForDetail;
+                        setSelectedInstallmentForDetail(null);
+                        onDeletePurchase(instToDel.purchaseId, instToDel.product, instToDel.debtorId);
+                      }}
+                      className="py-2 px-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 font-bold text-[11px] border border-red-200 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      title="Excluir esta compra inteira e todas as suas parcelas"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete_forever</span>
+                      <span>Excluir Compra</span>
+                    </button>
+                  )}
+
+                  {onDeleteInstallment && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const instId = selectedInstallmentForDetail.id;
+                        setSelectedInstallmentForDetail(null);
+                        onDeleteInstallment(instId);
+                      }}
+                      className="py-2 px-2 rounded-xl bg-slate-100 hover:bg-red-50 text-slate-700 hover:text-red-700 font-bold text-[11px] border border-slate-200 flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                      title="Excluir apenas esta parcela"
+                    >
+                      <span className="material-symbols-outlined text-[15px]">delete</span>
+                      <span>Excluir Parcela #{selectedInstallmentForDetail.installmentNumber}</span>
+                    </button>
+                  )}
+                </div>
+
                 {(selectedInstallmentForDetail.status === 'overdue' || (selectedInstallmentForDetail.delayDays || 0) > 0) && (
                   <button
                     type="button"
@@ -2929,10 +3089,36 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               >
                 <span className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[17px]">edit</span>
-                  <span>Editar Cadastro Completo</span>
+                  <span>Editar Cadastro da Pessoa</span>
                 </span>
                 <span className="text-[10px] bg-blue-500/40 px-1.5 py-0.5 rounded">F2 / Lápis</span>
               </button>
+
+              {/* Opção 1.5: Editar Compra / Data da 1ª Parcela */}
+              {onEditPurchase && debtorForEditOption.installment && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inst = debtorForEditOption.installment;
+                    const deb = debtorForEditOption.debtor;
+                    setDebtorForEditOption(null);
+                    playAppSound('click');
+                    onEditPurchase({
+                      purchaseId: inst.purchaseId,
+                      productName: inst.product,
+                      debtorId: deb.id,
+                      installment: inst,
+                    });
+                  }}
+                  className="w-full py-2.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-slate-950 rounded-xl text-xs font-black flex items-center justify-between shadow-xs transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[17px]">edit_calendar</span>
+                    <span>Editar Compra / Data ({debtorForEditOption.installment.product})</span>
+                  </span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              )}
 
               {/* Opção 2: Cobrança / Mensagem WhatsApp */}
               <button
@@ -2976,6 +3162,40 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 </span>
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
               </button>
+
+              {/* Opção 4: Excluir Pessoa ou Excluir Compra */}
+              <div className="grid grid-cols-2 gap-2 pt-1">
+                {onDeletePurchase && debtorForEditOption.installment && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const inst = debtorForEditOption.installment;
+                      const deb = debtorForEditOption.debtor;
+                      setDebtorForEditOption(null);
+                      onDeletePurchase(inst.purchaseId, inst.product, deb.id);
+                    }}
+                    className="py-2 px-2.5 bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">delete_forever</span>
+                    <span>Excluir Compra</span>
+                  </button>
+                )}
+
+                {onRequestDeleteDebtor && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const deb = debtorForEditOption.debtor;
+                      setDebtorForEditOption(null);
+                      onRequestDeleteDebtor(deb);
+                    }}
+                    className="py-2 px-2.5 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[11px] font-bold flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[15px]">person_remove</span>
+                    <span>Excluir Pessoa</span>
+                  </button>
+                )}
+              </div>
             </div>
 
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
@@ -3227,7 +3447,7 @@ Por favor, realize a transferência e envie o comprovante para liquidação no s
         </div>
       )}
 
-            {/* Modal de Detalhes dos Itens Unitários (TV, Celular, etc.) */}
+      {/* Modal de Detalhes dos Itens Unitários (TV, Celular, etc.) */}
       <DebtorUnitaryItemsModal
         isOpen={isUnitaryModalOpen}
         onClose={() => setIsUnitaryModalOpen(false)}
@@ -3240,6 +3460,8 @@ Por favor, realize a transferência e envie o comprovante para liquidação no s
         onShowProof={onShowProof}
         onOpenNewPurchaseForDebtor={onOpenNewPurchase}
         onOpenExtratoTotal={onOpenExtratoTotal}
+        onEditPurchase={onEditPurchase}
+        onDeletePurchase={onDeletePurchase}
       />
 
       {/* Janelinha do Print da Compra do Produto (Smart TV, etc.) */}

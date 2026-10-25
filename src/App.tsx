@@ -26,6 +26,7 @@ import {
   deleteDebtorFromFirestore,
   savePurchasesToFirestore,
   saveSinglePurchaseToFirestore,
+  deletePurchaseFromFirestore,
   getPurchasesFromFirestore,
   saveInstallmentsToFirestore,
   saveSingleInstallmentToFirestore,
@@ -69,6 +70,7 @@ import { ProofModal } from './components/ProofModal';
 import { NewPurchaseModal } from './components/NewPurchaseModal';
 import { NewDebtorModal } from './components/NewDebtorModal';
 import { EditDebtorModal } from './components/EditDebtorModal';
+import { EditPurchaseModal, EditPurchaseSavePayload } from './components/EditPurchaseModal';
 import { DigitalContractModal } from './components/DigitalContractModal';
 import { GeminiContractScannerModal } from './components/GeminiContractScannerModal';
 import { ExtratoTotalModal } from './components/ExtratoTotalModal';
@@ -283,11 +285,7 @@ export default function App() {
             }));
         }
       }
-      // Se o usuário já excluiu devedores demonstrativos ou já foi semeado, JAMAIS recria
-      if (isDemoSeeded || deletedIds.size > 0) {
-        return [];
-      }
-      return isMaster ? INITIAL_DEBTORS.filter((d) => !deletedIds.has(d.id)) : [];
+      return [];
     } catch (e) {
       console.error(e);
     }
@@ -298,7 +296,6 @@ export default function App() {
     try {
       const activeUser = currentUser || DEFAULT_USER;
       if (!activeUser.id) return [];
-      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
       const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
       const deletedIds = new Set<string>();
       if (deletedSaved) {
@@ -312,18 +309,20 @@ export default function App() {
       const tombstones = getPermanentTombstones(activeUser.id);
       tombstones.forEach((id) => deletedIds.add(id));
 
-      const isDemoSeeded = localStorage.getItem(`haspaho_demo_seeded_${activeUser.id}`) === 'true';
       const saved = localStorage.getItem(`haspaho_purchases_${activeUser.id}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter((p: Purchase) => p && (!p.debtorId || !deletedIds.has(p.debtorId)));
+          return parsed.filter(
+            (p: Purchase) =>
+              p &&
+              p.id &&
+              !deletedIds.has(p.id) &&
+              (!p.debtorId || !deletedIds.has(p.debtorId))
+          );
         }
       }
-      if (isDemoSeeded || deletedIds.size > 0) {
-        return [];
-      }
-      return isMaster ? INITIAL_PURCHASES.filter((p) => !deletedIds.has(p.debtorId)) : [];
+      return [];
     } catch (e) {
       console.error(e);
     }
@@ -334,7 +333,6 @@ export default function App() {
     try {
       const activeUser = currentUser || DEFAULT_USER;
       if (!activeUser.id) return [];
-      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
       const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
       const deletedIds = new Set<string>();
       if (deletedSaved) {
@@ -348,18 +346,21 @@ export default function App() {
       const tombstones = getPermanentTombstones(activeUser.id);
       tombstones.forEach((id) => deletedIds.add(id));
 
-      const isDemoSeeded = localStorage.getItem(`haspaho_demo_seeded_${activeUser.id}`) === 'true';
       const saved = localStorage.getItem(`haspaho_installments_${activeUser.id}`);
       if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed)) {
-          return parsed.filter((i: Installment) => i && (!i.debtorId || !deletedIds.has(i.debtorId)));
+          return parsed.filter(
+            (i: Installment) =>
+              i &&
+              i.id &&
+              !deletedIds.has(i.id) &&
+              (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+              (!i.debtorId || !deletedIds.has(i.debtorId))
+          );
         }
       }
-      if (isDemoSeeded || deletedIds.size > 0) {
-        return [];
-      }
-      return isMaster ? INITIAL_INSTALLMENTS.filter((i) => !deletedIds.has(i.debtorId)) : [];
+      return [];
     } catch (e) {
       console.error(e);
     }
@@ -578,14 +579,6 @@ export default function App() {
           });
 
           let finalDebtors = Array.from(mergedDebtorsMap.values()).filter((d) => !deletedIds.has(d.id));
-          const isDemoSeeded = localStorage.getItem(`haspaho_demo_seeded_${user.id}`) === 'true';
-          // Apenas semeia os 2 devedores de demonstração autorizados se a conta NUNCA foi semeada e não tem exclusões
-          if (finalDebtors.length === 0 && isMaster && deletedIds.size === 0 && !isDemoSeeded) {
-            finalDebtors = INITIAL_DEBTORS;
-            try {
-              localStorage.setItem(`haspaho_demo_seeded_${user.id}`, 'true');
-            } catch {}
-          }
 
           const cleanedDebtors = finalDebtors.map((d) => ({
             ...d,
@@ -610,18 +603,32 @@ export default function App() {
             const saved = localStorage.getItem(`haspaho_purchases_${user.id}`);
             if (saved) {
               const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) localPurchasesArr = parsed.filter((p: Purchase) => p && (!p.debtorId || !deletedIds.has(p.debtorId)));
+              if (Array.isArray(parsed)) {
+                localPurchasesArr = parsed.filter(
+                  (p: Purchase) =>
+                    p &&
+                    p.id &&
+                    !deletedIds.has(p.id) &&
+                    (!p.debtorId || !deletedIds.has(p.debtorId))
+                );
+              }
             }
           } catch {}
 
           const localPurchaseMap = new Map<string, Purchase>();
           localPurchasesArr.forEach((p) => {
-            if (p && p.id && (!p.debtorId || !deletedIds.has(p.debtorId))) localPurchaseMap.set(p.id, p);
+            if (p && p.id && !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))) {
+              localPurchaseMap.set(p.id, p);
+            }
           });
 
           const mergedPurchasesMap = new Map<string, Purchase>();
           (remotePurchases || []).forEach((remoteP) => {
-            if (!remoteP || !remoteP.id || (remoteP.debtorId && deletedIds.has(remoteP.debtorId))) return;
+            if (!remoteP || !remoteP.id) return;
+            if (deletedIds.has(remoteP.id) || (remoteP.debtorId && deletedIds.has(remoteP.debtorId))) {
+              deletePurchaseFromFirestore(user.id, remoteP.id).catch(() => {});
+              return;
+            }
             const localP = localPurchaseMap.get(remoteP.id);
             if (localP) {
               mergedPurchasesMap.set(remoteP.id, {
@@ -634,15 +641,20 @@ export default function App() {
           });
 
           localPurchasesArr.forEach((localP) => {
-            if (localP && localP.id && (!localP.debtorId || !deletedIds.has(localP.debtorId)) && !mergedPurchasesMap.has(localP.id)) {
+            if (
+              localP &&
+              localP.id &&
+              !deletedIds.has(localP.id) &&
+              (!localP.debtorId || !deletedIds.has(localP.debtorId)) &&
+              !mergedPurchasesMap.has(localP.id)
+            ) {
               mergedPurchasesMap.set(localP.id, localP);
             }
           });
 
-          let finalPurchases = Array.from(mergedPurchasesMap.values()).filter((p) => !p.debtorId || !deletedIds.has(p.debtorId));
-          if (finalPurchases.length === 0 && isMaster && deletedIds.size === 0 && !isDemoSeeded) {
-            finalPurchases = INITIAL_PURCHASES;
-          }
+          let finalPurchases = Array.from(mergedPurchasesMap.values()).filter(
+            (p) => !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))
+          );
 
           setPurchases(finalPurchases);
           try {
@@ -659,18 +671,43 @@ export default function App() {
             const saved = localStorage.getItem(`haspaho_installments_${user.id}`);
             if (saved) {
               const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) localInstsArr = parsed.filter((i: Installment) => i && (!i.debtorId || !deletedIds.has(i.debtorId)));
+              if (Array.isArray(parsed)) {
+                localInstsArr = parsed.filter(
+                  (i: Installment) =>
+                    i &&
+                    i.id &&
+                    !deletedIds.has(i.id) &&
+                    (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+                    (!i.debtorId || !deletedIds.has(i.debtorId))
+                );
+              }
             }
           } catch {}
 
           const localInstMap = new Map<string, Installment>();
           localInstsArr.forEach((inst) => {
-            if (inst && inst.id && (!inst.debtorId || !deletedIds.has(inst.debtorId))) localInstMap.set(inst.id, inst);
+            if (
+              inst &&
+              inst.id &&
+              !deletedIds.has(inst.id) &&
+              (!inst.purchaseId || !deletedIds.has(inst.purchaseId)) &&
+              (!inst.debtorId || !deletedIds.has(inst.debtorId))
+            ) {
+              localInstMap.set(inst.id, inst);
+            }
           });
 
           const mergedInstsMap = new Map<string, Installment>();
           (remoteInstallments || []).forEach((remoteInst) => {
-            if (!remoteInst || !remoteInst.id || (remoteInst.debtorId && deletedIds.has(remoteInst.debtorId))) return;
+            if (!remoteInst || !remoteInst.id) return;
+            if (
+              deletedIds.has(remoteInst.id) ||
+              (remoteInst.purchaseId && deletedIds.has(remoteInst.purchaseId)) ||
+              (remoteInst.debtorId && deletedIds.has(remoteInst.debtorId))
+            ) {
+              deleteInstallmentFromFirestore(user.id, remoteInst.id).catch(() => {});
+              return;
+            }
             const localInst = localInstMap.get(remoteInst.id);
             if (localInst) {
               // If local version is paid while remote is not, preserve local paid status!
@@ -689,15 +726,24 @@ export default function App() {
           });
 
           localInstsArr.forEach((localInst) => {
-            if (localInst && localInst.id && (!localInst.debtorId || !deletedIds.has(localInst.debtorId)) && !mergedInstsMap.has(localInst.id)) {
+            if (
+              localInst &&
+              localInst.id &&
+              !deletedIds.has(localInst.id) &&
+              (!localInst.purchaseId || !deletedIds.has(localInst.purchaseId)) &&
+              (!localInst.debtorId || !deletedIds.has(localInst.debtorId)) &&
+              !mergedInstsMap.has(localInst.id)
+            ) {
               mergedInstsMap.set(localInst.id, localInst);
             }
           });
 
-          let finalInsts = Array.from(mergedInstsMap.values()).filter((i) => !i.debtorId || !deletedIds.has(i.debtorId));
-          if (finalInsts.length === 0 && isMaster && deletedIds.size === 0 && !isDemoSeeded) {
-            finalInsts = INITIAL_INSTALLMENTS;
-          }
+          let finalInsts = Array.from(mergedInstsMap.values()).filter(
+            (i) =>
+              !deletedIds.has(i.id) &&
+              (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+              (!i.debtorId || !deletedIds.has(i.debtorId))
+          );
 
           const cleanedInsts = finalInsts.map((inst) => {
             const persistentCode = inst.status === 'paid' && !inst.authCode ? generateAuthCode() : inst.authCode;
@@ -803,8 +849,14 @@ export default function App() {
     const nextInstallments = installments.filter((i) => i.debtorId !== debtor.id);
     const nextPurchases = purchases.filter((p) => p.debtorId !== debtor.id);
 
-    // Registra tombstone permanente para jamais ressuscitar em atualizações ou login
+    // Registra tombstone permanente para o devedor e para todas as suas compras e parcelas
     addPermanentTombstone(activeUserId, debtor.id);
+    purchases
+      .filter((p) => p.debtorId === debtor.id)
+      .forEach((p) => addPermanentTombstone(activeUserId, p.id));
+    installments
+      .filter((i) => i.debtorId === debtor.id)
+      .forEach((i) => addPermanentTombstone(activeUserId, i.id));
 
     setDebtors(nextDebtors);
     setDeletedDebtors(nextDeleted);
@@ -991,6 +1043,17 @@ export default function App() {
   const [isNewDebtorModalOpen, setIsNewDebtorModalOpen] = useState(false);
   const [isEditDebtorOpen, setIsEditDebtorOpen] = useState(false);
   const [editingDebtor, setEditingDebtor] = useState<Debtor | null>(null);
+  const [editingPurchaseContext, setEditingPurchaseContext] = useState<{
+    isOpen: boolean;
+    purchase: Purchase | null;
+    installment: Installment | null;
+    debtor: Debtor | null;
+  }>({
+    isOpen: false,
+    purchase: null,
+    installment: null,
+    debtor: null,
+  });
   const [isContractOpen, setIsContractOpen] = useState(false);
   const [contractDebtorId, setContractDebtorId] = useState<string | null>(null);
   const [isGeminiScannerOpen, setIsGeminiScannerOpen] = useState(false);
@@ -1569,23 +1632,501 @@ export default function App() {
 
   const handleConfirmDeleteInstallment = async (inst: Installment) => {
     const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    addPermanentTombstone(activeUserId, inst.id);
+
     const nextInstallments = installments.filter((i) => i.id !== inst.id);
+    const normProd = (inst.product || '').trim().toLowerCase();
+
+    // Verifica se ainda restam parcelas desta mesma compra
+    const remainingForPurchase = nextInstallments.filter(
+      (i) =>
+        (inst.purchaseId && i.purchaseId === inst.purchaseId) ||
+        (!inst.purchaseId &&
+          i.debtorId === inst.debtorId &&
+          (i.product || '').trim().toLowerCase() === normProd)
+    );
+
+    let nextPurchases = purchases;
+    const removedPurchaseIds: string[] = [];
+
+    if (remainingForPurchase.length === 0) {
+      // Se todas as parcelas da compra foram excluídas, remove também a compra pai para nunca ressuscitar!
+      nextPurchases = purchases.filter((p) => {
+        const isMatch =
+          (inst.purchaseId && p.id === inst.purchaseId) ||
+          (p.debtorId === inst.debtorId && (p.product || '').trim().toLowerCase() === normProd);
+        if (isMatch) {
+          removedPurchaseIds.push(p.id);
+          addPermanentTombstone(activeUserId, p.id);
+        }
+        return !isMatch;
+      });
+      if (inst.purchaseId && !removedPurchaseIds.includes(inst.purchaseId)) {
+        removedPurchaseIds.push(inst.purchaseId);
+        addPermanentTombstone(activeUserId, inst.purchaseId);
+      }
+    } else {
+      // Atualiza contagem e valor total da compra pai
+      nextPurchases = purchases.map((p) => {
+        const isMatch =
+          (inst.purchaseId && p.id === inst.purchaseId) ||
+          (p.debtorId === inst.debtorId && (p.product || '').trim().toLowerCase() === normProd);
+        if (isMatch) {
+          const newTotal = remainingForPurchase.reduce(
+            (acc, item) => acc + safeToNumber(item.originalAmount || item.amount),
+            0
+          );
+          const paidCnt = remainingForPurchase.filter((item) => item.status === 'paid').length;
+          return {
+            ...p,
+            totalAmount: Number(safeToFixed(newTotal, 2)),
+            installmentsTotal: remainingForPurchase.length,
+            paidCount: paidCnt,
+            pendingCount: Math.max(0, remainingForPurchase.length - paidCnt),
+          };
+        }
+        return p;
+      });
+    }
+
+    // Recalcula saldo devedor (totalOwed) do cliente
+    const nextDebtors = debtors.map((d) => {
+      if (d.id === inst.debtorId || (d.name && inst.debtorName && d.name.trim().toLowerCase() === inst.debtorName.trim().toLowerCase())) {
+        const debtorInsts = nextInstallments.filter(
+          (i) => i.debtorId === d.id || (i.debtorName && d.name && i.debtorName.trim().toLowerCase() === d.name.trim().toLowerCase())
+        );
+        const newOwed = debtorInsts
+          .filter((i) => i.status !== 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.amount || i.originalAmount), 0);
+        const newPaid = debtorInsts
+          .filter((i) => i.status === 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.paidAmount || i.amount || i.originalAmount), 0);
+        const newOverdue = debtorInsts.filter(
+          (i) => i.status === 'overdue' || (i.delayDays || 0) > 0
+        ).length;
+        return {
+          ...d,
+          totalOwed: Number(safeToFixed(newOwed, 2)),
+          totalPaid: Number(safeToFixed(newPaid, 2)),
+          overdueCount: newOverdue,
+          activePurchases: nextPurchases.filter((p) => p.debtorId === d.id).length,
+        };
+      }
+      return d;
+    });
+
     setInstallments(nextInstallments);
+    setPurchases(nextPurchases);
+    setDebtors(nextDebtors);
     setDeletingInstallmentTarget(null);
 
     try {
       localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
+      localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
       if (activeUserId) {
         localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
+        localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
         deleteInstallmentFromFirestore(activeUserId, inst.id).catch((err) => console.warn('Delete inst firestore note:', err));
+        removedPurchaseIds.forEach((pId) => {
+          deletePurchaseFromFirestore(activeUserId, pId, inst.product, inst.debtorId).catch(() => {});
+        });
         saveInstallmentsToFirestore(activeUserId, nextInstallments).catch((err) => console.warn('Sync insts note:', err));
+        savePurchasesToFirestore(activeUserId, nextPurchases).catch((err) => console.warn('Sync purchases note:', err));
+        saveDebtorsToFirestore(activeUserId, nextDebtors).catch((err) => console.warn('Sync debtors note:', err));
       }
     } catch (e) {
       console.warn('LocalStorage error on delete installment:', e);
     }
 
-    addAuditLog('EXCLUSAO_PARCELA_DATABASE', `Parcela #${inst.installmentNumber} do produto "${inst.product}" excluída do banco.`, inst.debtorName, 'FIRESTORE_SAVED');
-    showToast('Parcela excluída com sucesso do sistema e do banco de dados!');
+    addAuditLog('EXCLUSAO_PARCELA_DATABASE', `Parcela #${inst.installmentNumber} do produto "${inst.product}" excluída definitivamente do banco.`, inst.debtorName, 'FIRESTORE_SAVED');
+    showToast('Parcela excluída definitivamente com sucesso!');
+  };
+
+  // Excluir compra inteira (produto + todas as suas parcelas) sem jamais reaparecer ao recarregar
+  const handleDeletePurchase = (purchaseId?: string, productName?: string, debtorId?: string) => {
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    const normProd = (productName || '').trim().toLowerCase();
+
+    const matchedPurchases = purchases.filter((p) => {
+      if (purchaseId && p.id === purchaseId) return true;
+      if (
+        normProd &&
+        (p.product || '').trim().toLowerCase() === normProd &&
+        (!debtorId || p.debtorId === debtorId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    const matchedPurchaseIds = new Set<string>(matchedPurchases.map((p) => p.id));
+    if (purchaseId) matchedPurchaseIds.add(purchaseId);
+
+    const matchedInstallments = installments.filter((i) => {
+      if (i.purchaseId && matchedPurchaseIds.has(i.purchaseId)) return true;
+      if (
+        normProd &&
+        (i.product || '').trim().toLowerCase() === normProd &&
+        (!debtorId || i.debtorId === debtorId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    // Registra tombstones permanentes para a compra e todas as suas parcelas
+    matchedPurchaseIds.forEach((id) => addPermanentTombstone(activeUserId, id));
+    matchedInstallments.forEach((i) => {
+      addPermanentTombstone(activeUserId, i.id);
+      if (i.purchaseId) addPermanentTombstone(activeUserId, i.purchaseId);
+    });
+
+    const removedInstIds = new Set(matchedInstallments.map((i) => i.id));
+    const nextPurchases = purchases.filter((p) => !matchedPurchaseIds.has(p.id));
+    const nextInstallments = installments.filter((i) => !removedInstIds.has(i.id));
+
+    const targetDebtorIdForRecalc =
+      debtorId || matchedPurchases[0]?.debtorId || matchedInstallments[0]?.debtorId;
+
+    const nextDebtors = debtors.map((d) => {
+      if (!targetDebtorIdForRecalc || d.id === targetDebtorIdForRecalc) {
+        const debtorInsts = nextInstallments.filter(
+          (i) => i.debtorId === d.id || (i.debtorName && d.name && i.debtorName.trim().toLowerCase() === d.name.trim().toLowerCase())
+        );
+        const newOwed = debtorInsts
+          .filter((i) => i.status !== 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.amount || i.originalAmount), 0);
+        const newPaid = debtorInsts
+          .filter((i) => i.status === 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.paidAmount || i.amount || i.originalAmount), 0);
+        const newOverdue = debtorInsts.filter(
+          (i) => i.status === 'overdue' || (i.delayDays || 0) > 0
+        ).length;
+        return {
+          ...d,
+          totalOwed: Number(safeToFixed(newOwed, 2)),
+          totalPaid: Number(safeToFixed(newPaid, 2)),
+          overdueCount: newOverdue,
+          activePurchases: nextPurchases.filter((p) => p.debtorId === d.id).length,
+        };
+      }
+      return d;
+    });
+
+    setPurchases(nextPurchases);
+    setInstallments(nextInstallments);
+    setDebtors(nextDebtors);
+    if (targetPurchaseFilter && (targetPurchaseFilter === purchaseId || targetPurchaseFilter.toLowerCase() === normProd)) {
+      setTargetPurchaseFilter('');
+    }
+
+    try {
+      localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
+      if (activeUserId) {
+        localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));
+        localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
+
+        deletePurchaseFromFirestore(activeUserId, purchaseId, productName, targetDebtorIdForRecalc).catch((err) =>
+          console.warn('Delete purchase firestore note:', err)
+        );
+        matchedInstallments.forEach((inst) => {
+          deleteInstallmentFromFirestore(activeUserId, inst.id).catch(() => {});
+        });
+        savePurchasesToFirestore(activeUserId, nextPurchases).catch(() => {});
+        saveInstallmentsToFirestore(activeUserId, nextInstallments).catch(() => {});
+        saveDebtorsToFirestore(activeUserId, nextDebtors).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('LocalStorage error on delete purchase:', e);
+    }
+
+    const label = productName || matchedPurchases[0]?.product || 'Compra';
+    addAuditLog(
+      'EXCLUSAO_COMPRA_COMPLETA',
+      `Compra "${label}" e suas ${matchedInstallments.length} parcelas foram excluídas definitivamente.`,
+      matchedPurchases[0]?.debtorName || matchedInstallments[0]?.debtorName || 'Devedor',
+      'FIRESTORE_SAVED'
+    );
+    showToast(`🗑️ Compra "${label}" e suas parcelas foram excluídas definitivamente!`);
+  };
+
+  // Abrir modal de edição de compra / parcela (data da 1ª parcela, nome do produto, valor, etc.)
+  const handleOpenEditPurchase = (target: {
+    purchaseId?: string;
+    productName?: string;
+    debtorId?: string;
+    installment?: Installment;
+  }) => {
+    const inst = target.installment || null;
+    const pId = target.purchaseId || inst?.purchaseId;
+    const normProd = (target.productName || inst?.product || '').trim().toLowerCase();
+    const dId = target.debtorId || inst?.debtorId;
+
+    const foundPurchase =
+      purchases.find((p) => pId && p.id === pId) ||
+      purchases.find(
+        (p) =>
+          normProd &&
+          (p.product || '').trim().toLowerCase() === normProd &&
+          (!dId || p.debtorId === dId)
+      ) ||
+      null;
+
+    const foundDebtor =
+      debtors.find((d) => d.id === (dId || foundPurchase?.debtorId)) ||
+      debtors.find(
+        (d) =>
+          inst?.debtorName &&
+          d.name.trim().toLowerCase() === inst.debtorName.trim().toLowerCase()
+      ) ||
+      null;
+
+    setEditingPurchaseContext({
+      isOpen: true,
+      purchase: foundPurchase,
+      installment: inst,
+      debtor: foundDebtor,
+    });
+  };
+
+  // Salvar edição da compra ou parcela individual (incluindo recálculo da data da 1ª parcela)
+  const handleSaveEditedPurchase = (payload: EditPurchaseSavePayload) => {
+    const activeUserId = currentUser?.id || DEFAULT_USER.id;
+    const normOrigProd = (payload.originalProductName || payload.product || '').trim().toLowerCase();
+    const cleanNewProduct = payload.product.trim() || 'Item Parcelado';
+    const cleanStore = payload.store.trim() || 'Mercado Livre / Loja';
+    const cleanCard = payload.cardName.trim() || 'Nubank Croma';
+
+    let nextInstallments = [...installments];
+    let nextPurchases = [...purchases];
+
+    if (payload.mode === 'single_installment' && payload.singleInstallmentId) {
+      nextInstallments = installments.map((inst) => {
+        if (inst.id === payload.singleInstallmentId) {
+          const newAmt = payload.singleInstallmentAmount || inst.amount || inst.originalAmount;
+          return {
+            ...inst,
+            product: cleanNewProduct,
+            cardName: cleanCard,
+            dueDate: payload.singleInstallmentDueDate || inst.dueDate,
+            amount: newAmt,
+            originalAmount: newAmt,
+          };
+        }
+        return inst;
+      });
+
+      // Atualiza também o nome do produto/cartão na compra vinculada se necessário
+      nextPurchases = purchases.map((p) => {
+        if (payload.purchaseId && p.id === payload.purchaseId) {
+          const pInsts = nextInstallments.filter((i) => i.purchaseId === p.id);
+          const sumAmt = pInsts.reduce((acc, i) => acc + safeToNumber(i.originalAmount || i.amount), 0);
+          return {
+            ...p,
+            product: cleanNewProduct,
+            store: cleanStore,
+            cardName: cleanCard,
+            totalAmount: sumAmt > 0 ? Number(safeToFixed(sumAmt, 2)) : p.totalAmount,
+          };
+        }
+        return p;
+      });
+    } else {
+      // Modo 'full_purchase': Atualiza a compra inteira e recalcula as datas de vencimento a partir da 1ª parcela
+      const targetPurchase =
+        purchases.find((p) => payload.purchaseId && p.id === payload.purchaseId) ||
+        purchases.find(
+          (p) =>
+            normOrigProd &&
+            (p.product || '').trim().toLowerCase() === normOrigProd &&
+            (!payload.debtorId || p.debtorId === payload.debtorId)
+        );
+
+      const resolvedPurchaseId = targetPurchase?.id || payload.purchaseId || `p-${Date.now()}`;
+      const existingLinkedInsts = installments
+        .filter((inst) => {
+          if (targetPurchase && inst.purchaseId === targetPurchase.id) return true;
+          if (payload.purchaseId && inst.purchaseId === payload.purchaseId) return true;
+          if (
+            normOrigProd &&
+            (inst.product || '').trim().toLowerCase() === normOrigProd &&
+            (!payload.debtorId || inst.debtorId === payload.debtorId)
+          ) {
+            return true;
+          }
+          return false;
+        })
+        .sort((a, b) => (a.installmentNumber || 1) - (b.installmentNumber || 1));
+
+      const debtorObj =
+        debtors.find((d) => d.id === (payload.debtorId || targetPurchase?.debtorId)) ||
+        debtors[0];
+      const realDebtorId = debtorObj?.id || payload.debtorId || targetPurchase?.debtorId || '';
+      const realDebtorName =
+        debtorObj?.name ||
+        targetPurchase?.debtorName ||
+        existingLinkedInsts[0]?.debtorName ||
+        'Devedor';
+      const realDebtorAvatar =
+        debtorObj?.avatar ||
+        existingLinkedInsts[0]?.debtorAvatar ||
+        getCleanDebtorAvatar(realDebtorName);
+
+      const newInstCount = Math.max(1, payload.installmentsTotal || 1);
+      const newTotalAmount = Math.max(0.01, payload.totalAmount);
+      const newInstValue = Number(safeToFixed(newTotalAmount / newInstCount, 2));
+      const baseTimestamp = Date.now();
+
+      const rebuiltInsts: Installment[] = [];
+      for (let i = 1; i <= newInstCount; i++) {
+        const existing = existingLinkedInsts[i - 1];
+        const calculatedDueDate = addMonthsToDateStr(payload.firstDueDate, i - 1);
+        if (existing) {
+          rebuiltInsts.push({
+            ...existing,
+            purchaseId: resolvedPurchaseId,
+            debtorId: realDebtorId,
+            debtorName: realDebtorName,
+            debtorAvatar: realDebtorAvatar,
+            product: cleanNewProduct,
+            cardName: cleanCard,
+            installmentNumber: i,
+            totalInstallments: newInstCount,
+            amount: newInstValue,
+            originalAmount: newInstValue,
+            dueDate: calculatedDueDate,
+          });
+        } else {
+          rebuiltInsts.push({
+            id: `inst-${baseTimestamp}-${i}`,
+            purchaseId: resolvedPurchaseId,
+            debtorId: realDebtorId,
+            debtorName: realDebtorName,
+            debtorAvatar: realDebtorAvatar,
+            product: cleanNewProduct,
+            cardName: cleanCard,
+            installmentNumber: i,
+            totalInstallments: newInstCount,
+            amount: newInstValue,
+            originalAmount: newInstValue,
+            dueDate: calculatedDueDate,
+            status: 'ontime',
+          });
+        }
+      }
+
+      // Se o usuário diminuiu o número de parcelas (ex: de 12x para 10x), adiciona tombstones e remove as excedentes
+      if (existingLinkedInsts.length > newInstCount) {
+        const removedExtra = existingLinkedInsts.slice(newInstCount);
+        removedExtra.forEach((extra) => {
+          addPermanentTombstone(activeUserId, extra.id);
+          deleteInstallmentFromFirestore(activeUserId, extra.id).catch(() => {});
+        });
+      }
+
+      const existingIdsSet = new Set(existingLinkedInsts.map((i) => i.id));
+      nextInstallments = [
+        ...rebuiltInsts,
+        ...installments.filter((i) => !existingIdsSet.has(i.id)),
+      ];
+
+      const paidCount = rebuiltInsts.filter((i) => i.status === 'paid').length;
+      const overdueCount = rebuiltInsts.filter(
+        (i) => i.status === 'overdue' || (i.delayDays || 0) > 0
+      ).length;
+      const nextPending = rebuiltInsts.find((i) => i.status !== 'paid');
+
+      const updatedPurchaseObj: Purchase = {
+        ...(targetPurchase || {
+          id: resolvedPurchaseId,
+          debtorId: realDebtorId,
+          debtorName: realDebtorName,
+          attachmentsCount: 0,
+        }),
+        id: resolvedPurchaseId,
+        debtorId: realDebtorId,
+        debtorName: realDebtorName,
+        product: cleanNewProduct,
+        store: cleanStore,
+        cardName: cleanCard,
+        totalAmount: newTotalAmount,
+        installmentsTotal: newInstCount,
+        installmentValue: newInstValue,
+        paidCount,
+        pendingCount: Math.max(0, newInstCount - paidCount),
+        overdueCount,
+        firstDueDate: payload.firstDueDate,
+        nextDueDate: nextPending?.dueDate || payload.firstDueDate,
+      };
+
+      if (targetPurchase) {
+        nextPurchases = purchases.map((p) => (p.id === targetPurchase.id ? updatedPurchaseObj : p));
+      } else {
+        nextPurchases = [updatedPurchaseObj, ...purchases];
+      }
+    }
+
+    // Recalcula saldos do devedor
+    const nextDebtors = debtors.map((d) => {
+      if (!payload.debtorId || d.id === payload.debtorId) {
+        const debtorInsts = nextInstallments.filter(
+          (i) => i.debtorId === d.id || (i.debtorName && d.name && i.debtorName.trim().toLowerCase() === d.name.trim().toLowerCase())
+        );
+        const newOwed = debtorInsts
+          .filter((i) => i.status !== 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.amount || i.originalAmount), 0);
+        const newPaid = debtorInsts
+          .filter((i) => i.status === 'paid')
+          .reduce((acc, i) => acc + safeToNumber(i.paidAmount || i.amount || i.originalAmount), 0);
+        const newOverdue = debtorInsts.filter(
+          (i) => i.status === 'overdue' || (i.delayDays || 0) > 0
+        ).length;
+        const firstPending = debtorInsts.find((i) => i.status !== 'paid');
+
+        return {
+          ...d,
+          totalOwed: Number(safeToFixed(newOwed, 2)),
+          totalPaid: Number(safeToFixed(newPaid, 2)),
+          overdueCount: newOverdue,
+          nextDueDate: firstPending?.dueDate || d.nextDueDate,
+          activePurchases: nextPurchases.filter((p) => p.debtorId === d.id).length,
+        };
+      }
+      return d;
+    });
+
+    setPurchases(nextPurchases);
+    setInstallments(nextInstallments);
+    setDebtors(nextDebtors);
+
+    try {
+      localStorage.setItem('haspaho_purchases', JSON.stringify(nextPurchases));
+      localStorage.setItem('haspaho_installments', JSON.stringify(nextInstallments));
+      localStorage.setItem('haspaho_debtors', JSON.stringify(nextDebtors));
+      if (activeUserId) {
+        localStorage.setItem(`haspaho_purchases_${activeUserId}`, JSON.stringify(nextPurchases));
+        localStorage.setItem(`haspaho_installments_${activeUserId}`, JSON.stringify(nextInstallments));
+        localStorage.setItem(`haspaho_debtors_${activeUserId}`, JSON.stringify(nextDebtors));
+        savePurchasesToFirestore(activeUserId, nextPurchases).catch(() => {});
+        saveInstallmentsToFirestore(activeUserId, nextInstallments).catch(() => {});
+        saveDebtorsToFirestore(activeUserId, nextDebtors).catch(() => {});
+      }
+    } catch (e) {
+      console.warn('LocalStorage error on edit purchase:', e);
+    }
+
+    addAuditLog(
+      'EDICAO_COMPRA_SISTEMA',
+      `Compra "${cleanNewProduct}" atualizada com sucesso (1º vencimento: ${payload.firstDueDate}).`,
+      debtors.find((d) => d.id === payload.debtorId)?.name || 'Devedor',
+      'FIRESTORE_SAVED'
+    );
+    showToast(`✨ Compra "${cleanNewProduct}" e datas das parcelas atualizadas com sucesso!`);
   };
 
   // Confirm payment submission with automatic score, late fee calculations
@@ -2811,6 +3352,8 @@ export default function App() {
             }}
             onEditDebtor={handleOpenEditDebtor}
             onRequestDeleteDebtor={handleRequestDeleteDebtor}
+            onEditPurchase={handleOpenEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
             onOpenContract={handleOpenContract}
             onOpenExtratoTotal={handleOpenExtratoTotal}
             onOpenPdfHub={handleOpenPdfHub}
@@ -2840,6 +3383,9 @@ export default function App() {
             }}
             onOpenNewDebtor={() => setIsNewDebtorModalOpen(true)}
             onEditDebtor={handleOpenEditDebtor}
+            onRequestDeleteDebtor={handleRequestDeleteDebtor}
+            onEditPurchase={handleOpenEditPurchase}
+            onDeletePurchase={handleDeletePurchase}
             onOpenContract={handleOpenContract}
             onOpenExtratoTotal={handleOpenExtratoTotal}
             onOpenGeminiScanner={() => setIsGeminiScannerOpen(true)}
@@ -3049,6 +3595,31 @@ export default function App() {
             setIsEditDebtorOpen(false);
             handleOpenContract(debtorId);
           }}
+        />
+      </ErrorBoundary>
+
+      {/* Edit Purchase / Installment Modal (Editar compra, data da 1ª parcela, valor ou excluir compra inteira) */}
+      <ErrorBoundary
+        fallbackTitle="Erro ao editar compra"
+        onReset={() => setEditingPurchaseContext((prev) => ({ ...prev, isOpen: false }))}
+      >
+        <EditPurchaseModal
+          isOpen={editingPurchaseContext.isOpen}
+          onClose={() =>
+            setEditingPurchaseContext({
+              isOpen: false,
+              purchase: null,
+              installment: null,
+              debtor: null,
+            })
+          }
+          purchase={editingPurchaseContext.purchase}
+          installment={editingPurchaseContext.installment}
+          debtor={editingPurchaseContext.debtor}
+          allInstallments={installments}
+          onSave={handleSaveEditedPurchase}
+          onDeletePurchase={handleDeletePurchase}
+          onDeleteInstallment={handleDeleteInstallment}
         />
       </ErrorBoundary>
 

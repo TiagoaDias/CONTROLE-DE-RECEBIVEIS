@@ -41,6 +41,13 @@ interface DashboardViewProps {
   userPixKey?: string;
   initialSection?: 'visao_clara' | 'dark' | 'visao_geral' | 'devedores' | 'parcelas';
   onRequestDeleteDebtor?: (debtor: Debtor) => void;
+  onEditPurchase?: (target: {
+    purchaseId?: string;
+    productName?: string;
+    debtorId?: string;
+    installment?: Installment;
+  }) => void;
+  onDeletePurchase?: (purchaseId?: string, productName?: string, debtorId?: string) => void;
   onRestoreAllData?: () => void;
   onDeleteInstallment?: (id: string) => void;
   theme?: 'light' | 'dark';
@@ -73,6 +80,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   userPixKey,
   initialSection = 'visao_geral',
   onRequestDeleteDebtor,
+  onEditPurchase,
+  onDeletePurchase,
   onRestoreAllData,
   theme = 'light',
   onToggleTheme,
@@ -547,6 +556,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onUpdateInstallment={onUpdateInstallment}
           userPixKey={userPixKey}
           onRequestDeleteDebtor={onRequestDeleteDebtor}
+          onEditPurchase={onEditPurchase}
+          onDeletePurchase={onDeletePurchase}
         />
       </div>
 
@@ -585,6 +596,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onShowProof={onShowProof}
           onOpenNewPurchaseForDebtor={onOpenNewPurchaseForDebtor}
           onOpenExtratoTotal={onOpenExtratoTotal}
+          onEditPurchase={onEditPurchase}
+          onDeletePurchase={onDeletePurchase}
         />
 
         {/* MODAL INTERATIVO DE SELEÇÃO DE CLIENTE / DEVEDOR */}

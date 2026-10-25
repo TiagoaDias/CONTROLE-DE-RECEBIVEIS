@@ -22,6 +22,13 @@ interface DebtorUnitaryItemsModalProps {
   ) => void;
   onOpenNewPurchaseForDebtor?: (debtorId: string) => void;
   onOpenExtratoTotal?: (purchaseId?: string, debtorId?: string) => void;
+  onEditPurchase?: (target: {
+    purchaseId?: string;
+    productName?: string;
+    debtorId?: string;
+    installment?: Installment;
+  }) => void;
+  onDeletePurchase?: (purchaseId?: string, productName?: string, debtorId?: string) => void;
 }
 
 export const DebtorUnitaryItemsModal: React.FC<DebtorUnitaryItemsModalProps> = ({
@@ -36,6 +43,8 @@ export const DebtorUnitaryItemsModal: React.FC<DebtorUnitaryItemsModalProps> = (
   onShowProof,
   onOpenNewPurchaseForDebtor,
   onOpenExtratoTotal,
+  onEditPurchase,
+  onDeletePurchase,
 }) => {
   const [selectedFilter, setSelectedFilter] = useState<string>('all');
   const [expandedItemIds, setExpandedItemIds] = useState<Record<string, boolean>>({});
@@ -387,7 +396,41 @@ export const DebtorUnitaryItemsModal: React.FC<DebtorUnitaryItemsModalProps> = (
                           </span>
                         </button>
 
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {onEditPurchase && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onClose();
+                                onEditPurchase({
+                                  purchaseId: item.purchaseId,
+                                  productName: item.productName,
+                                  debtorId: debtor.id,
+                                  installment: item.installments[0],
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 active:scale-95 text-[10.5px] text-amber-900 border border-amber-300 font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                              title="Editar nome do produto, valor ou data da 1ª parcela"
+                            >
+                              <span className="material-symbols-outlined text-[13px] text-amber-700">edit</span>
+                              <span>Editar Compra / Data</span>
+                            </button>
+                          )}
+
+                          {onDeletePurchase && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onDeletePurchase(item.purchaseId, item.productName, debtor.id);
+                              }}
+                              className="px-2.5 py-1 rounded-lg bg-red-50 hover:bg-red-100 active:scale-95 text-[10.5px] text-red-700 border border-red-200 font-bold flex items-center gap-1 transition-all cursor-pointer shadow-2xs"
+                              title="Excluir esta compra inteira e todas as suas parcelas"
+                            >
+                              <span className="material-symbols-outlined text-[13px]">delete</span>
+                              <span>Excluir Item</span>
+                            </button>
+                          )}
+
                           {!item.isPaidOff && onNudgeWhatsApp && debtor.phone && (
                             <button
                               type="button"

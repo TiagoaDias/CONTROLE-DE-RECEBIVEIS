@@ -2141,6 +2141,71 @@ export async function deleteInstallmentFromFirestore(userId: string, installment
   }
 }
 
+// DELETE PURCHASE AND ITS INSTALLMENTS FROM FIRESTORE
+export async function deletePurchaseFromFirestore(
+  userId: string,
+  purchaseId?: string,
+  productName?: string,
+  debtorId?: string
+): Promise<void> {
+  if (!userId) return;
+  if (isFirestoreQuotaExhausted()) return;
+  const path = `users/${userId}/purchases/${purchaseId || 'by-product'}`;
+  try {
+    const batch = writeBatch(db);
+    if (purchaseId) {
+      batch.delete(doc(db, 'users', userId, 'purchases', purchaseId));
+    }
+
+    const normProd = (productName || '').trim().toLowerCase();
+
+    try {
+      const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
+      purchasesSnap.docs.forEach((pDoc) => {
+        const pData = pDoc.data();
+        const matchId = purchaseId && (pDoc.id === purchaseId || pData?.id === purchaseId);
+        const matchProd =
+          normProd &&
+          (pData?.product || '').trim().toLowerCase() === normProd &&
+          (!debtorId || pData?.debtorId === debtorId);
+        if (matchId || matchProd) {
+          batch.delete(pDoc.ref);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not read purchases for deletePurchaseFromFirestore:', e);
+    }
+
+    try {
+      const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
+      installmentsSnap.docs.forEach((iDoc) => {
+        const iData = iDoc.data();
+        const matchPurchaseId = purchaseId && iData?.purchaseId === purchaseId;
+        const matchProd =
+          normProd &&
+          (iData?.product || '').trim().toLowerCase() === normProd &&
+          (!debtorId || iData?.debtorId === debtorId);
+        if (matchPurchaseId || matchProd) {
+          batch.delete(iDoc.ref);
+        }
+      });
+    } catch (e) {
+      console.warn('Could not read installments for deletePurchaseFromFirestore:', e);
+    }
+
+    await batch.commit();
+    console.log(`[Firestore:DELETE_PURCHASE] Success: Purchase ${purchaseId || productName} and linked installments deleted from Firestore.`);
+  } catch (err) {
+    if (isQuotaError(err)) {
+      setFirestoreQuotaExhausted(true);
+      console.warn(`[Firestore:DELETE_PURCHASE] Quota atingida. Exclusão mantida no LocalStorage.`);
+      return;
+    }
+    console.error(`[Firestore:DELETE_PURCHASE_ERROR] Failed deleting purchase ${purchaseId}:`, err);
+    handleFirestoreError(err, OperationType.DELETE, path);
+  }
+}
+
 // DELETE DEBTOR AND RELATED RECORDS FROM FIRESTORE
 export async function deleteDebtorFromFirestore(userId: string, debtorId: string): Promise<void> {
   if (!userId || !debtorId) return;

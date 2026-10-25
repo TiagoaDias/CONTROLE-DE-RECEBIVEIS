@@ -36,6 +36,9 @@ interface DevedoresViewProps {
   onToast: (msg: string) => void;
   searchQuery?: string;
   theme?: 'light' | 'dark';
+  onRequestDeleteDebtor?: (debtor: Debtor) => void;
+  onEditPurchase?: (opts: { purchaseId?: string; productName?: string; debtorId?: string; installment?: Installment }) => void;
+  onDeletePurchase?: (purchaseId: string, productName?: string, debtorId?: string) => void;
 }
 
 export const DevedoresView: React.FC<DevedoresViewProps> = ({
@@ -56,6 +59,9 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
   onToast: _onToast,
   searchQuery = '',
   theme = 'light',
+  onRequestDeleteDebtor,
+  onEditPurchase,
+  onDeletePurchase,
 }) => {
   const isDark = theme === 'dark';
   const [localSearch, setLocalSearch] = useState('');
@@ -361,59 +367,85 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                       </div>
 
                       {/* Ações Rápidas do Card */}
-                      <div className="pt-2 border-t border-slate-200 grid grid-cols-3 gap-1.5 relative z-10">
-                        <button
-                          type="button"
-                          onClick={() => onOpenNewPurchaseForDebtor(debtor.id)}
-                          className="h-8 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
-                          <span>+ Parcela</span>
-                        </button>
-
-                        <button
-                          type="button"
-                          onClick={(e) => handleOpenUnitaryModal(debtor, undefined, e)}
-                          className="h-8 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
-                        >
-                          <span className="material-symbols-outlined text-[14px]">devices</span>
-                          <span>Itens</span>
-                        </button>
-
-                        {debtor.phone ? (
+                      <div className="pt-2 border-t border-slate-200 flex flex-col gap-1.5 relative z-10">
+                        <div className="grid grid-cols-3 gap-1.5">
                           <button
                             type="button"
-                            onClick={() => onNudgeWhatsApp(
-                              debtor.name,
-                              `R$ ${safeToFixed(debtor.totalOwed)}`,
-                              'Parcelas em aberto',
-                              'Atual',
-                              debtor.phone
-                            )}
-                            className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            onClick={() => onOpenNewPurchaseForDebtor(debtor.id)}
+                            className="h-8 rounded-xl bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[14px]">chat</span>
-                            <span>WhatsApp</span>
+                            <span className="material-symbols-outlined text-[14px]">add_shopping_cart</span>
+                            <span>+ Compra</span>
                           </button>
-                        ) : onOpenContract ? (
+
                           <button
                             type="button"
-                            onClick={() => onOpenContract(debtor.id)}
-                            className="h-8 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            onClick={(e) => handleOpenUnitaryModal(debtor, undefined, e)}
+                            className="h-8 rounded-xl bg-cyan-600 hover:bg-cyan-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
                           >
-                            <span className="material-symbols-outlined text-[14px]">history_edu</span>
-                            <span>Contrato</span>
+                            <span className="material-symbols-outlined text-[14px]">devices</span>
+                            <span>Itens</span>
                           </button>
-                        ) : (
+
+                          {debtor.phone ? (
+                            <button
+                              type="button"
+                              onClick={() => onNudgeWhatsApp(
+                                debtor.name,
+                                `R$ ${safeToFixed(debtor.totalOwed)}`,
+                                'Parcelas em aberto',
+                                'Atual',
+                                debtor.phone
+                              )}
+                              className="h-8 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">chat</span>
+                              <span>WhatsApp</span>
+                            </button>
+                          ) : onOpenContract ? (
+                            <button
+                              type="button"
+                              onClick={() => onOpenContract(debtor.id)}
+                              className="h-8 rounded-xl bg-purple-700 hover:bg-purple-600 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">history_edu</span>
+                              <span>Contrato</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => onEditDebtor?.(debtor)}
+                              className="h-8 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            >
+                              <span className="material-symbols-outlined text-[14px]">edit</span>
+                              <span>Editar</span>
+                            </button>
+                          )}
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-1.5">
                           <button
                             type="button"
                             onClick={() => onEditDebtor?.(debtor)}
-                            className="h-8 rounded-xl bg-slate-700 hover:bg-slate-600 text-white font-bold text-[10.5px] flex items-center justify-center gap-1 shadow-xs cursor-pointer"
+                            className="h-7 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-all"
+                            title="Editar dados cadastrais da pessoa"
                           >
-                            <span className="material-symbols-outlined text-[14px]">edit</span>
-                            <span>Editar</span>
+                            <span className="material-symbols-outlined text-[13px] text-blue-600">edit</span>
+                            <span>Editar Pessoa</span>
                           </button>
-                        )}
+
+                          {onRequestDeleteDebtor && (
+                            <button
+                              type="button"
+                              onClick={() => onRequestDeleteDebtor(debtor)}
+                              className="h-7 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold text-[10px] flex items-center justify-center gap-1 cursor-pointer transition-all"
+                              title="Excluir pessoa e todas as compras/parcelas vinculadas"
+                            >
+                              <span className="material-symbols-outlined text-[13px] text-red-600">person_remove</span>
+                              <span>Excluir Pessoa</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
                   );
@@ -463,24 +495,56 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                           </h4>
                         </div>
 
-                        {/* Filtros de Itens Específicos */}
-                        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] select-none scrollbar-none">
+                        {/* Filtros de Itens Específicos com Editar e Excluir */}
+                        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px] select-none scrollbar-none flex-wrap">
                           {debtorUnitaryItems.map((it) => {
                             const isSelected = currentSelectedItem?.id === it.id;
                             return (
-                              <button
-                                key={it.id}
-                                type="button"
-                                onClick={() => setSelectedItemIdByDebtor((prev) => ({ ...prev, [debtor.id]: it.id }))}
-                                className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer border flex items-center gap-1 ${
-                                  isSelected
-                                    ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-extrabold shadow-2xs'
-                                    : 'bg-slate-100 text-slate-600 border-slate-200'
-                                }`}
-                              >
-                                <span className="material-symbols-outlined text-[12px]">{it.icon}</span>
-                                <span>{it.shortName}</span>
-                              </button>
+                              <div key={it.id} className="inline-flex items-center gap-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => setSelectedItemIdByDebtor((prev) => ({ ...prev, [debtor.id]: it.id }))}
+                                  className={`px-2.5 py-1 rounded-xl font-bold transition-all cursor-pointer border flex items-center gap-1 ${
+                                    isSelected
+                                      ? 'bg-cyan-500 text-slate-950 border-cyan-300 font-extrabold shadow-2xs'
+                                      : 'bg-slate-100 text-slate-600 border-slate-200'
+                                  }`}
+                                >
+                                  <span className="material-symbols-outlined text-[12px]">{it.icon}</span>
+                                  <span>{it.shortName}</span>
+                                </button>
+                                {isSelected && onEditPurchase && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onEditPurchase({
+                                        purchaseId: it.purchaseId,
+                                        productName: it.productName,
+                                        debtorId: debtor.id,
+                                        installment: it.installments[0],
+                                      });
+                                    }}
+                                    className="p-1 rounded-lg bg-amber-100 hover:bg-amber-200 text-amber-800 border border-amber-300 cursor-pointer flex items-center justify-center"
+                                    title={`Editar ${it.productName} (Data da 1ª parcela, valor, etc.)`}
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">edit_calendar</span>
+                                  </button>
+                                )}
+                                {isSelected && onDeletePurchase && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      onDeletePurchase(it.purchaseId, it.productName, debtor.id);
+                                    }}
+                                    className="p-1 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 border border-red-300 cursor-pointer flex items-center justify-center"
+                                    title={`Excluir compra ${it.productName} inteira`}
+                                  >
+                                    <span className="material-symbols-outlined text-[12px]">delete_forever</span>
+                                  </button>
+                                )}
+                              </div>
                             );
                           })}
                         </div>
@@ -662,6 +726,26 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                     >
                                       <WhatsAppIcon className="w-3.5 h-3.5 text-emerald-600" size={14} />
                                       <span>WhatsApp</span>
+                                    </button>
+                                  )}
+
+                                  {onEditPurchase && (
+                                    <button
+                                      type="button"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        onEditPurchase({
+                                          purchaseId: inst.purchaseId,
+                                          productName: inst.product,
+                                          debtorId: inst.debtorId || debtor.id,
+                                          installment: inst,
+                                        });
+                                      }}
+                                      className="py-1.5 px-2.5 rounded-xl bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-300 font-bold text-xs flex items-center justify-center gap-1 cursor-pointer transition-all active:scale-95"
+                                      title="Editar compra, data da 1ª parcela ou valor"
+                                    >
+                                      <span className="material-symbols-outlined text-[15px]">edit_calendar</span>
+                                      <span>Editar</span>
                                     </button>
                                   )}
 
@@ -898,6 +982,25 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                           </button>
                                         )}
 
+                                        {onEditPurchase && (
+                                          <button
+                                            type="button"
+                                            onClick={(e) => {
+                                              e.stopPropagation();
+                                              onEditPurchase({
+                                                purchaseId: inst.purchaseId,
+                                                productName: inst.product,
+                                                debtorId: inst.debtorId || debtor.id,
+                                                installment: inst,
+                                              });
+                                            }}
+                                            className="w-8 h-8 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-300 flex items-center justify-center transition-colors cursor-pointer shadow-xs active:scale-95"
+                                            title="Editar compra, data da 1ª parcela ou valor"
+                                          >
+                                            <span className="material-symbols-outlined text-[17px]">edit_calendar</span>
+                                          </button>
+                                        )}
+
                                         <button
                                           type="button"
                                           onClick={(e) => {
@@ -994,7 +1097,7 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                         </span>
                       </div>
 
-                      {/* Botão de Editar e Ações */}
+                      {/* Botão de Editar e Excluir Pessoa */}
                       <div className="flex items-center gap-2 flex-wrap">
                         {onEditDebtor && (
                           <button
@@ -1005,6 +1108,17 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                           >
                             <span className="material-symbols-outlined text-[13px]">edit</span>
                             <span>Editar</span>
+                          </button>
+                        )}
+                        {onRequestDeleteDebtor && (
+                          <button
+                            type="button"
+                            onClick={() => onRequestDeleteDebtor(debtor)}
+                            className="h-6 px-2.5 rounded-lg bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 hover:text-red-900 text-[11px] font-bold inline-flex items-center gap-1 transition-all cursor-pointer border border-red-200 shadow-2xs"
+                            title="Excluir devedor e suas compras"
+                          >
+                            <span className="material-symbols-outlined text-[13px]">person_remove</span>
+                            <span>Excluir</span>
                           </button>
                         )}
                       </div>
@@ -1125,6 +1239,8 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
         onShowProof={onShowProof}
         onOpenNewPurchaseForDebtor={onOpenNewPurchaseForDebtor}
         onOpenExtratoTotal={onOpenExtratoTotal}
+        onEditPurchase={onEditPurchase}
+        onDeletePurchase={onDeletePurchase}
       />
       {debtorSentinel}
 
@@ -1184,10 +1300,35 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
               >
                 <span className="flex items-center gap-2">
                   <span className="material-symbols-outlined text-[17px]">edit</span>
-                  <span>Editar Cadastro Completo</span>
+                  <span>Editar Cadastro da Pessoa</span>
                 </span>
                 <span className="text-[10px] bg-blue-500/40 px-1.5 py-0.5 rounded">Lápis</span>
               </button>
+
+              {/* Opção 1.5: Editar Compra / Data da 1ª Parcela */}
+              {debtorForEditOption.installment && onEditPurchase && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const inst = debtorForEditOption.installment!;
+                    const deb = debtorForEditOption.debtor;
+                    setDebtorForEditOption(null);
+                    onEditPurchase({
+                      purchaseId: inst.purchaseId,
+                      productName: inst.product,
+                      debtorId: inst.debtorId || deb.id,
+                      installment: inst,
+                    });
+                  }}
+                  className="w-full py-2.5 px-3 bg-amber-500 hover:bg-amber-600 active:scale-95 text-white rounded-xl text-xs font-bold flex items-center justify-between shadow-xs transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[17px]">edit_calendar</span>
+                    <span>Editar Compra / Data 1ª Parcela ({debtorForEditOption.installment.product})</span>
+                  </span>
+                  <span className="material-symbols-outlined text-[16px]">chevron_right</span>
+                </button>
+              )}
 
               {/* Opção 2: Cobrança / Mensagem WhatsApp */}
               {debtorForEditOption.debtor.phone && (
@@ -1231,6 +1372,25 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                 </span>
                 <span className="material-symbols-outlined text-[16px]">chevron_right</span>
               </button>
+
+              {/* Opção 4: Excluir Pessoa */}
+              {onRequestDeleteDebtor && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const deb = debtorForEditOption.debtor;
+                    setDebtorForEditOption(null);
+                    onRequestDeleteDebtor(deb);
+                  }}
+                  className="w-full py-2.5 px-3 bg-red-50 hover:bg-red-100 active:scale-95 text-red-700 border border-red-200 rounded-xl text-xs font-bold flex items-center justify-between transition-all cursor-pointer"
+                >
+                  <span className="flex items-center gap-2">
+                    <span className="material-symbols-outlined text-[17px] text-red-600">person_remove</span>
+                    <span>Excluir Pessoa e Compras Vinculadas</span>
+                  </span>
+                  <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                </button>
+              )}
             </div>
 
             <div className="pt-2 border-t border-slate-100 dark:border-slate-800 flex justify-end">
