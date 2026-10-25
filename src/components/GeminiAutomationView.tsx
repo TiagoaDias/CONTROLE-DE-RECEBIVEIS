@@ -56,7 +56,7 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     {
       id: 'welcome',
       sender: 'gemini',
-      text: 'Olá! Toque no microfone 🎤 para falar, escolha um atalho acima ou digite abaixo para registrar baixas, promessas e consultar saldos.',
+      text: 'Olá! Toque no botão Voz 🎤 para falar com o Gemini IA ou digite seu comando abaixo.',
       timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
     },
   ]);
@@ -113,14 +113,6 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
     } catch {}
     return false;
   }, []);
-
-  // KPIs rápidos para aproveitar o espaço superior com utilidade real
-  const stats = useMemo(() => {
-    const totalReceivable = debtors.reduce((acc, d) => acc + (d.totalOwed || 0), 0);
-    const totalPaid = debtors.reduce((acc, d) => acc + (d.totalPaid || 0), 0);
-    const overdueCount = installments.filter((i) => i.status === 'overdue').length;
-    return { totalReceivable, totalPaid, overdueCount };
-  }, [debtors, installments]);
 
   // Auto-scroll para a mensagem mais recente
   useEffect(() => {
@@ -901,381 +893,275 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
       {
         id: `welcome_${Date.now()}`,
         sender: 'gemini',
-        text: 'Conversa reiniciada. Toque num cliente acima, fale no microfone ou digite abaixo.',
+        text: 'Conversa reiniciada. Toque no microfone 🎤 para falar ou digite seu comando abaixo.',
         timestamp: new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
       },
     ]);
   };
 
-  const firstDebtorName = debtors[0]?.name || 'Fábio Dias';
-
-  const quickActions = [
-    {
-      icon: 'payments',
-      label: 'Dar Baixa',
-      color: 'text-emerald-400 bg-emerald-500/15 border-emerald-500/30',
-      cmd: `${firstDebtorName} pagou R$ 150,00 confirmado`,
-    },
-    {
-      icon: 'analytics',
-      label: 'Resumo Geral',
-      color: 'text-cyan-300 bg-cyan-500/15 border-cyan-500/30',
-      cmd: 'Gere um resumo geral de todos os recebíveis e atrasados do sistema.',
-    },
-    {
-      icon: 'warning',
-      label: 'Em Atraso',
-      color: 'text-amber-300 bg-amber-500/15 border-amber-500/30',
-      cmd: `Quanto ${firstDebtorName} ainda deve no aplicativo?`,
-    },
-    {
-      icon: 'event_upcoming',
-      label: 'Promessa',
-      color: 'text-purple-300 bg-purple-500/15 border-purple-500/30',
-      cmd: `${firstDebtorName} prometeu pagar amanhã via PIX`,
-    },
-  ];
-
   return (
-    <div className="w-full max-w-3xl mx-auto pt-1 pb-0.5 flex flex-col h-[calc(100dvh-8.1rem)] md:h-[calc(100dvh-8.75rem)] overflow-hidden animate-in fade-in duration-150">
-      {/* 1. Barra Superior Compacta & Proporcional */}
-      <div className="flex items-center justify-between px-2.5 py-1.5 bg-slate-900/95 dark:bg-slate-950/95 backdrop-blur-md rounded-xl border border-slate-800 text-white shadow-sm shrink-0 mb-1">
-        <div className="flex items-center gap-1.5 min-w-0">
-          {onClose && (
+    <div className="fixed inset-x-0 top-14 md:top-16 bottom-[5.25rem] md:bottom-[4.75rem] z-30 px-2 sm:px-4 pt-1.5 pb-1 flex flex-col overflow-hidden">
+      <div className="w-full max-w-3xl mx-auto flex-1 flex flex-col min-h-0 overflow-hidden">
+        {/* 1. Barra Superior Limpa: Apenas Mecanismo Gemini IA e Controles de Voz/Microfone */}
+        <div className="flex items-center justify-between px-3 py-1.5 bg-slate-900 dark:bg-slate-950 rounded-t-2xl border border-b-0 border-slate-800 text-white shrink-0">
+          <div className="flex items-center gap-2 min-w-0">
+            {onClose && (
+              <button
+                type="button"
+                onClick={() => {
+                  stopGeminiSpeaking();
+                  stopListening();
+                  onClose();
+                }}
+                className="w-7 h-7 rounded-lg hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
+                title="Voltar"
+              >
+                <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              </button>
+            )}
+
+            <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-2xs shrink-0">
+              <span className="material-symbols-outlined text-[14px]">smart_toy</span>
+            </div>
+
+            <div className="flex items-center gap-1.5 min-w-0">
+              <h1 className="text-xs sm:text-sm font-black text-white truncate leading-none">
+                Gemini IA
+              </h1>
+              <span className="inline-flex items-center gap-1 text-[9.5px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold shrink-0">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                Voz
+              </span>
+            </div>
+          </div>
+
+          {/* Controles Exclusivos de Voz & Microfone */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            {/* Ativar / Desbloquear Microfone */}
             <button
               type="button"
               onClick={() => {
-                stopGeminiSpeaking();
-                stopListening();
-                onClose();
+                if (typeof window !== 'undefined' && window.HaspahoNative?.requestRecordAudioPermission) {
+                  window.HaspahoNative.requestRecordAudioPermission();
+                } else {
+                  setShowMicPermissionGuide(true);
+                }
               }}
-              className="w-7 h-7 rounded-lg hover:bg-white/10 active:scale-95 text-slate-300 hover:text-white transition-all cursor-pointer flex items-center justify-center shrink-0"
-              title="Voltar ao Dashboard"
+              className="h-7 px-2.5 rounded-lg bg-blue-600/30 hover:bg-blue-600/45 text-cyan-200 border border-cyan-500/40 text-[10.5px] font-bold flex items-center gap-1 transition-all cursor-pointer active:scale-95"
+              title="Ativar Microfone"
             >
-              <span className="material-symbols-outlined text-[18px]">arrow_back</span>
+              <span className="material-symbols-outlined text-[14px]">mic</span>
+              <span>Ativar Microfone</span>
             </button>
-          )}
 
-          <div className="w-6 h-6 rounded-lg bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shadow-2xs shrink-0">
-            <span className="material-symbols-outlined text-[14px]">smart_toy</span>
-          </div>
-
-          <div className="flex items-center gap-1.5 min-w-0">
-            <h1 className="text-xs font-black text-white truncate leading-none">
-              Automação IA
-            </h1>
-            <span className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 font-bold shrink-0">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
-              Voz Ativa
-            </span>
-          </div>
-        </div>
-
-        {/* Botões de Controle Compactos */}
-        <div className="flex items-center gap-1 shrink-0">
-          {/* Botão Direto para Desbloquear/Ativar Voz Mobile */}
-          <button
-            type="button"
-            onClick={() => {
-              if (typeof window !== 'undefined' && window.HaspahoNative?.startNativeVoiceRecognition) {
-                window.HaspahoNative.startNativeVoiceRecognition();
-              } else {
-                setShowMicPermissionGuide(true);
-              }
-            }}
-            className="h-7 px-2 rounded-lg bg-blue-600/25 hover:bg-blue-600/40 text-cyan-200 border border-cyan-500/30 text-[10px] font-bold flex items-center gap-1 transition-all cursor-pointer"
-            title="Ativar Permissão ou Microfone Nativo do Celular"
-          >
-            <span className="material-symbols-outlined text-[14px]">settings_voice</span>
-            <span className="hidden xs:inline">Permissão</span>
-          </button>
-
-          {/* Alternar Resposta Falada */}
-          <button
-            type="button"
-            onClick={() => {
-              if (isGeminiSpeaking) stopGeminiSpeaking();
-              setVoiceOutputEnabled(!voiceOutputEnabled);
-            }}
-            className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
-              voiceOutputEnabled
-                ? 'bg-purple-600/30 text-purple-200 border border-purple-500/40'
-                : 'bg-white/5 text-slate-400 border border-white/10'
-            }`}
-            title={voiceOutputEnabled ? 'Voz do Gemini Ativa' : 'Voz no Mudo'}
-          >
-            <span className="material-symbols-outlined text-[15px]">
-              {voiceOutputEnabled ? 'volume_up' : 'volume_off'}
-            </span>
-          </button>
-
-          {/* Histórico TXT */}
-          <button
-            type="button"
-            onClick={handleOpenTxtModal}
-            className="w-7 h-7 sm:w-auto sm:px-2 rounded-lg bg-white/5 hover:bg-white/10 text-slate-300 hover:text-white border border-white/10 text-[10px] font-bold flex items-center justify-center gap-1 transition-all cursor-pointer"
-            title="Histórico em Arquivos TXT"
-          >
-            <span className="material-symbols-outlined text-[14px]">description</span>
-            <span className="hidden sm:inline">TXT</span>
-          </button>
-
-          {/* Limpar Conversa */}
-          <button
-            type="button"
-            onClick={clearChatHistory}
-            className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 border border-white/10 flex items-center justify-center transition-colors cursor-pointer"
-            title="Limpar Conversa"
-          >
-            <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
-          </button>
-        </div>
-      </div>
-
-      {/* 2. Card Principal Integrado (Aproveitamento Total do Espaço) */}
-      <div className="flex-1 bg-white dark:bg-slate-900 rounded-2xl shadow-md border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden relative min-h-0">
-        {/* Faixa Superior de Resumo & Atalhos Rápidos (Aproveita o espaço de forma produtiva) */}
-        <div className="px-2.5 py-1.5 bg-slate-50/90 dark:bg-slate-950/70 border-b border-slate-200/80 dark:border-slate-800/90 shrink-0 space-y-1.5">
-          {/* Linha 1: Mini KPIs + Pílulas de Clientes */}
-          <div className="flex items-center justify-between gap-1.5 overflow-x-auto no-scrollbar">
-            <div className="flex items-center gap-1 shrink-0">
-              <span className="px-1.5 py-0.5 rounded-md bg-emerald-500/10 border border-emerald-500/20 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
-                A Receber: R$ {stats.totalReceivable.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </span>
-              {stats.overdueCount > 0 && (
-                <span className="px-1.5 py-0.5 rounded-md bg-rose-500/10 border border-rose-500/20 text-[10px] font-bold text-rose-600 dark:text-rose-400">
-                  {stats.overdueCount} atraso(s)
-                </span>
-              )}
-            </div>
-
-            {/* Pílulas de acesso 1-toque aos clientes */}
-            <div className="flex items-center gap-1 shrink-0">
-              {debtors.slice(0, 4).map((d) => (
-                <button
-                  key={d.id}
-                  type="button"
-                  onClick={() => handleSendCommand(`Quanto ${d.name} ainda deve no aplicativo?`)}
-                  className="px-2 py-0.5 rounded-md bg-slate-200/70 dark:bg-slate-800 hover:bg-blue-600 hover:text-white text-[10px] font-bold text-slate-700 dark:text-slate-300 transition-colors cursor-pointer shrink-0 flex items-center gap-0.5"
-                  title={`Consultar saldo de ${d.name}`}
-                >
-                  <span className="material-symbols-outlined text-[11px]">person</span>
-                  <span className="max-w-[72px] truncate">{d.name.split(' ')[0]}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Linha 2: 4 Botões de Ação Rápida Compactos */}
-          <div className="grid grid-cols-4 gap-1">
-            {quickActions.map((act, idx) => (
-              <button
-                key={idx}
-                type="button"
-                onClick={() => handleSendCommand(act.cmd)}
-                disabled={isProcessing}
-                className={`px-1.5 py-1 rounded-lg border text-[10px] font-bold flex items-center justify-center gap-1 transition-all active:scale-95 cursor-pointer truncate ${act.color}`}
-              >
-                <span className="material-symbols-outlined text-[13px] shrink-0">{act.icon}</span>
-                <span className="truncate">{act.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Banner Falando: Se o Gemini estiver emitindo áudio */}
-        {isGeminiSpeaking && (
-          <div className="px-2.5 py-1 bg-gradient-to-r from-purple-900/70 to-indigo-900/70 border-b border-purple-500/30 text-white flex items-center justify-between gap-2 shrink-0">
-            <div className="flex items-center gap-1.5">
-              <span className="material-symbols-outlined text-purple-300 text-sm animate-pulse">
-                record_voice_over
-              </span>
-              <span className="text-[10.5px] font-bold text-purple-100">
-                Respondendo por voz...
-              </span>
-            </div>
+            {/* Alternar Voz de Resposta da IA */}
             <button
               type="button"
-              onClick={stopGeminiSpeaking}
-              className="px-2 py-0.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
+              onClick={() => {
+                if (isGeminiSpeaking) stopGeminiSpeaking();
+                setVoiceOutputEnabled(!voiceOutputEnabled);
+              }}
+              className={`w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer ${
+                voiceOutputEnabled
+                  ? 'bg-purple-600/30 text-purple-200 border border-purple-500/40'
+                  : 'bg-white/5 text-slate-400 border border-white/10'
+              }`}
+              title={voiceOutputEnabled ? 'Voz da IA Ativa' : 'Voz da IA no Mudo'}
             >
-              <span className="material-symbols-outlined text-xs">stop</span>
-              <span>Parar</span>
+              <span className="material-symbols-outlined text-[15px]">
+                {voiceOutputEnabled ? 'volume_up' : 'volume_off'}
+              </span>
+            </button>
+
+            {/* Limpar Conversa */}
+            <button
+              type="button"
+              onClick={clearChatHistory}
+              className="w-7 h-7 rounded-lg bg-white/5 hover:bg-white/10 text-slate-400 hover:text-red-400 border border-white/10 flex items-center justify-center transition-colors cursor-pointer"
+              title="Limpar Conversa"
+            >
+              <span className="material-symbols-outlined text-[14px]">delete_sweep</span>
             </button>
           </div>
-        )}
+        </div>
 
-        {/* Banner de Transcrição em Andamento */}
-        {!isListening && interimTranscript && (
-          <div className="px-2.5 py-1 bg-cyan-950/90 border-b border-cyan-500/30 text-cyan-200 text-[10.5px] font-bold flex items-center gap-1.5 shrink-0">
-            <span className="material-symbols-outlined text-cyan-400 text-sm animate-spin">sync</span>
-            <span className="truncate">{interimTranscript}</span>
-          </div>
-        )}
-
-        {/* 3. Fluxo de Mensagens Compacto e Proporcional */}
-        <div className="flex-1 p-2 sm:p-3 overflow-y-auto space-y-2 min-h-0">
-          {messages.map((msg) => (
-            <div
-              key={msg.id}
-              className={`flex gap-1.5 sm:gap-2 max-w-xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
-            >
-              {/* Avatar Compacto */}
-              <div
-                className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold shadow-2xs ${
-                  msg.sender === 'user'
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white'
-                }`}
-              >
-                {msg.sender === 'user' ? (
-                  (currentUser?.name || 'U').charAt(0).toUpperCase()
-                ) : (
-                  <span className="material-symbols-outlined text-[13px]">smart_toy</span>
-                )}
+        {/* 2. Área Principal do Gemini IA (Sem botões extras poluindo) */}
+        <div className="flex-1 bg-white dark:bg-slate-900 rounded-b-2xl shadow-md border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden relative min-h-0">
+          {/* Banner Falando: Se o Gemini estiver emitindo áudio */}
+          {isGeminiSpeaking && (
+            <div className="px-3 py-1 bg-gradient-to-r from-purple-900/80 to-indigo-900/80 border-b border-purple-500/30 text-white flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1.5">
+                <span className="material-symbols-outlined text-purple-300 text-sm animate-pulse">
+                  record_voice_over
+                </span>
+                <span className="text-[11px] font-bold text-purple-100">
+                  Gemini IA falando...
+                </span>
               </div>
+              <button
+                type="button"
+                onClick={stopGeminiSpeaking}
+                className="px-2 py-0.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white font-bold text-[10px] flex items-center gap-0.5 cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-xs">stop</span>
+                <span>Parar</span>
+              </button>
+            </div>
+          )}
 
-              {/* Balão da Mensagem Compacto */}
-              <div className={`space-y-1 max-w-[88%] ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
+          {/* Banner de Transcrição em Andamento */}
+          {!isListening && interimTranscript && (
+            <div className="px-3 py-1 bg-cyan-950/90 border-b border-cyan-500/30 text-cyan-200 text-[11px] font-bold flex items-center gap-1.5 shrink-0">
+              <span className="material-symbols-outlined text-cyan-400 text-sm animate-spin">sync</span>
+              <span className="truncate">{interimTranscript}</span>
+            </div>
+          )}
+
+          {/* 3. Fluxo de Mensagens Limpo */}
+          <div className="flex-1 p-2.5 sm:p-3 overflow-y-auto space-y-2 min-h-0">
+            {messages.map((msg) => (
+              <div
+                key={msg.id}
+                className={`flex gap-2 max-w-xl ${msg.sender === 'user' ? 'ml-auto flex-row-reverse' : 'mr-auto'}`}
+              >
                 <div
-                  className={`px-2.5 py-1.5 sm:px-3 sm:py-2 rounded-xl text-[11.5px] sm:text-xs leading-snug shadow-2xs ${
+                  className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 text-[10px] font-bold shadow-2xs ${
                     msg.sender === 'user'
-                      ? 'bg-blue-600 text-white rounded-tr-xs'
-                      : 'bg-slate-100 dark:bg-slate-800/95 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80'
+                      ? 'bg-blue-600 text-white'
+                      : 'bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white'
                   }`}
                 >
-                  <p className="whitespace-pre-line font-medium">{msg.text}</p>
-
-                  <div className="flex items-center justify-between gap-2 mt-1 pt-0.5 border-t border-black/5 dark:border-white/5 text-[9.5px] opacity-70">
-                    <span>{msg.timestamp}</span>
-
-                    {msg.sender === 'gemini' && (
-                      <button
-                        type="button"
-                        onClick={() => speakGeminiResponse(msg.text)}
-                        className="hover:underline flex items-center gap-0.5 cursor-pointer"
-                        title="Ouvir mensagem"
-                      >
-                        <span className="material-symbols-outlined text-[11px]">volume_up</span>
-                        <span>Ouvir</span>
-                      </button>
-                    )}
-                  </div>
+                  {msg.sender === 'user' ? (
+                    (currentUser?.name || 'U').charAt(0).toUpperCase()
+                  ) : (
+                    <span className="material-symbols-outlined text-[13px]">smart_toy</span>
+                  )}
                 </div>
 
-                {/* Card Compacto de Operação Financeira */}
-                {msg.result?.clientIdentified && (
-                  <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-left text-[11px] flex items-center justify-between gap-2 shadow-2xs">
-                    <div className="min-w-0">
-                      <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate">
-                        <span className="material-symbols-outlined text-xs text-blue-500">person</span>
-                        <span className="truncate">{msg.result.clientIdentified.name}</span>
-                      </div>
-                      <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
-                        Saldo: R$ {msg.result.clientIdentified.totalOwed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </span>
-                    </div>
+                <div className={`space-y-1 max-w-[86%] ${msg.sender === 'user' ? 'text-right' : 'text-left'}`}>
+                  <div
+                    className={`px-3 py-2 rounded-xl text-xs leading-snug shadow-2xs ${
+                      msg.sender === 'user'
+                        ? 'bg-blue-600 text-white rounded-tr-xs'
+                        : 'bg-slate-100 dark:bg-slate-800/95 text-slate-900 dark:text-slate-100 rounded-tl-xs border border-slate-200/80 dark:border-slate-700/80'
+                    }`}
+                  >
+                    <p className="whitespace-pre-line font-medium">{msg.text}</p>
 
-                    <div className="flex items-center gap-1.5 shrink-0">
-                      {msg.result.intentLabel && (
-                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
-                          {msg.result.intentLabel}
-                        </span>
-                      )}
-                      {onNavigateToDebtor && (
+                    <div className="flex items-center justify-between gap-2 mt-1 pt-0.5 border-t border-black/5 dark:border-white/5 text-[9.5px] opacity-70">
+                      <span>{msg.timestamp}</span>
+
+                      {msg.sender === 'gemini' && (
                         <button
                           type="button"
-                          onClick={() => onNavigateToDebtor(msg.result!.clientIdentified!.id)}
-                          className="px-2 py-1 rounded-lg bg-blue-600/15 text-blue-600 dark:text-blue-400 font-bold text-[10px] hover:bg-blue-600/25 cursor-pointer flex items-center gap-0.5"
+                          onClick={() => speakGeminiResponse(msg.text)}
+                          className="hover:underline flex items-center gap-0.5 cursor-pointer"
+                          title="Ouvir resposta"
                         >
-                          <span>Ficha</span>
-                          <span className="material-symbols-outlined text-[11px]">arrow_forward</span>
+                          <span className="material-symbols-outlined text-[11px]">volume_up</span>
+                          <span>Ouvir</span>
                         </button>
                       )}
                     </div>
                   </div>
-                )}
-              </div>
-            </div>
-          ))}
 
-          {/* Indicador de Processamento Compacto */}
-          {isProcessing && (
-            <div className="flex gap-2 max-w-xs mr-auto animate-in fade-in">
-              <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
-                <span className="material-symbols-outlined animate-spin text-[13px]">sync</span>
+                  {msg.result?.clientIdentified && (
+                    <div className="px-2.5 py-1.5 rounded-xl bg-slate-50 dark:bg-slate-800/80 border border-slate-200 dark:border-slate-700 text-left text-[11px] flex items-center justify-between gap-2 shadow-2xs">
+                      <div className="min-w-0">
+                        <div className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1 truncate">
+                          <span className="material-symbols-outlined text-xs text-blue-500">person</span>
+                          <span className="truncate">{msg.result.clientIdentified.name}</span>
+                        </div>
+                        <span className="text-[10px] font-semibold text-slate-500 dark:text-slate-400">
+                          Saldo: R$ {msg.result.clientIdentified.totalOwed.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                        </span>
+                      </div>
+
+                      {msg.result.intentLabel && (
+                        <span className="px-1.5 py-0.5 rounded text-[9.5px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20 shrink-0">
+                          {msg.result.intentLabel}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="px-2.5 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-[11px] text-slate-600 dark:text-slate-300 font-semibold flex items-center gap-1.5">
-                <span>Processando comando...</span>
+            ))}
+
+            {isProcessing && (
+              <div className="flex gap-2 max-w-xs mr-auto animate-in fade-in">
+                <div className="w-6 h-6 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined animate-spin text-[13px]">sync</span>
+                </div>
+                <div className="px-3 py-1.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300 font-semibold flex items-center gap-1.5">
+                  <span>Processando...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+
+          {/* 4. Painel de Voz em Tempo Real (Quando o microfone está ativo) */}
+          {isListening && (
+            <div className="absolute inset-x-2 bottom-14 z-20 p-2.5 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-cyan-400/50 shadow-2xl flex flex-col items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
+              <div className="flex items-center gap-2.5 w-full justify-between px-1">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="relative w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center border border-white/30 shrink-0">
+                    <span className="material-symbols-outlined text-white text-base animate-pulse">mic</span>
+                  </div>
+                  <div className="text-left min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+                      <span className="text-[10.5px] font-black text-cyan-300 uppercase">
+                        Microfone Ativo
+                      </span>
+                      <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-200 font-bold">
+                        00:{recordingSeconds.toString().padStart(2, '0')}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-200 font-medium truncate">
+                      {interimTranscript || 'Fale seu comando agora...'}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-0.5 h-4 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 shrink-0">
+                  <span className="w-0.5 bg-cyan-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.18)}px` }} />
+                  <span className="w-0.5 bg-blue-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.32)}px` }} />
+                  <span className="w-0.5 bg-purple-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.45)}px` }} />
+                  <span className="w-0.5 bg-blue-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.32)}px` }} />
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 w-full">
+                <button
+                  type="button"
+                  onClick={stopListening}
+                  className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 shadow-sm cursor-pointer active:scale-95"
+                >
+                  <span className="material-symbols-outlined text-sm">check_circle</span>
+                  <span>Concluir Fala</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={cancelListening}
+                  className="py-1.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer"
+                >
+                  <span className="material-symbols-outlined text-sm">close</span>
+                  <span>Cancelar</span>
+                </button>
               </div>
             </div>
           )}
 
-          <div ref={messagesEndRef} />
-        </div>
-
-        {/* 4. Painel de Voz em Tempo Real Compacto (Overlay) */}
-        {isListening && (
-          <div className="absolute inset-x-2 bottom-12 z-20 p-2.5 sm:p-3 rounded-2xl bg-slate-950/95 backdrop-blur-xl border border-cyan-400/50 shadow-2xl flex flex-col items-center gap-2 animate-in slide-in-from-bottom-2 duration-150">
-            <div className="flex items-center gap-2.5 w-full justify-between px-1">
-              <div className="flex items-center gap-2">
-                <div className="relative w-8 h-8 rounded-full bg-gradient-to-tr from-blue-600 to-purple-600 flex items-center justify-center border border-white/30 shrink-0">
-                  <span className="material-symbols-outlined text-white text-base animate-pulse">mic</span>
-                </div>
-                <div className="text-left">
-                  <div className="flex items-center gap-1.5">
-                    <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
-                    <span className="text-[10.5px] font-black text-cyan-300 uppercase">
-                      Ouvindo Voz
-                    </span>
-                    <span className="font-mono text-[10px] px-1.5 py-0.2 rounded-full bg-cyan-500/20 text-cyan-200 font-bold">
-                      00:{recordingSeconds.toString().padStart(2, '0')}
-                    </span>
-                  </div>
-                  <p className="text-[11px] text-slate-200 font-medium line-clamp-1">
-                    {interimTranscript || 'Fale agora (ex: "Fábio pagou 150 reais")'}
-                  </p>
-                </div>
+          {/* Alerta de Permissão do Microfone (Se bloqueado) */}
+          {voiceError && (
+            <div className="px-2.5 py-1.5 bg-amber-500/15 border-t border-amber-500/30 text-amber-900 dark:text-amber-200 text-[11px] flex items-center justify-between gap-2 shrink-0">
+              <div className="flex items-center gap-1 min-w-0">
+                <span className="material-symbols-outlined text-amber-500 text-sm shrink-0">mic_off</span>
+                <span className="truncate">{voiceError}</span>
               </div>
-
-              {/* Equalizador Compacto */}
-              <div className="flex items-center gap-0.5 h-4 px-2 py-0.5 rounded-full bg-black/40 border border-white/10 shrink-0">
-                <span className="w-0.5 bg-cyan-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.18)}px` }} />
-                <span className="w-0.5 bg-blue-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.32)}px` }} />
-                <span className="w-0.5 bg-purple-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.45)}px` }} />
-                <span className="w-0.5 bg-blue-400 rounded-full" style={{ height: `${Math.max(4, audioVolumeLevel * 0.32)}px` }} />
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 w-full">
-              <button
-                type="button"
-                onClick={stopListening}
-                className="flex-1 py-1.5 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] flex items-center justify-center gap-1 shadow-sm cursor-pointer active:scale-95"
-              >
-                <span className="material-symbols-outlined text-sm">check_circle</span>
-                <span>Concluir &amp; Executar</span>
-              </button>
-              <button
-                type="button"
-                onClick={cancelListening}
-                className="py-1.5 px-3 rounded-xl bg-white/10 hover:bg-white/20 text-slate-300 font-bold text-[11px] flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-sm">close</span>
-                <span>Cancelar</span>
-              </button>
-            </div>
-          </div>
-        )}
-
-        {/* Alerta Compacto de Permissão/Erro com Botão Direto */}
-        {voiceError && (
-          <div className="px-2.5 py-1 bg-amber-500/15 border-t border-amber-500/30 text-amber-900 dark:text-amber-200 text-[10.5px] flex items-center justify-between gap-1.5 shrink-0">
-            <div className="flex items-center gap-1 min-w-0">
-              <span className="material-symbols-outlined text-amber-500 text-sm shrink-0">warning</span>
-              <span className="truncate">{voiceError}</span>
-            </div>
-            <div className="flex items-center gap-1 shrink-0">
               <button
                 type="button"
                 onClick={() => {
@@ -1285,101 +1171,78 @@ export const GeminiAutomationView: React.FC<GeminiAutomationViewProps> = ({
                     setShowMicPermissionGuide(true);
                   }
                 }}
-                className="px-2 py-0.5 rounded-md bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10px] cursor-pointer"
+                className="px-2.5 py-1 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-bold text-[10.5px] cursor-pointer shrink-0"
               >
-                Desbloquear Microfone
-              </button>
-              <button
-                type="button"
-                onClick={() => setVoiceError(null)}
-                className="p-0.5 rounded hover:bg-black/10 text-slate-400 cursor-pointer"
-              >
-                <span className="material-symbols-outlined text-xs">close</span>
+                Ativar Microfone
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* 5. Barra Inferior de Entrada Compacta e Sempre Visível */}
-        <div className="p-1.5 bg-slate-50 dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shrink-0">
-          <input
-            type="file"
-            ref={audioFileInputRef}
-            accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac"
-            onChange={handleAudioFileUpload}
-            className="hidden"
-          />
-          <input
-            type="file"
-            ref={nativeMicCaptureInputRef}
-            accept="audio/*"
-            capture="user"
-            onChange={handleAudioFileUpload}
-            className="hidden"
-          />
-
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              handleSendCommand();
-            }}
-            className="flex items-center gap-1.5"
-          >
-            {/* Botão Principal de Microfone */}
-            <button
-              type="button"
-              onClick={toggleListening}
-              disabled={isProcessing}
-              title={isListening ? 'Toque para concluir fala' : 'Falar comando por voz'}
-              className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-all cursor-pointer shadow-sm ${
-                isListening
-                  ? 'bg-red-600 text-white animate-pulse'
-                  : 'bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white active:scale-95'
-              }`}
-            >
-              <span className="material-symbols-outlined text-[19px]">
-                {isListening ? 'mic_off' : 'mic'}
-              </span>
-            </button>
-
-            {/* Botão de Áudio / Voz Nativa Android */}
-            <button
-              type="button"
-              onClick={() => {
-                if (typeof window !== 'undefined' && window.HaspahoNative?.startNativeVoiceRecognition) {
-                  window.HaspahoNative.startNativeVoiceRecognition();
-                } else {
-                  audioFileInputRef.current?.click();
-                }
-              }}
-              disabled={isProcessing}
-              title="Voz Nativa do Sistema / Enviar arquivo de áudio"
-              className="w-8 h-8 rounded-xl bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:text-blue-500 flex items-center justify-center shrink-0 cursor-pointer transition-colors"
-            >
-              <span className="material-symbols-outlined text-[17px]">graphic_eq</span>
-            </button>
-
-            {/* Campo de Texto Compacto */}
+          {/* 5. Barra Inferior Fixa: Microfone + Digitar + Enviar (100% Visível Sem Rolagem) */}
+          <div className="p-2 bg-slate-50 dark:bg-slate-950/90 border-t border-slate-200 dark:border-slate-800 shrink-0">
             <input
-              ref={textInputRef}
-              type="text"
-              value={inputCommand}
-              onChange={(e) => setInputCommand(e.target.value)}
-              placeholder="Fale no 🎤 ou digite seu comando..."
-              disabled={isProcessing}
-              className="flex-1 h-9 px-2.5 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-900 dark:text-slate-100 outline-hidden focus:border-blue-500 font-medium min-w-0"
+              type="file"
+              ref={audioFileInputRef}
+              accept="audio/*,.mp3,.wav,.ogg,.m4a,.webm,.aac"
+              onChange={handleAudioFileUpload}
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={nativeMicCaptureInputRef}
+              accept="audio/*"
+              capture="user"
+              onChange={handleAudioFileUpload}
+              className="hidden"
             />
 
-            {/* Botão Enviar */}
-            <button
-              type="submit"
-              disabled={!inputCommand.trim() || isProcessing}
-              className="w-9 h-9 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-sm cursor-pointer transition-all active:scale-95"
-              title="Enviar comando"
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                handleSendCommand();
+              }}
+              className="flex items-center gap-2"
             >
-              <span className="material-symbols-outlined text-[18px]">send</span>
-            </button>
-          </form>
+              {/* Botão Principal de Ativar Microfone / Falar */}
+              <button
+                type="button"
+                onClick={toggleListening}
+                disabled={isProcessing}
+                title={isListening ? 'Parar microfone' : 'Ativar microfone e falar'}
+                className={`h-10 px-3 rounded-xl flex items-center justify-center gap-1.5 shrink-0 font-bold text-xs transition-all cursor-pointer shadow-sm ${
+                  isListening
+                    ? 'bg-red-600 text-white animate-pulse'
+                    : 'bg-gradient-to-tr from-blue-600 via-indigo-600 to-purple-600 text-white active:scale-95'
+                }`}
+              >
+                <span className="material-symbols-outlined text-[20px]">
+                  {isListening ? 'mic_off' : 'mic'}
+                </span>
+                <span>{isListening ? 'Ouvindo' : 'Voz'}</span>
+              </button>
+
+              {/* Campo para Digitar Comando */}
+              <input
+                ref={textInputRef}
+                type="text"
+                value={inputCommand}
+                onChange={(e) => setInputCommand(e.target.value)}
+                placeholder="Digite ou toque em Voz..."
+                disabled={isProcessing}
+                className="flex-1 h-10 px-3 rounded-xl border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm text-slate-900 dark:text-slate-100 outline-hidden focus:border-blue-500 font-medium min-w-0"
+              />
+
+              {/* Botão Enviar */}
+              <button
+                type="submit"
+                disabled={!inputCommand.trim() || isProcessing}
+                className="w-10 h-10 rounded-xl bg-blue-600 hover:bg-blue-700 disabled:opacity-40 text-white flex items-center justify-center shrink-0 shadow-sm cursor-pointer transition-all active:scale-95"
+                title="Enviar"
+              >
+                <span className="material-symbols-outlined text-[19px]">send</span>
+              </button>
+            </form>
+          </div>
         </div>
       </div>
 

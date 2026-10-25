@@ -76,15 +76,15 @@ export const BottomNav: React.FC<BottomNavProps> = ({
         <div
           role="menu"
           aria-label="Menu de Ações Rápidas"
-          className="fixed bottom-[4.15rem] sm:bottom-20 left-1/2 -translate-x-1/2 z-[70] w-[calc(100vw-12px)] max-w-[360px] sm:max-w-[440px] max-h-[calc(100dvh-4.75rem)] overflow-hidden bg-slate-950/95 sm:bg-slate-900/95 backdrop-blur-2xl text-white p-1.5 sm:p-2.5 rounded-2xl sm:rounded-3xl border border-cyan-500/40 shadow-[0_16px_48px_rgba(0,0,0,0.85),0_0_28px_rgba(6,182,212,0.22)] flex flex-col gap-1 sm:gap-1.5 animate-in slide-in-from-bottom-4 zoom-in-95 duration-150 select-none"
+          className="fixed bottom-[3.4rem] sm:bottom-16 left-1/2 -translate-x-1/2 z-[70] w-[calc(100vw-12px)] max-w-[350px] sm:max-w-[420px] max-h-[calc(100dvh-4rem)] overflow-hidden bg-slate-950/95 sm:bg-slate-900/95 backdrop-blur-2xl text-white p-1.5 sm:p-2 rounded-2xl border border-cyan-500/40 shadow-[0_16px_48px_rgba(0,0,0,0.85),0_0_28px_rgba(6,182,212,0.22)] flex flex-col gap-1 sm:gap-1.5 animate-in slide-in-from-bottom-4 zoom-in-95 duration-150 select-none"
         >
           {/* Header Compacto do Menu */}
           <div className="flex items-center justify-between px-1 py-0.5 border-b border-white/10 shrink-0">
             <div className="flex items-center gap-1.5">
-              <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-2xs">
-                <span className="material-symbols-outlined text-[14px] sm:text-[16px]">bolt</span>
+              <span className="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center shadow-2xs">
+                <span className="material-symbols-outlined text-[13px] sm:text-[15px]">bolt</span>
               </span>
-              <span className="text-[10.5px] sm:text-xs font-black uppercase tracking-wider text-slate-100 leading-none">
+              <span className="text-[10px] sm:text-[11px] font-black uppercase tracking-wider text-slate-100 leading-none">
                 Ações Rápidas
               </span>
             </div>
@@ -94,10 +94,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 setIsMenuOpen(false);
                 try { playAppSound('whoosh'); } catch {}
               }}
-              className="w-6 h-6 sm:w-7 sm:h-7 rounded-full hover:bg-white/10 active:scale-90 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
+              className="w-6 h-6 rounded-full hover:bg-white/10 active:scale-90 text-slate-400 hover:text-white flex items-center justify-center transition-all cursor-pointer"
               aria-label="Fechar menu"
             >
-              <span className="material-symbols-outlined text-[16px] sm:text-[18px]">close</span>
+              <span className="material-symbols-outlined text-[15px] sm:text-[16px]">close</span>
             </button>
           </div>
 
@@ -120,29 +120,29 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="col-span-3 px-2 py-1.5 sm:px-2.5 sm:py-2 rounded-xl bg-gradient-to-r from-blue-900/70 via-indigo-900/70 to-purple-900/70 hover:from-blue-600/40 hover:to-purple-600/40 border border-blue-400/50 hover:border-blue-300 flex items-center gap-2 transition-all cursor-pointer group active:scale-[0.98] shadow-sm"
+              className="col-span-3 px-2 py-1.5 rounded-xl bg-gradient-to-r from-blue-900/70 via-indigo-900/70 to-purple-900/70 hover:from-blue-600/40 hover:to-purple-600/40 border border-blue-400/50 hover:border-blue-300 flex items-center gap-2 transition-all cursor-pointer group active:scale-[0.98] shadow-sm"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)] group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[17px] sm:text-[19px]">smart_toy</span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 text-white flex items-center justify-center shrink-0 shadow-[0_0_10px_rgba(99,102,241,0.5)] group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[15px] sm:text-[17px]">smart_toy</span>
               </div>
               <div className="flex-1 min-w-0 leading-tight">
                 <div className="flex items-center gap-1.5">
-                  <span className="text-[11px] sm:text-xs font-black text-white group-hover:text-cyan-200 transition-colors truncate">
+                  <span className="text-[11px] font-black text-white group-hover:text-cyan-200 transition-colors truncate">
                     Automação Gemini
                   </span>
                   <span className="text-[8.5px] font-bold text-cyan-300 truncate">
                     · Voz &amp; Texto
                   </span>
                 </div>
-                <div className="text-[9.5px] sm:text-[10.5px] text-cyan-200/80 truncate">
+                <div className="text-[9.5px] text-cyan-200/80 truncate">
                   Comandos rápidos, histórico TXT e rateio
                 </div>
               </div>
               <div className="flex items-center gap-0.5 shrink-0 text-cyan-300">
-                <span className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-blue-500/20 flex items-center justify-center">
-                  <span className="material-symbols-outlined text-[13px] sm:text-[14px]">mic</span>
+                <span className="w-5 h-5 rounded-md bg-blue-500/20 flex items-center justify-center">
+                  <span className="material-symbols-outlined text-[12px] sm:text-[13px]">mic</span>
                 </span>
-                <span className="material-symbols-outlined text-slate-400 text-[16px] group-hover:text-white group-hover:translate-x-0.5 transition-all">
+                <span className="material-symbols-outlined text-slate-400 text-[15px] group-hover:text-white group-hover:translate-x-0.5 transition-all">
                   chevron_right
                 </span>
               </div>
@@ -165,12 +165,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/50 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/50 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">person_add</span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px]">person_add</span>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-emerald-200 transition-colors leading-tight truncate w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-emerald-200 transition-colors leading-tight truncate w-full">
                 Comprador
               </span>
             </div>
@@ -192,12 +192,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-blue-500/15 border border-white/10 hover:border-blue-500/50 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-blue-500/15 border border-white/10 hover:border-blue-500/50 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">add_shopping_cart</span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-blue-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px]">add_shopping_cart</span>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-blue-200 transition-colors leading-tight truncate w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-blue-200 transition-colors leading-tight truncate w-full">
                 Nova Compra
               </span>
             </div>
@@ -220,12 +220,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     try { playAppSound('click'); } catch {}
                   }
                 }}
-                className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-400/50 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-cyan-500/15 border border-white/10 hover:border-cyan-400/50 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
               >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-[16px] sm:text-[18px]">document_scanner</span>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-cyan-600 to-indigo-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px]">document_scanner</span>
                 </div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-cyan-200 transition-colors leading-tight truncate w-full">
+                <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-cyan-200 transition-colors leading-tight truncate w-full">
                   Escanear IA
                 </span>
               </div>
@@ -248,12 +248,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-rose-500/15 border border-white/10 hover:border-rose-500/40 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">picture_as_pdf</span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-rose-600 to-red-600 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px]">picture_as_pdf</span>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-rose-200 transition-colors leading-tight truncate w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-rose-200 transition-colors leading-tight truncate w-full">
                 PDFs &amp; TXT
               </span>
             </div>
@@ -275,12 +275,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   try { playAppSound('click'); } catch {}
                 }
               }}
-              className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/40 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+              className="p-1.5 rounded-xl bg-white/5 hover:bg-emerald-500/15 border border-white/10 hover:border-emerald-500/40 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
             >
-              <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                <span className="material-symbols-outlined text-[16px] sm:text-[18px]">account_balance_wallet</span>
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                <span className="material-symbols-outlined text-[15px] sm:text-[16px]">account_balance_wallet</span>
               </div>
-              <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-emerald-200 transition-colors leading-tight truncate w-full">
+              <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-emerald-200 transition-colors leading-tight truncate w-full">
                 Finanças
               </span>
             </div>
@@ -303,12 +303,12 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                     try { playAppSound('click'); } catch {}
                   }
                 }}
-                className="p-1.5 sm:p-2 rounded-xl bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-400/50 flex flex-col items-center justify-center text-center gap-1 transition-all cursor-pointer group active:scale-[0.97]"
+                className="p-1.5 rounded-xl bg-white/5 hover:bg-purple-600/20 border border-white/10 hover:border-purple-400/50 flex flex-col items-center justify-center text-center gap-0.5 transition-all cursor-pointer group active:scale-[0.97]"
               >
-                <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-purple-500/20 border border-purple-400/30 text-purple-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
-                  <span className="material-symbols-outlined text-[16px] sm:text-[18px] text-purple-300 font-bold">verified</span>
+                <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-lg bg-purple-500/20 border border-purple-400/30 text-purple-200 flex items-center justify-center shrink-0 shadow-2xs group-hover:scale-105 transition-transform">
+                  <span className="material-symbols-outlined text-[15px] sm:text-[16px] text-purple-300 font-bold">verified</span>
                 </div>
-                <span className="text-[10px] sm:text-[11px] font-bold text-white group-hover:text-purple-200 transition-colors leading-tight truncate w-full">
+                <span className="text-[9.5px] sm:text-[10.5px] font-bold text-white group-hover:text-purple-200 transition-colors leading-tight truncate w-full">
                   Autenticar
                 </span>
               </div>
@@ -325,10 +325,10 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                   onOpenControlPanel();
                   try { playAppSound('pop'); } catch {}
                 }}
-                className="flex-1 py-1 px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[10.5px] sm:text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+                className="flex-1 py-1 px-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-slate-300 hover:text-white text-[10px] sm:text-[11px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
                 title="Abrir Centro de Controle e Configurações"
               >
-                <span className="material-symbols-outlined text-[14px] text-cyan-400">tune</span>
+                <span className="material-symbols-outlined text-[13px] text-cyan-400">tune</span>
                 <span className="truncate">Painel &amp; Ajustes</span>
               </button>
             )}
@@ -340,38 +340,36 @@ export const BottomNav: React.FC<BottomNavProps> = ({
                 if (onLogout) onLogout();
                 try { playAppSound('whoosh'); } catch {}
               }}
-              className="flex-1 py-1 px-2 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-200 hover:text-white text-[10.5px] sm:text-xs font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
+              className="flex-1 py-1 px-2 rounded-lg bg-red-950/40 hover:bg-red-900/60 border border-red-500/30 text-red-200 hover:text-white text-[10px] sm:text-[11px] font-bold flex items-center justify-center gap-1 active:scale-95 transition-all cursor-pointer"
               title="Encerrar sessão com segurança"
             >
-              <span className="material-symbols-outlined text-[14px] text-red-400">logout</span>
+              <span className="material-symbols-outlined text-[13px] text-red-400">logout</span>
               <span className="truncate">Sair da Conta</span>
             </button>
           </div>
         </div>
       )}
 
-      {/* Barra de Navegação Fixa Inferior */}
-
+      {/* Barra de Navegação Fixa Inferior Compacta */}
       <nav
         aria-label="Navegação Principal do Rodapé"
-        className="fixed bottom-0 inset-x-0 z-[65] bg-white/85 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-4px_25px_rgba(15,23,42,0.09)] pb-safe transition-all"
+        className="fixed bottom-0 inset-x-0 z-[65] bg-white/90 backdrop-blur-xl border-t border-slate-200/60 shadow-[0_-2px_18px_rgba(15,23,42,0.08)] pb-safe transition-all"
       >
-        <div className="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex justify-between items-center h-16 px-3 sm:px-6">
+        <div className="w-full max-w-md sm:max-w-lg md:max-w-xl mx-auto flex justify-between items-center h-12 sm:h-13 px-2 sm:px-5">
           {/* 1. Dashboard */}
           <button
             type="button"
             onClick={() => handleTabClick('dashboard')}
             aria-label="Ir para o Dashboard"
-            className={`group flex flex-col items-center justify-center flex-1 h-full transition-all gap-1 cursor-pointer select-none ${
+            className={`group flex flex-col items-center justify-center flex-1 h-full transition-all gap-0.5 py-0.5 cursor-pointer select-none ${
               currentTab === 'dashboard'
-                ? 'text-blue-600 font-bold scale-102'
+                ? 'text-blue-600 font-bold'
                 : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
-            {/* Ícone Dashboard estilo painel com subdivisões igual ao print */}
             <div className="relative flex items-center justify-center">
               <svg
-                className={`w-6 h-6 transition-transform ${
+                className={`w-[18px] h-[18px] sm:w-5 sm:h-5 transition-transform ${
                   currentTab === 'dashboard' ? 'stroke-blue-600 fill-blue-50/50' : 'stroke-slate-500 group-hover:stroke-slate-700'
                 }`}
                 viewBox="0 0 24 24"
@@ -387,7 +385,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </svg>
             </div>
             <span
-              className={`text-[10px] sm:text-[11px] tracking-tight text-center leading-none ${
+              className={`text-[9.5px] sm:text-[10px] tracking-tight text-center leading-none ${
                 currentTab === 'dashboard' ? 'text-blue-600 font-extrabold' : 'text-slate-600'
               }`}
             >
@@ -395,8 +393,8 @@ export const BottomNav: React.FC<BottomNavProps> = ({
             </span>
           </button>
 
-          {/* 2. Botão Central Flutuante Azul (+) com menu de Ações Rápidas */}
-          <div className="flex items-center justify-center shrink-0 px-4 -mt-7 pointer-events-auto z-[75] relative">
+          {/* 2. Botão Central Flutuante Azul (+) Compacto com menu de Ações Rápidas */}
+          <div className="flex items-center justify-center shrink-0 px-2.5 -mt-4 sm:-mt-5 pointer-events-auto z-[75] relative">
             <button
               type="button"
               onClick={(e) => {
@@ -407,34 +405,33 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               }}
               aria-label={isMenuOpen ? "Fechar Menu de Ações Rápidas" : "Abrir Menu de Ações Rápidas"}
               aria-expanded={isMenuOpen}
-              className={`w-14 h-14 sm:w-16 sm:h-16 rounded-full text-white shadow-[0_8px_25px_rgba(37,99,235,0.55)] hover:shadow-[0_12px_32px_rgba(37,99,235,0.7)] flex items-center justify-center transition-all duration-200 cursor-pointer ring-4 outline-none pointer-events-auto active:scale-95 ${
+              className={`w-11 h-11 sm:w-12 sm:h-12 rounded-full text-white shadow-[0_6px_18px_rgba(37,99,235,0.5)] hover:shadow-[0_8px_24px_rgba(37,99,235,0.65)] flex items-center justify-center transition-all duration-200 cursor-pointer ring-2 sm:ring-3 outline-none pointer-events-auto active:scale-95 ${
                 isMenuOpen
-                  ? 'bg-rose-600 rotate-45 ring-rose-300 shadow-[0_8px_25px_rgba(225,29,72,0.6)]'
+                  ? 'bg-rose-600 rotate-45 ring-rose-300 shadow-[0_6px_18px_rgba(225,29,72,0.55)]'
                   : 'bg-gradient-to-tr from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 ring-white'
               }`}
               title="Ações Rápidas (+)"
             >
-              <span className="material-symbols-outlined text-[34px] sm:text-[36px] font-normal leading-none select-none transition-transform duration-200">
+              <span className="material-symbols-outlined text-[24px] sm:text-[26px] font-normal leading-none select-none transition-transform duration-200">
                 add
               </span>
             </button>
           </div>
 
-          {/* 5. Relatórios */}
+          {/* 3. Relatórios */}
           <button
             type="button"
             onClick={() => handleTabClick('relatorios')}
             aria-label="Ir para Relatórios"
-            className={`group flex flex-col items-center justify-center flex-1 h-full transition-all gap-1 cursor-pointer select-none ${
+            className={`group flex flex-col items-center justify-center flex-1 h-full transition-all gap-0.5 py-0.5 cursor-pointer select-none ${
               currentTab === 'relatorios'
-                ? 'text-blue-600 font-bold scale-102'
+                ? 'text-blue-600 font-bold'
                 : 'text-slate-500 hover:text-slate-800 font-semibold'
             }`}
           >
-            {/* Ícone Relatórios (três colunas verticais de gráfico) igual ao print */}
             <div className="relative flex items-center justify-center">
               <svg
-                className={`w-6 h-6 transition-transform ${
+                className={`w-[18px] h-[18px] sm:w-5 sm:h-5 transition-transform ${
                   currentTab === 'relatorios' ? 'stroke-blue-600 fill-blue-50/50' : 'stroke-slate-500 group-hover:stroke-slate-700'
                 }`}
                 viewBox="0 0 24 24"
@@ -449,7 +446,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
               </svg>
             </div>
             <span
-              className={`text-[10px] sm:text-[11px] tracking-tight text-center leading-none ${
+              className={`text-[9.5px] sm:text-[10px] tracking-tight text-center leading-none ${
                 currentTab === 'relatorios' ? 'text-blue-600 font-extrabold' : 'text-slate-600'
               }`}
             >
