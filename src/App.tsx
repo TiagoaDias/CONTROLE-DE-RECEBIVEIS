@@ -246,7 +246,7 @@ export default function App() {
   });
   const [deletingDebtorTarget, setDeletingDebtorTarget] = useState<Debtor | null>(null);
   const [deletingInstallmentTarget, setDeletingInstallmentTarget] = useState<Installment | null>(null);
-  const [userSettingsTab, setUserSettingsTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'lixeira'>('profile');
+  const [userSettingsTab, setUserSettingsTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira'>('profile');
 
   // Domain data in state - with robust LocalStorage persistence and fallback per user ID
   const [debtors, setDebtors] = useState<Debtor[]>(() => {
@@ -2764,14 +2764,14 @@ export default function App() {
       <main
         className={`flex-1 w-full relative ${
           currentTab === 'erp-legacy'
-            ? 'px-0 sm:px-2 lg:px-3 pt-14 sm:pt-16 pb-6 sm:pb-8'
+            ? 'px-0 sm:px-2 lg:px-3 pt-20 sm:pt-20 md:pt-16 pb-6 sm:pb-8'
             : currentTab === 'admin-forum'
-            ? 'px-1 sm:px-3 lg:px-4 pt-16 md:pt-20 pb-6'
+            ? 'px-1 sm:px-3 lg:px-4 pt-24 md:pt-20 pb-6'
             : currentTab === 'gemini-automacao'
-            ? 'px-1.5 sm:px-4 lg:px-6 pt-14 md:pt-16 pb-[4.25rem] sm:pb-20'
+            ? 'px-1.5 sm:px-4 lg:px-6 pt-20 md:pt-16 pb-[4.25rem] sm:pb-20'
             : isStackScreen
-            ? 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-20 md:pt-20 pb-36 sm:pb-28'
-            : 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-24 sm:pt-28 md:pt-20 pb-36 sm:pb-28'
+            ? 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-[6.75rem] md:pt-20 pb-36 sm:pb-28'
+            : 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-[7.75rem] sm:pt-32 md:pt-20 pb-36 sm:pb-28'
         }`}
       >
         <ErrorBoundary fallbackTitle="Visualização em Recuperação" onReset={() => handleNavigate('dashboard')}>
@@ -2898,6 +2898,10 @@ export default function App() {
         {currentTab === 'perfil' && (
           <PerfilView
             currentUser={currentUser}
+            debtors={debtors}
+            purchases={purchases}
+            installments={installments}
+            deletedDebtors={deletedDebtors}
             onNavigate={handleNavigate}
             onOpenAssetInspector={() => setIsAssetModalOpen(true)}
             onOpenLogin={() => setIsAuthOpen(true)}
@@ -3092,7 +3096,7 @@ export default function App() {
         onLoginSuccess={handleLoginSuccess}
       />
 
-      {/* User Settings Modal (Thiago Dias: Foto, E-mail, PIX, CEP, Endereço, Senha, Lixeira) */}
+      {/* User Settings Modal (Thiago Dias: Foto, E-mail, PIX, CEP, Endereço, Senha, Backup JSON, Lixeira) */}
       {currentUser && (
         <UserSettingsModal
           isOpen={isUserSettingsOpen}
@@ -3107,6 +3111,9 @@ export default function App() {
             handleLogout();
           }}
           onToast={showToast}
+          debtors={debtors}
+          purchases={purchases}
+          installments={installments}
           deletedDebtors={deletedDebtors}
           onRestoreDebtor={handleRestoreDebtor}
           onPermanentDeleteDebtor={handlePermanentDeleteDebtor}

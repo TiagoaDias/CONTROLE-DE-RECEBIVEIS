@@ -233,10 +233,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   // Devedor ativo garantido para o modal detalhado (enraizado ou consolidado)
   const activeModalDebtor = useMemo(() => {
     if (selectedPrimaryDebtor) return selectedPrimaryDebtor;
-    if (debtors.length > 0) return debtors[0];
     return {
       id: 'general',
-      name: 'Consolidado Geral',
+      name: 'Todos os Clientes (Consolidado)',
       phone: '',
       totalOwed: totalOpenAmount,
       totalPaid: totalPaidAmount,
@@ -246,7 +245,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       overdueCount: overdueInstallments.length,
       createdAt: new Date().toISOString(),
     } as unknown as Debtor;
-  }, [selectedPrimaryDebtor, debtors, totalOpenAmount, totalPaidAmount, purchases.length, overdueInstallments.length]);
+  }, [selectedPrimaryDebtor, totalOpenAmount, totalPaidAmount, purchases.length, overdueInstallments.length]);
 
   return (
     <>
@@ -549,9 +548,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           userPixKey={userPixKey}
           onRequestDeleteDebtor={onRequestDeleteDebtor}
         />
+      </div>
 
-        {/* MODAL DE DETALHES DE KPIS ENRAIZADO NO DEVEDOR ATIVO */}
-        <DebtorKpiDetailModal
+      {/* MODAL DE DETALHES DE KPIS ENRAIZADO NO DEVEDOR ATIVO */}
+      <DebtorKpiDetailModal
           isOpen={activeKpiModal !== null}
           onClose={() => setActiveKpiModal(null)}
           type={activeKpiModal || 'open'}
@@ -798,7 +798,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
         )}
-      </div>
     </>
   );
 };

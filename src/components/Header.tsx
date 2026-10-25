@@ -174,7 +174,7 @@ export const Header: React.FC<HeaderProps> = ({
   // Stack Header for sub-screens (Detalhe Parcela, Detalhe Atraso)
   if (isStackScreen) {
     return (
-      <header className={`fixed top-0 inset-x-0 z-40 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b transition-colors ${
+      <header className={`fixed top-0 inset-x-0 z-40 pt-[max(env(safe-area-inset-top,0px),26px)] md:pt-0 backdrop-blur-xl shadow-[0_1px_8px_rgba(0,0,0,0.03)] border-b transition-colors ${
         isDarkMode ? 'bg-slate-900/95 border-slate-800 text-white' : 'bg-white/95 border-slate-100 text-slate-900'
       }`}>
         <div className="h-16 w-full px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12 flex items-center justify-between">
@@ -222,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
 
   // Main Header with responsive desktop expansion & mobile optimization
   return (
-    <header className={`fixed top-0 inset-x-0 z-40 backdrop-blur-xl shadow-xs border-b transition-colors ${
+    <header className={`fixed top-0 inset-x-0 z-40 pt-[max(env(safe-area-inset-top,0px),26px)] md:pt-0 backdrop-blur-xl shadow-xs border-b transition-colors ${
       isDarkMode ? 'bg-slate-900/90 border-slate-800 text-slate-100' : 'bg-white/80 border-slate-200/60 text-slate-900'
     }`}>
       <div className="w-full px-3 sm:px-6 lg:px-8 xl:px-10 2xl:px-12">

@@ -1,11 +1,20 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenTab, UserAccount } from '../types';
+import { ScreenTab, UserAccount, Debtor, Purchase, Installment } from '../types';
 import { APP_IMAGES } from '../data/mockData';
 import { HaspahoLogo } from './HaspahoLogo';
 import { ImageCropperModal } from './ImageCropperModal';
+import {
+  exportFullDataBackupJson,
+  getLastBackupMetadata,
+  FullBackupMetadata,
+} from '../utils/backupHelper';
 
 interface PerfilViewProps {
   currentUser: UserAccount | null;
+  debtors?: Debtor[];
+  purchases?: Purchase[];
+  installments?: Installment[];
+  deletedDebtors?: Debtor[];
   onNavigate: (tab: ScreenTab) => void;
   onOpenAssetInspector: () => void;
   onOpenLogin: () => void;
@@ -19,6 +28,10 @@ interface PerfilViewProps {
 
 export const PerfilView: React.FC<PerfilViewProps> = ({
   currentUser,
+  debtors = [],
+  purchases = [],
+  installments = [],
+  deletedDebtors = [],
   onNavigate,
   onOpenAssetInspector,
   onOpenLogin,
@@ -32,6 +45,23 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
   const [pixKey, setPixKey] = useState(
     currentUser?.pixKey || '(14) 99733-9863'
   );
+  const [lastBackupMeta, setLastBackupMeta] = useState<FullBackupMetadata | null>(() =>
+    getLastBackupMetadata(currentUser?.id)
+  );
+
+  const handleExportBackupJson = () => {
+    const meta = exportFullDataBackupJson({
+      currentUser,
+      debtors,
+      purchases,
+      installments,
+      deletedDebtors,
+    });
+    setLastBackupMeta(meta);
+    onToast(
+      `✅ Backup JSON exportado com sucesso (${meta.debtorsCount} devedores, ${meta.purchasesCount} compras, ${meta.installmentsCount} parcelas)!`
+    );
+  };
   const [notifyWhatsapp, setNotifyWhatsapp] = useState(true);
   const [notifyInvoiceClose, setNotifyInvoiceClose] = useState(true);
   const [autoPenalty, setAutoPenalty] = useState(true);
@@ -176,6 +206,16 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
 
 
 
+          <button
+            type="button"
+            onClick={handleExportBackupJson}
+            className="px-3.5 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer border border-emerald-200"
+            title="Exportar backup completo de devedores, compras e parcelas em formato JSON para o dispositivo"
+          >
+            <span className="material-symbols-outlined text-[16px]">cloud_download</span>
+            <span>Exportar Backup (.JSON)</span>
+          </button>
+
           {onClearAllData && (
             <button
               type="button"
@@ -196,6 +236,44 @@ export const PerfilView: React.FC<PerfilViewProps> = ({
           >
             <span className="material-symbols-outlined text-[16px]">logout</span>
             <span>Sair</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Backup Completo em JSON (Redundância Local além do Firebase) */}
+      <div className="bg-gradient-to-r from-emerald-50/90 via-white to-teal-50/80 border border-emerald-200/90 rounded-2xl p-4 shadow-xs flex flex-col gap-3">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2.5">
+          <div className="flex items-start gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <span className="material-symbols-outlined text-[20px]">database</span>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="text-xs sm:text-sm font-black text-slate-900">
+                  Backup Completo de Dados (.JSON)
+                </h3>
+                <span className="text-[9px] font-extrabold uppercase bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-300">
+                  Redundância Local + Firebase
+                </span>
+              </div>
+              <p className="text-[11px] text-slate-600 mt-0.5">
+                Salve uma cópia de segurança com todos os devedores ({debtors.length}), compras ({purchases.length}) e parcelas ({installments.length}) no armazenamento local do aparelho.
+              </p>
+              {lastBackupMeta && (
+                <p className="text-[10px] font-bold text-emerald-700 mt-1">
+                  ✓ Último backup: {lastBackupMeta.exportedAtFormatted} ({lastBackupMeta.fileName})
+                </p>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportBackupJson}
+            className="w-full sm:w-auto h-10 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white rounded-xl font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all cursor-pointer shrink-0"
+          >
+            <span className="material-symbols-outlined text-[18px]">download_for_offline</span>
+            <span>Baixar Backup JSON</span>
           </button>
         </div>
       </div>

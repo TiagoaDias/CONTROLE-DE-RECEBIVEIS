@@ -115,10 +115,32 @@ export function applyAppIconThemeWithFeedback(
   }
 }
 
-// Inicializa no carregamento do script
+// Inicializa no carregamento do script e remove lixo acumulado de caches/logs antigos
 if (typeof window !== 'undefined') {
   try {
     const current = getStoredAppIconTheme();
     applyAppIconTheme(current);
+
+    // Limpeza automática de lixo de armazenamento (logs excessivos e caches obsoletos de versões anteriores)
+    const rawLogs = localStorage.getItem('haspaho_audit_logs');
+    if (rawLogs && rawLogs.length > 8000) {
+      try {
+        const parsed = JSON.parse(rawLogs);
+        if (Array.isArray(parsed) && parsed.length > 25) {
+          localStorage.setItem('haspaho_audit_logs', JSON.stringify(parsed.slice(0, 25)));
+        }
+      } catch {
+        localStorage.removeItem('haspaho_audit_logs');
+      }
+    }
+
+    if ('caches' in window) {
+      window.caches.keys().then((keys) => {
+        keys.forEach((key) => {
+          window.caches.delete(key).catch(() => {});
+        });
+      }).catch(() => {});
+    }
   } catch {}
 }
+

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { UserAccount, Debtor } from '../types';
+import { UserAccount, Debtor, Purchase, Installment } from '../types';
 import { HaspahoLogo } from './HaspahoLogo';
 import { WhatsAppIcon } from './WhatsAppIcon';
 import { systemHealthSentinel, SystemHealthReport } from '../utils/systemHealthSentinel';
@@ -11,6 +11,11 @@ import {
   APP_ICON_OPTIONS,
   AppIconTheme,
 } from '../utils/appIconHelper';
+import {
+  exportFullDataBackupJson,
+  getLastBackupMetadata,
+  FullBackupMetadata,
+} from '../utils/backupHelper';
 
 interface UserSettingsModalProps {
   isOpen: boolean;
@@ -19,10 +24,13 @@ interface UserSettingsModalProps {
   onSaveUser: (updatedUser: UserAccount) => void;
   onLogout: () => void;
   onToast: (msg: string) => void;
+  debtors?: Debtor[];
+  purchases?: Purchase[];
+  installments?: Installment[];
   deletedDebtors?: Debtor[];
   onRestoreDebtor?: (debtorId: string) => void;
   onPermanentDeleteDebtor?: (debtorId: string) => void;
-  initialTab?: 'profile' | 'address' | 'pix' | 'security' | 'suporte' | 'lixeira';
+  initialTab?: 'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira';
 }
 
 export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
@@ -32,6 +40,9 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   onSaveUser,
   onLogout,
   onToast,
+  debtors = [],
+  purchases = [],
+  installments = [],
   deletedDebtors = [],
   onRestoreDebtor,
   onPermanentDeleteDebtor,
@@ -62,7 +73,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'suporte' | 'lixeira'>(
+  const [activeTab, setActiveTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira'>(
     initialTab || 'profile'
   );
 
@@ -70,6 +81,23 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [isRunningDiagnostic, setIsRunningDiagnostic] = useState(false);
   const [isCapturingSupportPrint, setIsCapturingSupportPrint] = useState(false);
   const [iconTheme, setIconTheme] = useState<AppIconTheme>(getStoredAppIconTheme());
+  const [lastBackupMeta, setLastBackupMeta] = useState<FullBackupMetadata | null>(() =>
+    getLastBackupMetadata(currentUser?.id)
+  );
+
+  const handleExportBackupJson = () => {
+    const meta = exportFullDataBackupJson({
+      currentUser,
+      debtors,
+      purchases,
+      installments,
+      deletedDebtors,
+    });
+    setLastBackupMeta(meta);
+    onToast(
+      `✅ Backup JSON exportado com sucesso (${meta.debtorsCount} devedores, ${meta.purchasesCount} compras, ${meta.installmentsCount} parcelas)!`
+    );
+  };
 
   // Sincroniza o formulário sempre que o modal abre ou o usuário ativo muda
   useEffect(() => {
@@ -263,8 +291,9 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
             { id: 'profile', label: 'Dados Pessoais & Foto', shortLabel: 'Perfil & Foto', icon: 'person' },
             { id: 'pix', label: 'Chave PIX de Recebimento', shortLabel: 'Chave PIX', icon: 'qr_code_2' },
             { id: 'address', label: 'Endereço & CEP', shortLabel: 'Endereço & CEP', icon: 'home_pin' },
+            { id: 'backup', label: 'Backup Local (JSON)', shortLabel: 'Backup JSON', icon: 'cloud_download', highlight: true },
             { id: 'security', label: 'Segurança & Senha', shortLabel: 'Segurança', icon: 'shield_lock' },
-            { id: 'suporte', label: 'Sentinela & Suporte Full Stack', shortLabel: 'Suporte (Zap)', icon: 'health_and_safety', highlight: true },
+            { id: 'suporte', label: 'Sentinela & Suporte Full Stack', shortLabel: 'Suporte (Zap)', icon: 'health_and_safety' },
             { id: 'lixeira', label: `🗑️ Lixeira (${deletedDebtors.length})`, shortLabel: `🗑️ Lixeira (${deletedDebtors.length})`, icon: 'delete_sweep' },
           ].map((tab) => (
             <button
@@ -820,6 +849,27 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                 </div>
               </div>
 
+              {/* Quick Backup Redundancy Shortcut inside Security */}
+              <div className="p-4 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50/70 border border-emerald-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-extrabold text-emerald-950 flex items-center gap-1.5">
+                    <span className="material-symbols-outlined text-[18px] text-emerald-600">database</span>
+                    <span>Backup de Redundância Local (Formato JSON)</span>
+                  </h4>
+                  <p className="text-[11px] text-emerald-800">
+                    Exporte devedores ({debtors.length}), compras ({purchases.length}) e parcelas ({installments.length}) para o armazenamento do dispositivo.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handleExportBackupJson}
+                  className="px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer shrink-0"
+                >
+                  <span className="material-symbols-outlined text-[17px]">download</span>
+                  <span>Exportar JSON</span>
+                </button>
+              </div>
+
               {/* Logout Action Inside Security */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
                 <div>
@@ -839,6 +889,106 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                   <span className="material-symbols-outlined text-[17px]">logout</span>
                   <span>Sair da Conta</span>
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* TAB: BACKUP COMPLETO EM JSON (ARMAZENAMENTO LOCAL & REDUNDÂNCIA ALÉM DO FIREBASE) */}
+          {activeTab === 'backup' && (
+            <div className="space-y-4">
+              <div className="bg-gradient-to-br from-emerald-50 via-white to-teal-50/60 border-2 border-emerald-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                  <div className="flex items-start gap-3">
+                    <div className="w-11 h-11 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shadow-md shrink-0">
+                      <span className="material-symbols-outlined text-[24px]">cloud_download</span>
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <h3 className="text-sm sm:text-base font-black text-slate-900">
+                          Backup Completo em JSON (Armazenamento Local)
+                        </h3>
+                        <span className="text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300">
+                          Redundância Dupla • Offline + Firebase
+                        </span>
+                      </div>
+                      <p className="text-xs text-slate-600 mt-1 leading-relaxed">
+                        Exporte uma cópia integral e estruturada de todos os seus dados (<strong>devedores, compras e parcelas</strong>) diretamente para a memória do seu dispositivo em formato <code>.json</code>, garantindo proteção extra além da nuvem Firebase.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Resumo quantitativo dos registros incluídos no pacote JSON */}
+                <div className="grid grid-cols-3 gap-2.5 sm:gap-3">
+                  <div className="bg-white border border-slate-200/90 rounded-xl p-3 text-center shadow-2xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">
+                      Devedores
+                    </span>
+                    <span className="text-lg sm:text-xl font-black text-slate-900 mt-0.5 block">
+                      {debtors.length}
+                    </span>
+                    <span className="text-[10px] text-emerald-700 font-semibold">
+                      Cadastros ativos
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/90 rounded-xl p-3 text-center shadow-2xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">
+                      Compras
+                    </span>
+                    <span className="text-lg sm:text-xl font-black text-blue-700 mt-0.5 block">
+                      {purchases.length}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      Contratos & vendas
+                    </span>
+                  </div>
+
+                  <div className="bg-white border border-slate-200/90 rounded-xl p-3 text-center shadow-2xs">
+                    <span className="text-[10px] font-extrabold uppercase text-slate-400 block tracking-wider">
+                      Parcelas
+                    </span>
+                    <span className="text-lg sm:text-xl font-black text-indigo-700 mt-0.5 block">
+                      {installments.length}
+                    </span>
+                    <span className="text-[10px] text-slate-500 font-semibold">
+                      Abertas e quitadas
+                    </span>
+                  </div>
+                </div>
+
+                {/* Informação do último backup realizado neste dispositivo */}
+                {lastBackupMeta && (
+                  <div className="p-3 rounded-xl bg-white/90 border border-emerald-200 flex items-center justify-between gap-2 text-xs">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <span className="material-symbols-outlined text-emerald-600 text-[18px] shrink-0">
+                        check_circle
+                      </span>
+                      <div className="truncate">
+                        <span className="font-bold text-slate-800">Último backup local: </span>
+                        <span className="text-slate-600">{lastBackupMeta.exportedAtFormatted}</span>
+                        <span className="text-[10px] text-slate-400 block truncate">
+                          Arquivo: {lastBackupMeta.fileName} ({(lastBackupMeta.sizeBytes / 1024).toFixed(1)} KB)
+                        </span>
+                      </div>
+                    </div>
+                    <span className="text-[10px] font-extrabold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200 shrink-0">
+                      Verificado
+                    </span>
+                  </div>
+                )}
+
+                {/* Botão principal de exportação imediata */}
+                <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                  <button
+                    type="button"
+                    onClick={handleExportBackupJson}
+                    className="flex-1 h-12 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                  >
+                    <span className="material-symbols-outlined text-[20px]">download_for_offline</span>
+                    <span>Baixar Backup Completo (.JSON) no Dispositivo</span>
+                  </button>
+                </div>
               </div>
             </div>
           )}

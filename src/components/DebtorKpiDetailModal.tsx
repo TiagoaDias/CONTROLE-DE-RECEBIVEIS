@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Debtor, Installment } from '../types';
 import { SafeDebtorAvatar } from './DebtorsMasterSpreadsheet';
 import { safeToFixed } from '../utils/numberUtils';
@@ -244,16 +245,16 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
   // RETORNO CONDICIONAL SEGURO APÓS A EXECUÇÃO DE TODOS OS HOOKS
   if (!isOpen || !debtor) return null;
 
-  return (
+  const modalContent = (
     <div
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-[450] flex items-center justify-center p-2.5 sm:p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
+      className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center pt-10 sm:pt-4 px-2 sm:px-4 pb-3 bg-slate-950/75 backdrop-blur-md animate-in fade-in duration-200 overflow-y-auto"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className={`w-full max-w-2xl bg-white border-2 ${config.borderHighlight} ring-2 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.3)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col text-slate-800 animate-in zoom-in-95 duration-200 max-h-[85dvh] sm:max-h-[88vh] my-auto`}
+        className={`w-full max-w-2xl bg-white border-2 ${config.borderHighlight} ring-2 ring-cyan-400/40 shadow-[0_0_40px_rgba(6,182,212,0.3)] rounded-2xl sm:rounded-3xl overflow-hidden flex flex-col text-slate-800 animate-in zoom-in-95 duration-200 max-h-[85vh] sm:max-h-[88vh] sm:my-auto`}
       >
         {/* ============================================================ */}
         {/* CABEÇALHO COMPACTO E REENQUADRADO                            */}
@@ -636,4 +637,9 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
       </div>
     </div>
   );
+
+  if (typeof document !== 'undefined') {
+    return createPortal(modalContent, document.body);
+  }
+  return modalContent;
 };

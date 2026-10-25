@@ -80,7 +80,7 @@ export const addAuditLog = (
     hash: generateLogHash(rawStr),
   };
 
-  const updatedLogs = [newEntry, ...logs].slice(0, 200); // keep last 200 logs
+  const updatedLogs = [newEntry, ...logs].slice(0, 25); // keep last 25 lightweight logs
   try {
     localStorage.setItem('haspaho_audit_logs', JSON.stringify(updatedLogs));
     window.dispatchEvent(new Event('haspaho-audit-log-updated'));
