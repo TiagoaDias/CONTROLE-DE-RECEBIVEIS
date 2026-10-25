@@ -2767,6 +2767,8 @@ export default function App() {
             ? 'px-0 sm:px-2 lg:px-3 pt-14 sm:pt-16 pb-6 sm:pb-8'
             : currentTab === 'admin-forum'
             ? 'px-1 sm:px-3 lg:px-4 pt-16 md:pt-20 pb-6'
+            : currentTab === 'gemini-automacao'
+            ? 'px-1.5 sm:px-4 lg:px-6 pt-14 md:pt-16 pb-[4.25rem] sm:pb-20'
             : isStackScreen
             ? 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-20 md:pt-20 pb-36 sm:pb-28'
             : 'px-1 sm:px-4 lg:px-8 xl:px-10 2xl:px-12 pt-24 sm:pt-28 md:pt-20 pb-36 sm:pb-28'
