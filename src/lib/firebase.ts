@@ -31,6 +31,8 @@ import {
   writeBatch,
   setLogLevel,
   disableNetwork,
+  enableNetwork,
+  onSnapshot,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserAccount, Debtor, Purchase, Installment } from '../types';
@@ -961,18 +963,11 @@ export function removeSafeLocalStorage(key: string): void {
   } catch {}
 }
 
-// Inicia como false para permitir sincronização e salvamento em nuvem
+// Inicia sempre como false e garante que a rede do Firestore esteja habilitada na inicialização
 let firestoreQuotaExhausted = false;
 try {
-  const raw = getSafeLocalStorage(QUOTA_STORAGE_KEY);
-  if (raw) {
-    const parsed = JSON.parse(raw);
-    const today = new Date().toISOString().slice(0, 10);
-    if (parsed.exhausted && parsed.date === today) {
-      firestoreQuotaExhausted = true;
-      disableNetwork(db).catch(() => {});
-    }
-  }
+  removeSafeLocalStorage(QUOTA_STORAGE_KEY);
+  enableNetwork(db).catch(() => {});
 } catch {}
 
 export function isFirestoreQuotaExhausted(): boolean {
@@ -982,13 +977,9 @@ export function isFirestoreQuotaExhausted(): boolean {
 export function setFirestoreQuotaExhausted(val: boolean): void {
   firestoreQuotaExhausted = val;
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    if (val) {
-      removeSafeLocalStorage('haspaho_force_enable_firestore_writes');
-      setSafeLocalStorage(QUOTA_STORAGE_KEY, JSON.stringify({ exhausted: true, date: today }));
-      disableNetwork(db).catch(() => {});
-    } else {
+    if (!val) {
       removeSafeLocalStorage(QUOTA_STORAGE_KEY);
+      enableNetwork(db).catch(() => {});
     }
   } catch {}
 }
@@ -1538,20 +1529,116 @@ export async function sendFirebasePasswordReset(email: string): Promise<void> {
 }
 
 /**
- * Real Google OAuth authentication via Firebase Popup
+ * Resolve o ID canônico unificado do usuário para garantir que tanto o navegador Web
+ * quanto o aplicativo instalado (PWA / Android APK) leiam e gravem exatamente no mesmo
+ * caminho do Firestore, independentemente do método de login (Google OAuth, Credential Manager ou Gmail Direto).
+ */
+export function resolveCanonicalUserId(userId?: string, emailHint?: string): string {
+  let detectedEmail = (emailHint || auth.currentUser?.email || '').trim().toLowerCase();
+  if (!detectedEmail) {
+    try {
+      const rawAuth = getSafeLocalStorage('haspaho_auth_user');
+      if (rawAuth) {
+        const parsed = JSON.parse(rawAuth);
+        if (parsed?.email) {
+          detectedEmail = String(parsed.email).trim().toLowerCase();
+        }
+      }
+    } catch {}
+  }
+
+  const rawId = (userId || '').trim();
+  const isMaster =
+    detectedEmail === 'tiagodias8888@gmail.com' ||
+    rawId === 'usr_thiago_dias' ||
+    rawId === 'usr_google_tiagodias8888_gmail_com' ||
+    rawId.toLowerCase().includes('tiagodias8888');
+
+  if (isMaster) {
+    return TIAGO_DIAS_USER.id; // 'usr_thiago_dias'
+  }
+
+  if (detectedEmail && (detectedEmail.endsWith('@gmail.com') || detectedEmail.endsWith('@googlemail.com'))) {
+    return `usr_google_${detectedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  }
+
+  return rawId || auth.currentUser?.uid || TIAGO_DIAS_USER.id;
+}
+
+// Cache em memória de IDs secundários descobertos no Firestore para o mesmo e-mail
+const discoveredEmailUidsCache = new Map<string, string[]>();
+
+/**
+ * Retorna todos os IDs candidatos nos quais os dados do usuário podem ter sido gravados
+ * (ex: ID canônico 'usr_thiago_dias', UID do Firebase Auth de um login Google anterior, etc.)
+ */
+export async function getCandidateUserIds(userId: string, emailHint?: string): Promise<string[]> {
+  const candidates = new Set<string>();
+  const canonical = resolveCanonicalUserId(userId, emailHint);
+  if (canonical) candidates.add(canonical);
+  if (userId && userId.trim()) candidates.add(userId.trim());
+  if (auth.currentUser?.uid) candidates.add(auth.currentUser.uid);
+
+  let detectedEmail = (emailHint || auth.currentUser?.email || '').trim().toLowerCase();
+  if (!detectedEmail) {
+    try {
+      const rawAuth = getSafeLocalStorage('haspaho_auth_user');
+      if (rawAuth) {
+        const parsed = JSON.parse(rawAuth);
+        if (parsed?.email) {
+          detectedEmail = String(parsed.email).trim().toLowerCase();
+        }
+      }
+    } catch {}
+  }
+
+  if (canonical === TIAGO_DIAS_USER.id || detectedEmail === 'tiagodias8888@gmail.com') {
+    candidates.add('usr_thiago_dias');
+    candidates.add('usr_google_tiagodias8888_gmail_com');
+    detectedEmail = 'tiagodias8888@gmail.com';
+  }
+
+  if (detectedEmail) {
+    candidates.add(`usr_google_${detectedEmail.replace(/[^a-zA-Z0-9]/g, '_')}`);
+    const cached = discoveredEmailUidsCache.get(detectedEmail);
+    if (cached) {
+      cached.forEach((id) => candidates.add(id));
+    } else if (!isFirestoreQuotaExhausted()) {
+      try {
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const matchedUids: string[] = [];
+        usersSnap.docs.forEach((docSnap) => {
+          const data = docSnap.data();
+          const docEmail = String(data?.email || '').trim().toLowerCase();
+          if (docEmail && docEmail === detectedEmail) {
+            matchedUids.push(docSnap.id);
+            if (data?.id) matchedUids.push(String(data.id));
+          }
+        });
+        discoveredEmailUidsCache.set(detectedEmail, matchedUids);
+        matchedUids.forEach((id) => candidates.add(id));
+      } catch {}
+    }
+  }
+
+  return Array.from(candidates).filter(Boolean);
+}
+
+/**
+ * Real Google OAuth authentication via Firebase Popup / Native
  */
 export async function processFirebaseUserResult(fbUser: any): Promise<UserAccount> {
   const email = (fbUser.email || '').toLowerCase();
   const isMaster = email === 'tiagodias8888@gmail.com';
-  const userId = fbUser.uid || 'user-google-' + Date.now();
+  const canonicalId = resolveCanonicalUserId(fbUser.uid, email);
 
   if (isMaster) {
-    const remote = await getUserFromFirestore(userId).catch(() => null);
+    const remote = await getUserFromFirestore(canonicalId).catch(() => null);
     const hasSeen = remote ? (remote.hasSeenWelcome ?? true) : true;
     const user: UserAccount = {
       ...TIAGO_DIAS_USER,
       ...remote,
-      id: userId,
+      id: canonicalId,
       email,
       name: fbUser.displayName || remote?.name || TIAGO_DIAS_USER.name,
       avatar: fbUser.photoURL || remote?.avatar || TIAGO_DIAS_USER.avatar,
@@ -1568,18 +1655,18 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
     return user;
   }
 
-  const existingUser = await getUserFromFirestore(userId).catch(() => null);
+  const existingUser = await getUserFromFirestore(canonicalId).catch(() => null);
   if (existingUser) {
     return {
       ...existingUser,
-      id: userId,
+      id: canonicalId,
       isFirstLogin: false,
       hasSeenWelcome: existingUser.hasSeenWelcome ?? true,
     };
   }
 
   const newUser: UserAccount = {
-    id: userId,
+    id: canonicalId,
     name: fbUser.displayName || email.split('@')[0] || 'Usuário Google',
     username: email.split('@')[0] || 'usuario',
     email: email || 'usuario.google@exemplo.com',
@@ -1603,10 +1690,6 @@ export async function processFirebaseUserResult(fbUser: any): Promise<UserAccoun
 }
 
 // =========================================================================
-// AUTHENTICATION & SECURITY (Centralized in authService.ts)
-// =========================================================================
-
-// =========================================================================
 // USER PROFILE FIRESTORE OPERATIONS
 // =========================================================================
 
@@ -1615,23 +1698,24 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
     console.warn('[Firestore:SAVE_USER] Aborted: user or user.id is invalid.', user);
     return;
   }
-  if (!auth.currentUser) {
-    console.log('[Firestore:SAVE_USER] Nenhuma sessão ativa do Firebase Auth. Perfil persistido localmente.');
-    return;
-  }
   if (isFirestoreQuotaExhausted()) {
     return;
   }
-  const path = `users/${user.id}`;
+  const canonicalId = resolveCanonicalUserId(user.id, user.email);
+  const path = `users/${canonicalId}`;
   try {
-    const userRef = doc(db, 'users', user.id);
+    const userRef = doc(db, 'users', canonicalId);
     const cleaned = cleanFirestoreObject({
       ...user,
+      id: canonicalId,
       updatedAt: new Date().toISOString(),
     });
-    console.log(`[Firestore:SAVE_USER] Sending user profile to ${path}:`, { id: user.id, email: user.email, name: user.name });
+    console.log(`[Firestore:SAVE_USER] Sending user profile to ${path}:`, { id: canonicalId, email: user.email, name: user.name });
     await setDoc(userRef, cleaned, { merge: true });
-    console.log(`[Firestore:SAVE_USER] Success: User ${user.id} persisted to Firestore.`);
+    if (user.id && user.id !== canonicalId) {
+      await setDoc(doc(db, 'users', user.id), cleaned, { merge: true }).catch(() => {});
+    }
+    console.log(`[Firestore:SAVE_USER] Success: User ${canonicalId} persisted to Firestore.`);
   } catch (err: any) {
     if (err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       console.warn(`[Firestore:SAVE_USER] Permissão negada ao salvar ${path}. Perfil mantido localmente.`);
@@ -1642,22 +1726,19 @@ export async function saveUserToFirestore(user: UserAccount): Promise<void> {
       console.warn(`[Firestore:SAVE_USER] Quota atingida ou modo offline. Perfil mantido seguro no LocalStorage.`);
       return;
     }
-    console.error(`[Firestore:SAVE_USER_ERROR] Failed to save user ${user.id}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
+    console.error(`[Firestore:SAVE_USER_ERROR] Failed to save user ${canonicalId}:`, err);
   }
 }
 
 /**
  * Marks the welcome presentation as completed for the authenticated user in Firebase Firestore.
- * Ensures the presentation is never displayed again on subsequent logins or page refreshes.
  */
 export async function markWelcomeCompletedInFirestore(userId: string): Promise<void> {
   if (!userId) return;
-  if (!auth.currentUser) return;
   if (isFirestoreQuotaExhausted()) return;
-  const path = `users/${userId}`;
+  const canonicalId = resolveCanonicalUserId(userId);
   try {
-    const userRef = doc(db, 'users', userId);
+    const userRef = doc(db, 'users', canonicalId);
     await setDoc(
       userRef,
       cleanFirestoreObject({
@@ -1668,47 +1749,41 @@ export async function markWelcomeCompletedInFirestore(userId: string): Promise<v
       }),
       { merge: true }
     );
-    console.log(`[Firestore:MARK_WELCOME] User ${userId} successfully marked as completed welcome presentation.`);
+    console.log(`[Firestore:MARK_WELCOME] User ${canonicalId} successfully marked as completed welcome presentation.`);
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
       return;
     }
-    console.warn(`[Firestore:MARK_WELCOME] Note marking welcome for ${userId}:`, err);
+    console.warn(`[Firestore:MARK_WELCOME] Note marking welcome for ${canonicalId}:`, err);
   }
 }
 
 export async function getUserFromFirestore(userId: string): Promise<UserAccount | null> {
   if (!userId) return null;
-  // If there is no active Firebase Auth session, skip remote Firestore read to prevent permission errors
-  if (!auth.currentUser) {
-    console.log(`[Firestore:GET_USER] Sem sessão ativa do Firebase Auth para ${userId}. Operando com dados locais.`);
-    return null;
-  }
-  const path = `users/${userId}`;
+  const candidateIds = await getCandidateUserIds(userId);
+  const canonicalId = resolveCanonicalUserId(userId);
   try {
-    const userRef = doc(db, 'users', userId);
-    console.log(`[Firestore:GET_USER] Reading user profile from ${path}...`);
-    const snap = await getDoc(userRef);
-    if (snap.exists()) {
-      const data = snap.data() as UserAccount;
-      console.log(`[Firestore:GET_USER] Found user ${userId}:`, data.name || data.email);
-      return data;
+    for (const cid of candidateIds) {
+      const userRef = doc(db, 'users', cid);
+      const snap = await getDoc(userRef);
+      if (snap.exists()) {
+        const data = snap.data() as UserAccount;
+        console.log(`[Firestore:GET_USER] Found user ${cid}:`, data.name || data.email);
+        return { ...data, id: canonicalId };
+      }
     }
-    console.log(`[Firestore:GET_USER] User ${userId} does not exist in Firestore.`);
     return null;
   } catch (err: any) {
     if (err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
-      console.warn(`[Firestore:GET_USER] Permissão não concedida para ler ${path}. Usando perfil local com segurança.`);
+      console.warn(`[Firestore:GET_USER] Permissão não concedida. Usando perfil local com segurança.`);
       return null;
     }
     if (isQuotaError(err) || isOfflineOrNetworkError(err)) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:GET_USER] Operando em modo offline para ${userId}. Usando dados locais.`);
       return null;
     }
-    console.error(`[Firestore:GET_USER_ERROR] Failed reading user ${userId}:`, err);
-    handleFirestoreError(err, OperationType.GET, path);
+    console.warn(`[Firestore:GET_USER_ERROR] Note reading user ${userId}:`, err);
     return null;
   }
 }
@@ -1747,11 +1822,8 @@ export async function saveDebtorsToFirestore(userId: string, debtors: Debtor[]):
   if (isFirestoreQuotaExhausted()) {
     return;
   }
-  if (!auth.currentUser) {
-    console.log('[Firestore:SAVE_DEBTORS] Nenhuma sessão ativa do Firebase Auth. Dados persistidos localmente.');
-    return;
-  }
-  const path = `users/${userId}/debtors`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/debtors`;
   console.log(`[Firestore:SAVE_DEBTORS] Received ${debtors?.length || 0} debtors for path: ${path}`);
   try {
     const safeDebtors = Array.isArray(debtors) ? debtors : [];
@@ -1767,8 +1839,8 @@ export async function saveDebtorsToFirestore(userId: string, debtors: Debtor[]):
       const batch = writeBatch(db);
       for (const d of chunk) {
         if (!d || !d.id) continue;
-        const docRef = doc(db, 'users', userId, 'debtors', d.id);
-        const cleaned = cleanFirestoreObject({ ...d, userId, updatedAt: new Date().toISOString() });
+        const docRef = doc(db, 'users', canonicalId, 'debtors', d.id);
+        const cleaned = cleanFirestoreObject({ ...d, userId: canonicalId, updatedAt: new Date().toISOString() });
         batch.set(docRef, cleaned, { merge: true });
       }
       await batch.commit();
@@ -1780,19 +1852,18 @@ export async function saveDebtorsToFirestore(userId: string, debtors: Debtor[]):
       console.warn(`[Firestore:SAVE_DEBTORS] Quota limite diária atingida. Dados devedores mantidos no LocalStorage.`);
       return;
     }
-    console.error(`[Firestore:SAVE_DEBTORS_ERROR] Failed committing debtors for user ${userId}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
+    console.error(`[Firestore:SAVE_DEBTORS_ERROR] Failed committing debtors for user ${canonicalId}:`, err);
   }
 }
 
 export async function saveSingleDebtorToFirestore(userId: string, debtor: Debtor): Promise<void> {
   if (!userId || !debtor || !debtor.id) return;
   if (isFirestoreQuotaExhausted()) return;
-  if (!auth.currentUser) return;
-  const path = `users/${userId}/debtors/${debtor.id}`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/debtors/${debtor.id}`;
   try {
-    const docRef = doc(db, 'users', userId, 'debtors', debtor.id);
-    const cleaned = cleanFirestoreObject({ ...debtor, userId, updatedAt: new Date().toISOString() });
+    const docRef = doc(db, 'users', canonicalId, 'debtors', debtor.id);
+    const cleaned = cleanFirestoreObject({ ...debtor, userId: canonicalId, updatedAt: new Date().toISOString() });
     console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Saving debtor "${debtor.name}" (${debtor.id}) to ${path}...`);
     await setDoc(docRef, cleaned, { merge: true });
     console.log(`[Firestore:SAVE_SINGLE_DEBTOR] Success: Debtor ${debtor.id} persisted to Firestore.`);
@@ -1803,49 +1874,56 @@ export async function saveSingleDebtorToFirestore(userId: string, debtor: Debtor
       return;
     }
     console.error(`[Firestore:SAVE_SINGLE_DEBTOR_ERROR] Failed saving debtor ${debtor.id}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getDebtorsFromFirestore(userId: string): Promise<Debtor[]> {
   if (!userId) return [];
-  if (!auth.currentUser) return []; // Skip remote read if not authenticated
-  const path = `users/${userId}/debtors`;
-  console.log(`[Firestore:GET_DEBTORS] Fetching debtors collection from ${path}...`);
+  const candidateIds = await getCandidateUserIds(userId);
+  const mergedMap = new Map<string, Debtor>();
   try {
-    const colRef = collection(db, 'users', userId, 'debtors');
-    const snap = await getDocs(colRef);
-    if (snap.empty) {
-      console.log(`[Firestore:GET_DEBTORS] Path ${path} is empty (0 debtors found).`);
-      return [];
+    for (const cid of candidateIds) {
+      const colRef = collection(db, 'users', cid, 'debtors');
+      const snap = await getDocs(colRef);
+      snap.docs.forEach((d) => {
+        const data = d.data() as Debtor;
+        const id = data.id || d.id;
+        if (!id) return;
+        const normalized: Debtor = {
+          ...data,
+          id,
+          totalOwed: typeof data.totalOwed === 'number' ? data.totalOwed : (Number(data.totalOwed) || 0),
+          totalPaid: typeof data.totalPaid === 'number' ? data.totalPaid : (Number(data.totalPaid) || 0),
+          overdueCount: typeof data.overdueCount === 'number' ? data.overdueCount : (Number(data.overdueCount) || 0),
+        };
+        if (!mergedMap.has(id)) {
+          mergedMap.set(id, normalized);
+        } else {
+          const existing = mergedMap.get(id)!;
+          const existingTs = (existing as any).updatedAt || '';
+          const newTs = (normalized as any).updatedAt || '';
+          if (newTs >= existingTs) {
+            mergedMap.set(id, { ...existing, ...normalized });
+          }
+        }
+      });
     }
-    const result = snap.docs.map((d) => {
-      const data = d.data() as Debtor;
-      return {
-        ...data,
-        id: data.id || d.id,
-        totalOwed: typeof data.totalOwed === 'number' ? data.totalOwed : (Number(data.totalOwed) || 0),
-        totalPaid: typeof data.totalPaid === 'number' ? data.totalPaid : (Number(data.totalPaid) || 0),
-        overdueCount: typeof data.overdueCount === 'number' ? data.overdueCount : (Number(data.overdueCount) || 0),
-      };
-    });
-    console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors from Firestore.`);
+    const result = Array.from(mergedMap.values());
+    console.log(`[Firestore:GET_DEBTORS] Fetched ${result.length} debtors across candidate paths [${candidateIds.join(', ')}].`);
     return result;
   } catch (err: any) {
     if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
       console.warn(`[Firestore:GET_DEBTORS] Acesso negado ou modo offline/quota. Usando devedores do cache LocalStorage.`);
-      return [];
+      return Array.from(mergedMap.values());
     }
-    console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors at ${path}:`, err);
-    handleFirestoreError(err, OperationType.LIST, path);
-    return [];
+    console.error(`[Firestore:GET_DEBTORS_ERROR] Failed reading debtors:`, err);
+    return Array.from(mergedMap.values());
   }
 }
 
 // =========================================================================
 // USER TOMBSTONES FIRESTORE OPERATIONS (Isolamento Permanente de Exclusões)
-// Garante persistência em nuvem das exclusões no espaço estritamente privado do UID real
 // =========================================================================
 
 export async function saveTombstoneToFirestore(
@@ -1854,22 +1932,15 @@ export async function saveTombstoneToFirestore(
 ): Promise<void> {
   if (!userId || !debtorId) return;
   if (isFirestoreQuotaExhausted()) return;
-
-  // Garante que apenas o usuário autenticado com seu UID real do Firebase Auth grava
-  const currentAuthUid = auth.currentUser?.uid;
-  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
-  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
-    return; // Não utiliza ID sintético sem sessão de autenticação válida
-  }
-
-  const path = `users/${userId}/tombstones/${debtorId}`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/tombstones/${debtorId}`;
   try {
-    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
+    const docRef = doc(db, 'users', canonicalId, 'tombstones', debtorId);
     await setDoc(
       docRef,
       cleanFirestoreObject({
         debtorId,
-        userId,
+        userId: canonicalId,
         deletedAt: new Date().toISOString(),
       }),
       { merge: true }
@@ -1879,7 +1950,7 @@ export async function saveTombstoneToFirestore(
       setFirestoreQuotaExhausted(true);
       return;
     }
-    console.warn(`[Firestore:SAVE_TOMBSTONE] Aviso ao salvar tombstone ${debtorId}:`, err);
+    console.warn(`[Firestore:SAVE_TOMBSTONE] Aviso ao salvar tombstone ${debtorId} em ${path}:`, err);
   }
 }
 
@@ -1889,16 +1960,12 @@ export async function removeTombstoneFromFirestore(
 ): Promise<void> {
   if (!userId || !debtorId) return;
   if (isFirestoreQuotaExhausted()) return;
-
-  const currentAuthUid = auth.currentUser?.uid;
-  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
-  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
-    return;
-  }
-
+  const candidateIds = await getCandidateUserIds(userId);
   try {
-    const docRef = doc(db, 'users', userId, 'tombstones', debtorId);
-    await deleteDoc(docRef);
+    for (const cid of candidateIds) {
+      const docRef = doc(db, 'users', cid, 'tombstones', debtorId);
+      await deleteDoc(docRef).catch(() => {});
+    }
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
@@ -1910,25 +1977,25 @@ export async function removeTombstoneFromFirestore(
 
 export async function getTombstonesFromFirestore(userId: string): Promise<string[]> {
   if (!userId) return [];
-  const currentAuthUid = auth.currentUser?.uid;
-  const isMasterAdmin = auth.currentUser?.email === 'tiagodias8888@gmail.com';
-  if (!currentAuthUid || (currentAuthUid !== userId && !isMasterAdmin)) {
-    return [];
-  }
-
-  const path = `users/${userId}/tombstones`;
+  const candidateIds = await getCandidateUserIds(userId);
+  const tombstonesSet = new Set<string>();
   try {
-    const colRef = collection(db, 'users', userId, 'tombstones');
-    const snap = await getDocs(colRef);
-    if (snap.empty) return [];
-    return snap.docs.map((d) => d.id || d.data()?.debtorId).filter(Boolean);
+    for (const cid of candidateIds) {
+      const colRef = collection(db, 'users', cid, 'tombstones');
+      const snap = await getDocs(colRef);
+      snap.docs.forEach((d) => {
+        const id = d.id || d.data()?.debtorId;
+        if (id) tombstonesSet.add(id);
+      });
+    }
+    return Array.from(tombstonesSet);
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
-      return [];
+      return Array.from(tombstonesSet);
     }
-    console.warn(`[Firestore:GET_TOMBSTONES] Aviso ao ler tombstones em ${path}:`, err);
-    return [];
+    console.warn(`[Firestore:GET_TOMBSTONES] Aviso ao ler tombstones:`, err);
+    return Array.from(tombstonesSet);
   }
 }
 
@@ -1942,8 +2009,8 @@ export async function savePurchasesToFirestore(
     return;
   }
   if (isFirestoreQuotaExhausted()) return;
-  if (!auth.currentUser) return;
-  const path = `users/${userId}/purchases`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/purchases`;
   console.log(`[Firestore:SAVE_PURCHASES] Received ${purchases?.length || 0} purchases for path: ${path}`);
   try {
     const safePurchases = Array.isArray(purchases) ? purchases : [];
@@ -1959,8 +2026,8 @@ export async function savePurchasesToFirestore(
       const batch = writeBatch(db);
       for (const p of chunk) {
         if (!p || !p.id) continue;
-        const docRef = doc(db, 'users', userId, 'purchases', p.id);
-        const cleaned = cleanFirestoreObject({ ...p, userId, updatedAt: new Date().toISOString() });
+        const docRef = doc(db, 'users', canonicalId, 'purchases', p.id);
+        const cleaned = cleanFirestoreObject({ ...p, userId: canonicalId, updatedAt: new Date().toISOString() });
         batch.set(docRef, cleaned, { merge: true });
       }
       await batch.commit();
@@ -1972,19 +2039,18 @@ export async function savePurchasesToFirestore(
       console.warn(`[Firestore:SAVE_PURCHASES] Quota limite diária atingida. Compras mantidas no LocalStorage.`);
       return;
     }
-    console.error(`[Firestore:SAVE_PURCHASES_ERROR] Failed committing purchases for user ${userId}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
+    console.error(`[Firestore:SAVE_PURCHASES_ERROR] Failed committing purchases for user ${canonicalId}:`, err);
   }
 }
 
 export async function saveSinglePurchaseToFirestore(userId: string, purchase: Purchase): Promise<void> {
   if (!userId || !purchase || !purchase.id) return;
   if (isFirestoreQuotaExhausted()) return;
-  if (!auth.currentUser) return;
-  const path = `users/${userId}/purchases/${purchase.id}`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/purchases/${purchase.id}`;
   try {
-    const docRef = doc(db, 'users', userId, 'purchases', purchase.id);
-    const cleaned = cleanFirestoreObject({ ...purchase, userId, updatedAt: new Date().toISOString() });
+    const docRef = doc(db, 'users', canonicalId, 'purchases', purchase.id);
+    const cleaned = cleanFirestoreObject({ ...purchase, userId: canonicalId, updatedAt: new Date().toISOString() });
     console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Saving purchase "${purchase.product}" (${purchase.id}) to ${path}...`);
     await setDoc(docRef, cleaned, { merge: true });
     console.log(`[Firestore:SAVE_SINGLE_PURCHASE] Success: Purchase ${purchase.id} persisted to Firestore.`);
@@ -1995,34 +2061,45 @@ export async function saveSinglePurchaseToFirestore(userId: string, purchase: Pu
       return;
     }
     console.error(`[Firestore:SAVE_SINGLE_PURCHASE_ERROR] Failed saving purchase ${purchase.id}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getPurchasesFromFirestore(userId: string): Promise<Purchase[]> {
   if (!userId) return [];
-  if (!auth.currentUser) return []; // Skip remote read if not authenticated
-  const path = `users/${userId}/purchases`;
-  console.log(`[Firestore:GET_PURCHASES] Fetching purchases collection from ${path}...`);
+  const candidateIds = await getCandidateUserIds(userId);
+  const mergedMap = new Map<string, Purchase>();
   try {
-    const colRef = collection(db, 'users', userId, 'purchases');
-    const snap = await getDocs(colRef);
-    if (snap.empty) {
-      console.log(`[Firestore:GET_PURCHASES] Path ${path} is empty (0 purchases found).`);
-      return [];
+    for (const cid of candidateIds) {
+      const colRef = collection(db, 'users', cid, 'purchases');
+      const snap = await getDocs(colRef);
+      snap.docs.forEach((d) => {
+        const data = d.data() as Purchase;
+        const id = data.id || d.id;
+        if (!id) return;
+        const normalized: Purchase = { ...data, id };
+        if (!mergedMap.has(id)) {
+          mergedMap.set(id, normalized);
+        } else {
+          const existing = mergedMap.get(id)!;
+          const existingTs = (existing as any).updatedAt || '';
+          const newTs = (normalized as any).updatedAt || '';
+          if (newTs >= existingTs) {
+            mergedMap.set(id, { ...existing, ...normalized });
+          }
+        }
+      });
     }
-    const result = snap.docs.map((d) => d.data() as Purchase);
-    console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases from Firestore.`);
+    const result = Array.from(mergedMap.values());
+    console.log(`[Firestore:GET_PURCHASES] Fetched ${result.length} purchases across candidate paths [${candidateIds.join(', ')}].`);
     return result;
   } catch (err: any) {
     if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
       console.warn(`[Firestore:GET_PURCHASES] Acesso negado ou modo offline/quota. Usando compras do LocalStorage.`);
-      return [];
+      return Array.from(mergedMap.values());
     }
-    console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases at ${path}:`, err);
-    handleFirestoreError(err, OperationType.LIST, path);
-    return [];
+    console.error(`[Firestore:GET_PURCHASES_ERROR] Failed reading purchases:`, err);
+    return Array.from(mergedMap.values());
   }
 }
 
@@ -2036,8 +2113,8 @@ export async function saveInstallmentsToFirestore(
     return;
   }
   if (isFirestoreQuotaExhausted()) return;
-  if (!auth.currentUser) return;
-  const path = `users/${userId}/installments`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/installments`;
   console.log(`[Firestore:SAVE_INSTALLMENTS] Received ${installments?.length || 0} installments for path: ${path}`);
   try {
     const safeInsts = Array.isArray(installments) ? installments : [];
@@ -2053,8 +2130,8 @@ export async function saveInstallmentsToFirestore(
       const batch = writeBatch(db);
       for (const inst of chunk) {
         if (!inst || !inst.id) continue;
-        const docRef = doc(db, 'users', userId, 'installments', inst.id);
-        const cleaned = cleanFirestoreObject({ ...inst, userId, updatedAt: new Date().toISOString() });
+        const docRef = doc(db, 'users', canonicalId, 'installments', inst.id);
+        const cleaned = cleanFirestoreObject({ ...inst, userId: canonicalId, updatedAt: new Date().toISOString() });
         batch.set(docRef, cleaned, { merge: true });
       }
       await batch.commit();
@@ -2066,19 +2143,18 @@ export async function saveInstallmentsToFirestore(
       console.warn(`[Firestore:SAVE_INSTALLMENTS] Quota limite diária atingida. Parcelas mantidas no LocalStorage.`);
       return;
     }
-    console.error(`[Firestore:SAVE_INSTALLMENTS_ERROR] Failed committing installments for user ${userId}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
+    console.error(`[Firestore:SAVE_INSTALLMENTS_ERROR] Failed committing installments for user ${canonicalId}:`, err);
   }
 }
 
 export async function saveSingleInstallmentToFirestore(userId: string, installment: Installment): Promise<void> {
   if (!userId || !installment || !installment.id) return;
   if (isFirestoreQuotaExhausted()) return;
-  if (!auth.currentUser) return;
-  const path = `users/${userId}/installments/${installment.id}`;
+  const canonicalId = resolveCanonicalUserId(userId);
+  const path = `users/${canonicalId}/installments/${installment.id}`;
   try {
-    const docRef = doc(db, 'users', userId, 'installments', installment.id);
-    const cleaned = cleanFirestoreObject({ ...installment, userId, updatedAt: new Date().toISOString() });
+    const docRef = doc(db, 'users', canonicalId, 'installments', installment.id);
+    const cleaned = cleanFirestoreObject({ ...installment, userId: canonicalId, updatedAt: new Date().toISOString() });
     console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Saving installment #${installment.installmentNumber} (${installment.id}) to ${path}...`);
     await setDoc(docRef, cleaned, { merge: true });
     console.log(`[Firestore:SAVE_SINGLE_INSTALLMENT] Success: Installment ${installment.id} persisted to Firestore.`);
@@ -2089,34 +2165,52 @@ export async function saveSingleInstallmentToFirestore(userId: string, installme
       return;
     }
     console.error(`[Firestore:SAVE_SINGLE_INSTALLMENT_ERROR] Failed saving installment ${installment.id}:`, err);
-    handleFirestoreError(err, OperationType.WRITE, path);
   }
 }
 
 export async function getInstallmentsFromFirestore(userId: string): Promise<Installment[]> {
   if (!userId) return [];
-  if (!auth.currentUser) return []; // Skip remote read if not authenticated
-  const path = `users/${userId}/installments`;
-  console.log(`[Firestore:GET_INSTALLMENTS] Fetching installments collection from ${path}...`);
+  const candidateIds = await getCandidateUserIds(userId);
+  const mergedMap = new Map<string, Installment>();
   try {
-    const colRef = collection(db, 'users', userId, 'installments');
-    const snap = await getDocs(colRef);
-    if (snap.empty) {
-      console.log(`[Firestore:GET_INSTALLMENTS] Path ${path} is empty (0 installments found).`);
-      return [];
+    for (const cid of candidateIds) {
+      const colRef = collection(db, 'users', cid, 'installments');
+      const snap = await getDocs(colRef);
+      snap.docs.forEach((d) => {
+        const data = d.data() as Installment;
+        const id = data.id || d.id;
+        if (!id) return;
+        const normalized: Installment = { ...data, id };
+        if (!mergedMap.has(id)) {
+          mergedMap.set(id, normalized);
+        } else {
+          const existing = mergedMap.get(id)!;
+          if (existing.status === 'paid' && normalized.status !== 'paid') {
+            return;
+          }
+          if (normalized.status === 'paid' && existing.status !== 'paid') {
+            mergedMap.set(id, normalized);
+            return;
+          }
+          const existingTs = (existing as any).updatedAt || '';
+          const newTs = (normalized as any).updatedAt || '';
+          if (newTs >= existingTs) {
+            mergedMap.set(id, { ...existing, ...normalized });
+          }
+        }
+      });
     }
-    const result = snap.docs.map((d) => d.data() as Installment);
-    console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments from Firestore.`);
+    const result = Array.from(mergedMap.values());
+    console.log(`[Firestore:GET_INSTALLMENTS] Fetched ${result.length} installments across candidate paths [${candidateIds.join(', ')}].`);
     return result;
   } catch (err: any) {
     if (isQuotaError(err) || isOfflineOrNetworkError(err) || err?.code === 'permission-denied' || (err?.message && err.message.includes('Missing or insufficient permissions'))) {
       if (isQuotaError(err)) setFirestoreQuotaExhausted(true);
       console.warn(`[Firestore:GET_INSTALLMENTS] Acesso negado ou modo offline/quota. Usando parcelas do LocalStorage.`);
-      return [];
+      return Array.from(mergedMap.values());
     }
-    console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments at ${path}:`, err);
-    handleFirestoreError(err, OperationType.LIST, path);
-    return [];
+    console.error(`[Firestore:GET_INSTALLMENTS_ERROR] Failed reading installments:`, err);
+    return Array.from(mergedMap.values());
   }
 }
 
@@ -2124,20 +2218,19 @@ export async function getInstallmentsFromFirestore(userId: string): Promise<Inst
 export async function deleteInstallmentFromFirestore(userId: string, installmentId: string): Promise<void> {
   if (!userId || !installmentId) return;
   if (isFirestoreQuotaExhausted()) return;
-  const path = `users/${userId}/installments/${installmentId}`;
+  const candidateIds = await getCandidateUserIds(userId);
   try {
-    console.log(`[Firestore:DELETE_INSTALLMENT] Deleting installment ${installmentId} from ${path}...`);
-    const docRef = doc(db, 'users', userId, 'installments', installmentId);
-    await deleteDoc(docRef);
+    for (const cid of candidateIds) {
+      const docRef = doc(db, 'users', cid, 'installments', installmentId);
+      await deleteDoc(docRef).catch(() => {});
+    }
     console.log(`[Firestore:DELETE_INSTALLMENT] Success: Installment ${installmentId} deleted from Firestore.`);
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:DELETE_INSTALLMENT] Quota atingida. Remoção registrada no LocalStorage.`);
       return;
     }
     console.error(`[Firestore:DELETE_INSTALLMENT_ERROR] Failed deleting installment ${installmentId}:`, err);
-    handleFirestoreError(err, OperationType.DELETE, path);
   }
 }
 
@@ -2150,59 +2243,54 @@ export async function deletePurchaseFromFirestore(
 ): Promise<void> {
   if (!userId) return;
   if (isFirestoreQuotaExhausted()) return;
-  const path = `users/${userId}/purchases/${purchaseId || 'by-product'}`;
+  const candidateIds = await getCandidateUserIds(userId);
   try {
-    const batch = writeBatch(db);
-    if (purchaseId) {
-      batch.delete(doc(db, 'users', userId, 'purchases', purchaseId));
-    }
-
     const normProd = (productName || '').trim().toLowerCase();
+    for (const cid of candidateIds) {
+      const batch = writeBatch(db);
+      if (purchaseId) {
+        batch.delete(doc(db, 'users', cid, 'purchases', purchaseId));
+      }
 
-    try {
-      const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
-      purchasesSnap.docs.forEach((pDoc) => {
-        const pData = pDoc.data();
-        const matchId = purchaseId && (pDoc.id === purchaseId || pData?.id === purchaseId);
-        const matchProd =
-          normProd &&
-          (pData?.product || '').trim().toLowerCase() === normProd &&
-          (!debtorId || pData?.debtorId === debtorId);
-        if (matchId || matchProd) {
-          batch.delete(pDoc.ref);
-        }
-      });
-    } catch (e) {
-      console.warn('Could not read purchases for deletePurchaseFromFirestore:', e);
+      try {
+        const purchasesSnap = await getDocs(collection(db, 'users', cid, 'purchases'));
+        purchasesSnap.docs.forEach((pDoc) => {
+          const pData = pDoc.data();
+          const matchId = purchaseId && (pDoc.id === purchaseId || pData?.id === purchaseId);
+          const matchProd =
+            normProd &&
+            (pData?.product || '').trim().toLowerCase() === normProd &&
+            (!debtorId || pData?.debtorId === debtorId);
+          if (matchId || matchProd) {
+            batch.delete(pDoc.ref);
+          }
+        });
+      } catch {}
+
+      try {
+        const installmentsSnap = await getDocs(collection(db, 'users', cid, 'installments'));
+        installmentsSnap.docs.forEach((iDoc) => {
+          const iData = iDoc.data();
+          const matchPurchaseId = purchaseId && iData?.purchaseId === purchaseId;
+          const matchProd =
+            normProd &&
+            (iData?.product || '').trim().toLowerCase() === normProd &&
+            (!debtorId || iData?.debtorId === debtorId);
+          if (matchPurchaseId || matchProd) {
+            batch.delete(iDoc.ref);
+          }
+        });
+      } catch {}
+
+      await batch.commit().catch(() => {});
     }
-
-    try {
-      const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
-      installmentsSnap.docs.forEach((iDoc) => {
-        const iData = iDoc.data();
-        const matchPurchaseId = purchaseId && iData?.purchaseId === purchaseId;
-        const matchProd =
-          normProd &&
-          (iData?.product || '').trim().toLowerCase() === normProd &&
-          (!debtorId || iData?.debtorId === debtorId);
-        if (matchPurchaseId || matchProd) {
-          batch.delete(iDoc.ref);
-        }
-      });
-    } catch (e) {
-      console.warn('Could not read installments for deletePurchaseFromFirestore:', e);
-    }
-
-    await batch.commit();
     console.log(`[Firestore:DELETE_PURCHASE] Success: Purchase ${purchaseId || productName} and linked installments deleted from Firestore.`);
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:DELETE_PURCHASE] Quota atingida. Exclusão mantida no LocalStorage.`);
       return;
     }
     console.error(`[Firestore:DELETE_PURCHASE_ERROR] Failed deleting purchase ${purchaseId}:`, err);
-    handleFirestoreError(err, OperationType.DELETE, path);
   }
 }
 
@@ -2210,47 +2298,115 @@ export async function deletePurchaseFromFirestore(
 export async function deleteDebtorFromFirestore(userId: string, debtorId: string): Promise<void> {
   if (!userId || !debtorId) return;
   if (isFirestoreQuotaExhausted()) return;
-  const path = `users/${userId}/debtors/${debtorId}`;
-  console.log(`[Firestore:DELETE_DEBTOR] Initiating cascade delete for debtor ${debtorId} from ${path}...`);
+  const candidateIds = await getCandidateUserIds(userId);
   try {
-    const batch = writeBatch(db);
-    batch.delete(doc(db, 'users', userId, 'debtors', debtorId));
-    
-    // Also delete associated purchases from Firestore
-    try {
-      const purchasesSnap = await getDocs(collection(db, 'users', userId, 'purchases'));
-      purchasesSnap.docs.forEach((p) => {
-        if (p.data()?.debtorId === debtorId) {
-          batch.delete(p.ref);
-        }
-      });
-    } catch (e) {
-      console.warn('Could not read purchases for cascade delete:', e);
-    }
+    for (const cid of candidateIds) {
+      const batch = writeBatch(db);
+      batch.delete(doc(db, 'users', cid, 'debtors', debtorId));
 
-    // Also delete associated installments from Firestore
-    try {
-      const installmentsSnap = await getDocs(collection(db, 'users', userId, 'installments'));
-      installmentsSnap.docs.forEach((inst) => {
-        if (inst.data()?.debtorId === debtorId) {
-          batch.delete(inst.ref);
-        }
-      });
-    } catch (e) {
-      console.warn('Could not read installments for cascade delete:', e);
-    }
+      try {
+        const purchasesSnap = await getDocs(collection(db, 'users', cid, 'purchases'));
+        purchasesSnap.docs.forEach((p) => {
+          if (p.data()?.debtorId === debtorId) {
+            batch.delete(p.ref);
+          }
+        });
+      } catch {}
 
-    await batch.commit();
+      try {
+        const installmentsSnap = await getDocs(collection(db, 'users', cid, 'installments'));
+        installmentsSnap.docs.forEach((inst) => {
+          if (inst.data()?.debtorId === debtorId) {
+            batch.delete(inst.ref);
+          }
+        });
+      } catch {}
+
+      await batch.commit().catch(() => {});
+    }
     console.log(`[Firestore:DELETE_DEBTOR] Success: Debtor ${debtorId} and sub-records deleted from Firestore.`);
   } catch (err) {
     if (isQuotaError(err)) {
       setFirestoreQuotaExhausted(true);
-      console.warn(`[Firestore:DELETE_DEBTOR] Quota atingida. Exclusão mantida no LocalStorage.`);
       return;
     }
     console.error(`[Firestore:DELETE_DEBTOR_ERROR] Failed deleting debtor ${debtorId}:`, err);
-    handleFirestoreError(err, OperationType.DELETE, path);
   }
+}
+
+/**
+ * Inscreve listeners em tempo real (onSnapshot) no caminho canônico do usuário no Firestore
+ * para que qualquer alteração feita no navegador ou em outro celular apareça instantaneamente no app instalado.
+ */
+export function subscribeToUserFirestoreRealtime(
+  userId: string,
+  callbacks: {
+    onDebtorsSnapshot?: (debtors: Debtor[]) => void;
+    onPurchasesSnapshot?: (purchases: Purchase[]) => void;
+    onInstallmentsSnapshot?: (installments: Installment[]) => void;
+  }
+): () => void {
+  if (!userId) return () => {};
+  const canonicalId = resolveCanonicalUserId(userId);
+  const unsubs: Array<() => void> = [];
+
+  try {
+    if (callbacks.onDebtorsSnapshot) {
+      const unsubD = onSnapshot(
+        collection(db, 'users', canonicalId, 'debtors'),
+        (snap) => {
+          if (snap.empty) return;
+          const items = snap.docs.map((d) => {
+            const data = d.data() as Debtor;
+            return {
+              ...data,
+              id: data.id || d.id,
+              totalOwed: typeof data.totalOwed === 'number' ? data.totalOwed : Number(data.totalOwed) || 0,
+              totalPaid: typeof data.totalPaid === 'number' ? data.totalPaid : Number(data.totalPaid) || 0,
+              overdueCount: typeof data.overdueCount === 'number' ? data.overdueCount : Number(data.overdueCount) || 0,
+            };
+          });
+          callbacks.onDebtorsSnapshot?.(items);
+        },
+        () => {}
+      );
+      unsubs.push(unsubD);
+    }
+
+    if (callbacks.onPurchasesSnapshot) {
+      const unsubP = onSnapshot(
+        collection(db, 'users', canonicalId, 'purchases'),
+        (snap) => {
+          if (snap.empty) return;
+          const items = snap.docs.map((d) => ({ ...(d.data() as Purchase), id: (d.data() as Purchase).id || d.id }));
+          callbacks.onPurchasesSnapshot?.(items);
+        },
+        () => {}
+      );
+      unsubs.push(unsubP);
+    }
+
+    if (callbacks.onInstallmentsSnapshot) {
+      const unsubI = onSnapshot(
+        collection(db, 'users', canonicalId, 'installments'),
+        (snap) => {
+          if (snap.empty) return;
+          const items = snap.docs.map((d) => ({ ...(d.data() as Installment), id: (d.data() as Installment).id || d.id }));
+          callbacks.onInstallmentsSnapshot?.(items);
+        },
+        () => {}
+      );
+      unsubs.push(unsubI);
+    }
+  } catch {}
+
+  return () => {
+    unsubs.forEach((u) => {
+      try {
+        u();
+      } catch {}
+    });
+  };
 }
 
 // CLEAR ALL USER DEBTORS, PURCHASES, INSTALLMENTS FROM FIRESTORE

@@ -40,16 +40,13 @@
         "phone": { "type": "string" },
         "email": { "type": "string" },
         "notes": { "type": "string" },
-        "totalDebt": { "type": "number" },
+        "totalOwed": { "type": "number" },
         "totalPaid": { "type": "number" },
-        "totalRemaining": { "type": "number" },
-        "installmentsCount": { "type": "number" },
-        "paidCount": { "type": "number" },
-        "status": { "type": "string", "enum": ["adimplente", "atrasado", "quitado"] },
+        "overdueCount": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["id", "userId", "name", "totalDebt"]
+      "required": ["id", "userId", "name"]
     },
     "Purchase": {
       "title": "Purchase",
@@ -59,12 +56,15 @@
         "id": { "type": "string" },
         "userId": { "type": "string" },
         "debtorId": { "type": "string" },
-        "description": { "type": "string" },
-        "originalAmount": { "type": "number" },
-        "date": { "type": "string" },
+        "product": { "type": "string" },
+        "totalAmount": { "type": "number" },
+        "installmentsTotal": { "type": "number" },
+        "installmentValue": { "type": "number" },
+        "firstDueDate": { "type": "string" },
+        "nextDueDate": { "type": "string" },
         "notes": { "type": "string" }
       },
-      "required": ["id", "userId", "debtorId", "description", "originalAmount"]
+      "required": ["id", "userId", "debtorId", "product", "totalAmount"]
     },
     "Installment": {
       "title": "Installment",
@@ -75,19 +75,28 @@
         "userId": { "type": "string" },
         "debtorId": { "type": "string" },
         "purchaseId": { "type": "string" },
-        "number": { "type": "number" },
+        "installmentNumber": { "type": "number" },
         "totalInstallments": { "type": "number" },
         "amount": { "type": "number" },
         "dueDate": { "type": "string" },
-        "paymentDate": { "type": "string" },
+        "paidAt": { "type": "string" },
         "paidAmount": { "type": "number" },
         "status": { "type": "string", "enum": ["overdue", "soon", "ontime", "paid"] },
         "notes": { "type": "string" },
-        "proofOfPayment": { "type": "string" },
-        "receiptGenerated": { "type": "boolean" },
-        "receiptNumber": { "type": "string" }
+        "authCode": { "type": "string" }
       },
-      "required": ["id", "userId", "debtorId", "number", "amount", "dueDate", "status"]
+      "required": ["id", "userId", "debtorId", "installmentNumber", "amount", "dueDate", "status"]
+    },
+    "Tombstone": {
+      "title": "Tombstone",
+      "description": "Permanent deletion marker to prevent deleted items from reappearing",
+      "type": "object",
+      "properties": {
+        "debtorId": { "type": "string" },
+        "userId": { "type": "string" },
+        "deletedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["debtorId", "userId"]
     },
     "ForumTopic": {
       "title": "ForumTopic",
@@ -103,7 +112,7 @@
         "title": { "type": "string" },
         "content": { "type": "string" },
         "category": { "type": "string", "enum": ["sugestao", "melhoria", "bug", "duvida", "conformidade"] },
-        "status": { "type": "string", "enum": ["aberto", "em_analise", "em_desenvolvimento", "concluido", "rejeitado"] },
+        "status": { "type": "string", "enum": ["aberto", "em_analise", "em_desenvolvimento", "concluido", "rejeitado", "aprovado"] },
         "createdAt": { "type": "string", "format": "date-time" },
         "upvotes": { "type": "number" },
         "devResponse": { "type": "string" },
@@ -128,6 +137,10 @@
     "/users/{userId}/installments/{installmentId}": {
       "schema": "Installment",
       "description": "Payment installments associated with the debtor"
+    },
+    "/users/{userId}/tombstones/{tombstoneId}": {
+      "schema": "Tombstone",
+      "description": "Permanent deletion tombstones associated with the user"
     },
     "/forum_topics/{topicId}": {
       "schema": "ForumTopic",

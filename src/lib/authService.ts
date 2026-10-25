@@ -8,6 +8,7 @@ import {
   initializeGoogleSignInNative,
   signInWithGoogleNative,
   signOutGoogleNative,
+  resolveCanonicalUserId,
 } from './firebase';
 import {
   signInWithEmailAndPassword,
@@ -51,24 +52,16 @@ export async function loginWithDirectGoogleAccount(
   }
 
   const isMaster = cleanEmail === 'tiagodias8888@gmail.com';
-  let resolvedUid = isMaster
-    ? TIAGO_DIAS_USER.id
-    : `usr_google_${cleanEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+  const resolvedUid = resolveCanonicalUserId(undefined, cleanEmail);
 
-  // Tenta autenticar silenciosamente no Firebase Auth para ativar sincronização Firestore em nuvem
+  // Tenta autenticar silenciosamente no Firebase Auth para ativar token extra se disponível, mantendo o ID canônico unificado
   try {
     const syncPass = isMaster ? 'haspaho2026' : `HaspahoGmail#${cleanEmail.slice(0, 16)}`;
     try {
-      const fbCred = await signInWithEmailAndPassword(auth, cleanEmail, syncPass);
-      if (fbCred?.user?.uid) {
-        resolvedUid = fbCred.user.uid;
-      }
+      await signInWithEmailAndPassword(auth, cleanEmail, syncPass);
     } catch {
       try {
-        const fbCred = await createUserWithEmailAndPassword(auth, cleanEmail, syncPass);
-        if (fbCred?.user?.uid) {
-          resolvedUid = fbCred.user.uid;
-        }
+        await createUserWithEmailAndPassword(auth, cleanEmail, syncPass);
       } catch {}
     }
   } catch {}

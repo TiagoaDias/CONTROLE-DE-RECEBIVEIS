@@ -30,6 +30,8 @@ interface UserSettingsModalProps {
   deletedDebtors?: Debtor[];
   onRestoreDebtor?: (debtorId: string) => void;
   onPermanentDeleteDebtor?: (debtorId: string) => void;
+  onSyncFirebase?: () => Promise<void> | void;
+  onImportBackup?: (data: { debtors?: Debtor[]; purchases?: Purchase[]; installments?: Installment[] }) => Promise<void> | void;
   initialTab?: 'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira';
 }
 
@@ -46,6 +48,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   deletedDebtors = [],
   onRestoreDebtor,
   onPermanentDeleteDebtor,
+  onSyncFirebase,
+  onImportBackup,
   initialTab = 'profile',
 }) => {
   if (!isOpen || !currentUser) return null;
@@ -84,6 +88,8 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [lastBackupMeta, setLastBackupMeta] = useState<FullBackupMetadata | null>(() =>
     getLastBackupMetadata(currentUser?.id)
   );
+  const [isSyncingCloud, setIsSyncingCloud] = useState(false);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   const handleExportBackupJson = () => {
     const meta = exportFullDataBackupJson({
@@ -97,6 +103,36 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
     onToast(
       `✅ Backup JSON exportado com sucesso (${meta.debtorsCount} devedores, ${meta.purchasesCount} compras, ${meta.installmentsCount} parcelas)!`
     );
+  };
+
+  const handleImportBackupJsonFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (ev) => {
+      try {
+        const raw = String(ev.target?.result || '');
+        const parsed = JSON.parse(raw);
+        const payload = parsed?.data || parsed;
+        if (!payload || (!Array.isArray(payload.debtors) && !Array.isArray(payload.purchases) && !Array.isArray(payload.installments))) {
+          onToast('⚠️ Arquivo JSON inválido ou sem registros de backup HASPAHO.');
+          return;
+        }
+        if (onImportBackup) {
+          await onImportBackup({
+            debtors: payload.debtors || [],
+            purchases: payload.purchases || [],
+            installments: payload.installments || [],
+          });
+        }
+      } catch (err) {
+        console.error('Erro ao importar arquivo JSON de backup:', err);
+        onToast('⚠️ Não foi possível ler o arquivo JSON selecionado.');
+      } finally {
+        if (backupFileInputRef.current) backupFileInputRef.current.value = '';
+      }
+    };
+    reader.readAsText(file);
   };
 
   // Sincroniza o formulário sempre que o modal abre ou o usuário ativo muda
@@ -978,16 +1014,57 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                   </div>
                 )}
 
-                {/* Botão principal de exportação imediata */}
-                <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5">
+                {/* Botões principais: Exportar JSON, Restaurar JSON e Sincronizar Firebase */}
+                <div className="pt-1 flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 flex-wrap">
                   <button
                     type="button"
                     onClick={handleExportBackupJson}
-                    className="flex-1 h-12 px-5 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                    className="flex-1 min-w-[220px] h-12 px-4 bg-emerald-600 hover:bg-emerald-700 active:scale-[0.99] text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
                   >
                     <span className="material-symbols-outlined text-[20px]">download_for_offline</span>
-                    <span>Baixar Backup Completo (.JSON) no Dispositivo</span>
+                    <span>Baixar Backup (.JSON)</span>
                   </button>
+
+                  {onImportBackup && (
+                    <>
+                      <input
+                        ref={backupFileInputRef}
+                        type="file"
+                        accept=".json,application/json"
+                        onChange={handleImportBackupJsonFile}
+                        className="hidden"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => backupFileInputRef.current?.click()}
+                        className="flex-1 min-w-[200px] h-12 px-4 bg-blue-600 hover:bg-blue-700 active:scale-[0.99] text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                      >
+                        <span className="material-symbols-outlined text-[20px]">upload_file</span>
+                        <span>Importar Backup (.JSON)</span>
+                      </button>
+                    </>
+                  )}
+
+                  {onSyncFirebase && (
+                    <button
+                      type="button"
+                      disabled={isSyncingCloud}
+                      onClick={async () => {
+                        setIsSyncingCloud(true);
+                        try {
+                          await onSyncFirebase();
+                        } finally {
+                          setIsSyncingCloud(false);
+                        }
+                      }}
+                      className="flex-1 min-w-[220px] h-12 px-4 bg-amber-600 hover:bg-amber-700 active:scale-[0.99] text-white rounded-xl font-black text-xs sm:text-sm flex items-center justify-center gap-2 shadow-md transition-all cursor-pointer"
+                    >
+                      <span className={`material-symbols-outlined text-[20px] ${isSyncingCloud ? 'animate-spin' : ''}`}>
+                        cloud_sync
+                      </span>
+                      <span>{isSyncingCloud ? 'Sincronizando Firebase...' : 'Sincronizar Firebase Agora'}</span>
+                    </button>
+                  )}
                 </div>
               </div>
             </div>

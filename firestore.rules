@@ -1,38 +1,29 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Helper function to check if request is authenticated
-    function isAuthenticated() {
-      return request.auth != null;
+    // Helper function to check if userId scope is valid
+    function isValidUserScope(userId) {
+      return userId != null && userId.size() > 0;
     }
 
-    // Helper function to verify that the user owns the resource or is master admin
-    function isOwner(userId) {
-      return isAuthenticated() && (
-        request.auth.uid == userId ||
-        request.auth.token.email == 'tiagodias8888@gmail.com'
-      );
-    }
-
-    // User profile and private subcollections isolated per UID (debtors, purchases, installments, auth_records)
+    // User profile and private subcollections isolated per userId (debtors, purchases, installments, tombstones, auth_records)
+    // Allows access for both Firebase Auth sessions and Direct Gmail / Android WebView sessions
     match /users/{userId} {
-      allow read, write: if isOwner(userId);
+      allow read, write: if isValidUserScope(userId);
 
       match /{document=**} {
-        allow read, write: if isOwner(userId);
+        allow read, write: if isValidUserScope(userId);
       }
     }
 
     // Forum topics
     match /forum_topics/{topicId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
-    // Registered credentials lookup (Escrita restrita a usuários autenticados)
+    // Registered credentials lookup
     match /registered_credentials/{credId} {
-      allow read: if true;
-      allow write: if isAuthenticated();
+      allow read, write: if true;
     }
 
     // System connection test

@@ -44,6 +44,8 @@ import {
   processFirebaseUserResult,
   initializeGoogleSignInNative,
   isNativeOrAndroidWebView,
+  resolveCanonicalUserId,
+  subscribeToUserFirestoreRealtime,
 } from './lib/firebase';
 import { logoutUser } from './lib/authService';
 import './utils/appIconHelper';
@@ -118,41 +120,92 @@ const DEFAULT_USER: UserAccount = GUEST_EMPTY_USER;
 // Garante que registros de demonstração excluídos JAMAIS reapareçam em novos logins,
 // atualizações ou sincronizações de versão.
 // =========================================================================
+export function getLocalCandidateSuffixes(userId?: string, emailHint?: string): string[] {
+  const suffixes = new Set<string>();
+  const canonical = resolveCanonicalUserId(userId, emailHint);
+  if (canonical) suffixes.add(canonical);
+  if (userId && userId.trim()) suffixes.add(userId.trim());
+  if (canonical === 'usr_thiago_dias' || emailHint?.toLowerCase() === 'tiagodias8888@gmail.com') {
+    suffixes.add('usr_thiago_dias');
+    suffixes.add('usr_google_tiagodias8888_gmail_com');
+  }
+  return Array.from(suffixes).filter(Boolean);
+}
+
+export function readMergedLocalRecords<T extends { id?: string }>(
+  baseKey: 'haspaho_debtors' | 'haspaho_purchases' | 'haspaho_installments' | 'haspaho_deleted_debtors',
+  userId?: string,
+  emailHint?: string
+): T[] {
+  const map = new Map<string, T>();
+  const suffixes = getLocalCandidateSuffixes(userId, emailHint);
+  const keysToTry = [...suffixes.map((s) => `${baseKey}_${s}`), baseKey];
+  for (const key of keysToTry) {
+    try {
+      const raw = localStorage.getItem(key);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((item: T) => {
+            if (item && item.id && !map.has(item.id)) {
+              map.set(item.id, item);
+            }
+          });
+        }
+      }
+    } catch {}
+  }
+  return Array.from(map.values());
+}
+
 export function getPermanentTombstones(userId: string): Set<string> {
   const set = new Set<string>();
   if (!userId) return set;
-  try {
-    const raw = localStorage.getItem(`haspaho_tombstones_${userId}`);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) {
-        parsed.forEach((id: string) => typeof id === 'string' && set.add(id));
+  const suffixes = getLocalCandidateSuffixes(userId);
+  for (const s of suffixes) {
+    try {
+      const raw = localStorage.getItem(`haspaho_tombstones_${s}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          parsed.forEach((id: string) => typeof id === 'string' && set.add(id));
+        }
       }
-    }
-  } catch {}
+    } catch {}
+  }
   return set;
 }
 
 export function addPermanentTombstone(userId: string, debtorId: string): void {
   if (!userId || !debtorId) return;
+  const canonicalId = resolveCanonicalUserId(userId);
   try {
-    const set = getPermanentTombstones(userId);
+    const set = getPermanentTombstones(canonicalId);
     set.add(debtorId);
-    localStorage.setItem(`haspaho_tombstones_${userId}`, JSON.stringify(Array.from(set)));
+    const arr = Array.from(set);
+    localStorage.setItem(`haspaho_tombstones_${canonicalId}`, JSON.stringify(arr));
+    if (userId !== canonicalId) {
+      localStorage.setItem(`haspaho_tombstones_${userId}`, JSON.stringify(arr));
+    }
   } catch {}
-  // Persiste também no Firestore no espaço estritamente privado do usuário autenticado
-  saveTombstoneToFirestore(userId, debtorId).catch(() => {});
+  // Persiste também no Firestore
+  saveTombstoneToFirestore(canonicalId, debtorId).catch(() => {});
 }
 
 export function removePermanentTombstone(userId: string, debtorId: string): void {
   if (!userId || !debtorId) return;
+  const canonicalId = resolveCanonicalUserId(userId);
   try {
-    const set = getPermanentTombstones(userId);
+    const set = getPermanentTombstones(canonicalId);
     set.delete(debtorId);
-    localStorage.setItem(`haspaho_tombstones_${userId}`, JSON.stringify(Array.from(set)));
+    const arr = Array.from(set);
+    localStorage.setItem(`haspaho_tombstones_${canonicalId}`, JSON.stringify(arr));
+    if (userId !== canonicalId) {
+      localStorage.setItem(`haspaho_tombstones_${userId}`, JSON.stringify(arr));
+    }
   } catch {}
   // Remove também do Firestore
-  removeTombstoneFromFirestore(userId, debtorId).catch(() => {});
+  removeTombstoneFromFirestore(canonicalId, debtorId).catch(() => {});
 }
 
 export const getCleanDebtorAvatar = (name?: string, currentAvatar?: string): string => {
@@ -220,6 +273,7 @@ export default function App() {
              parsed.isMasterAdmin = false;
              parsed.isFullStackDev = false;
           }
+          parsed.id = resolveCanonicalUserId(parsed.id, parsed.email);
           return parsed;
         }
       }
@@ -236,11 +290,7 @@ export default function App() {
   const [deletedDebtors, setDeletedDebtors] = useState<Debtor[]>(() => {
     try {
       const activeUser = currentUser || DEFAULT_USER;
-      const saved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`) || localStorage.getItem('haspaho_deleted_debtors');
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) return parsed;
-      }
+      return readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', activeUser.id, activeUser.email);
     } catch (e) {
       console.error(e);
     }
@@ -255,37 +305,20 @@ export default function App() {
     try {
       const activeUser = currentUser || DEFAULT_USER;
       if (!activeUser.id) return [];
-      const isMaster = (activeUser.id === 'usr_thiago_dias' || activeUser.email?.toLowerCase() === 'tiagodias8888@gmail.com') && activeUser.isMasterAdmin;
-      const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
-      const deletedIds = new Set<string>();
-      if (deletedSaved) {
-        try {
-          const parsedDel = JSON.parse(deletedSaved);
-          if (Array.isArray(parsedDel)) {
-            parsedDel.forEach((d: any) => d?.id && deletedIds.add(d.id));
-          }
-        } catch {}
-      }
-      // Inclui permanentemente todos os registros excluídos (tombstones)
+      const deletedList = readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', activeUser.id, activeUser.email);
+      const deletedIds = new Set<string>(deletedList.map((d) => d.id));
       const tombstones = getPermanentTombstones(activeUser.id);
       tombstones.forEach((id) => deletedIds.add(id));
 
-      const isDemoSeeded = localStorage.getItem(`haspaho_demo_seeded_${activeUser.id}`) === 'true';
-      const saved = localStorage.getItem(`haspaho_debtors_${activeUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed
-            .filter((d: Debtor) => d && d.id && !deletedIds.has(d.id))
-            .map((d: Debtor) => ({
-              ...d,
-              totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
-              totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : (Number(d.totalPaid) || 0),
-              overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : (Number(d.overdueCount) || 0),
-            }));
-        }
-      }
-      return [];
+      const localDebtors = readMergedLocalRecords<Debtor>('haspaho_debtors', activeUser.id, activeUser.email);
+      return localDebtors
+        .filter((d: Debtor) => d && d.id && !deletedIds.has(d.id))
+        .map((d: Debtor) => ({
+          ...d,
+          totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
+          totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : (Number(d.totalPaid) || 0),
+          overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : (Number(d.overdueCount) || 0),
+        }));
     } catch (e) {
       console.error(e);
     }
@@ -296,33 +329,19 @@ export default function App() {
     try {
       const activeUser = currentUser || DEFAULT_USER;
       if (!activeUser.id) return [];
-      const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
-      const deletedIds = new Set<string>();
-      if (deletedSaved) {
-        try {
-          const parsedDel = JSON.parse(deletedSaved);
-          if (Array.isArray(parsedDel)) {
-            parsedDel.forEach((d: any) => d?.id && deletedIds.add(d.id));
-          }
-        } catch {}
-      }
+      const deletedList = readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', activeUser.id, activeUser.email);
+      const deletedIds = new Set<string>(deletedList.map((d) => d.id));
       const tombstones = getPermanentTombstones(activeUser.id);
       tombstones.forEach((id) => deletedIds.add(id));
 
-      const saved = localStorage.getItem(`haspaho_purchases_${activeUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (p: Purchase) =>
-              p &&
-              p.id &&
-              !deletedIds.has(p.id) &&
-              (!p.debtorId || !deletedIds.has(p.debtorId))
-          );
-        }
-      }
-      return [];
+      const localPurchases = readMergedLocalRecords<Purchase>('haspaho_purchases', activeUser.id, activeUser.email);
+      return localPurchases.filter(
+        (p: Purchase) =>
+          p &&
+          p.id &&
+          !deletedIds.has(p.id) &&
+          (!p.debtorId || !deletedIds.has(p.debtorId))
+      );
     } catch (e) {
       console.error(e);
     }
@@ -333,34 +352,20 @@ export default function App() {
     try {
       const activeUser = currentUser || DEFAULT_USER;
       if (!activeUser.id) return [];
-      const deletedSaved = localStorage.getItem(`haspaho_deleted_debtors_${activeUser.id}`);
-      const deletedIds = new Set<string>();
-      if (deletedSaved) {
-        try {
-          const parsedDel = JSON.parse(deletedSaved);
-          if (Array.isArray(parsedDel)) {
-            parsedDel.forEach((d: any) => d?.id && deletedIds.add(d.id));
-          }
-        } catch {}
-      }
+      const deletedList = readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', activeUser.id, activeUser.email);
+      const deletedIds = new Set<string>(deletedList.map((d) => d.id));
       const tombstones = getPermanentTombstones(activeUser.id);
       tombstones.forEach((id) => deletedIds.add(id));
 
-      const saved = localStorage.getItem(`haspaho_installments_${activeUser.id}`);
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed)) {
-          return parsed.filter(
-            (i: Installment) =>
-              i &&
-              i.id &&
-              !deletedIds.has(i.id) &&
-              (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
-              (!i.debtorId || !deletedIds.has(i.debtorId))
-          );
-        }
-      }
-      return [];
+      const localInsts = readMergedLocalRecords<Installment>('haspaho_installments', activeUser.id, activeUser.email);
+      return localInsts.filter(
+        (i: Installment) =>
+          i &&
+          i.id &&
+          !deletedIds.has(i.id) &&
+          (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+          (!i.debtorId || !deletedIds.has(i.debtorId))
+      );
     } catch (e) {
       console.error(e);
     }
@@ -401,29 +406,49 @@ export default function App() {
 
       if (fbUser && !isExplicitLoggedOut) {
         isExplicitLogoutRef.current = false;
-        const authUid = fbUser.uid;
-        console.log('[Auth:SESSION_ACTIVE] Firebase Auth session detected for UID:', authUid, fbUser.email);
+        const canonicalId = resolveCanonicalUserId(fbUser.uid, fbUser.email || undefined);
+        console.log('[Auth:SESSION_ACTIVE] Firebase Auth session detected for canonical UID:', canonicalId, fbUser.email);
         setCurrentUser((prev) => {
-          if (!prev || prev.id !== authUid) {
+          if (!prev || prev.id !== canonicalId) {
             try {
               const saved = localStorage.getItem('haspaho_auth_user');
               if (saved) {
                 const parsed = JSON.parse(saved);
-                // CRITICAL: Only reuse cached data if the email matches the authenticated Google account!
                 if (parsed.email && fbUser.email && parsed.email.toLowerCase() === fbUser.email.toLowerCase()) {
-                  return { ...parsed, id: authUid, email: fbUser.email };
+                  const unified = { ...parsed, id: canonicalId, email: fbUser.email };
+                  localStorage.setItem('haspaho_auth_user', JSON.stringify(unified));
+                  return unified;
                 }
               }
             } catch {}
-            const fallbackUser = {
-              id: authUid,
-              name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuário',
-              email: fbUser.email || '',
-              authProvider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'gmail' : 'local',
-              createdAt: new Date().toISOString(),
-              isFirstLogin: false,
-              hasSeenWelcome: true,
-            };
+            const isMaster = fbUser.email?.toLowerCase() === 'tiagodias8888@gmail.com';
+            const fallbackUser: UserAccount = isMaster
+              ? {
+                  ...TIAGO_DIAS_USER,
+                  id: canonicalId,
+                  email: fbUser.email || TIAGO_DIAS_USER.email,
+                  authProvider: 'gmail',
+                  isMasterAdmin: true,
+                  isFullStackDev: true,
+                  isFirstLogin: false,
+                  hasSeenWelcome: true,
+                }
+              : {
+                  id: canonicalId,
+                  name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Usuário',
+                  username: fbUser.email?.split('@')[0] || 'usuario',
+                  email: fbUser.email || '',
+                  phoneWhatsapp: fbUser.phoneNumber || '',
+                  companyName: 'HASPAHO Gestão',
+                  city: 'Brasil',
+                  state: 'BR',
+                  role: 'Usuário Gestor',
+                  pixKey: fbUser.email || '',
+                  authProvider: fbUser.providerData?.[0]?.providerId === 'google.com' ? 'gmail' : 'local',
+                  createdAt: new Date().toISOString(),
+                  isFirstLogin: false,
+                  hasSeenWelcome: true,
+                };
             localStorage.setItem('haspaho_auth_user', JSON.stringify(fallbackUser));
             return fallbackUser;
           }
@@ -441,7 +466,8 @@ export default function App() {
           if (saved) {
             const parsed = JSON.parse(saved);
             if (parsed && (parsed.id || parsed.email)) {
-              console.log('[Auth:SESSION_RESTORED] Restoring session for:', parsed.name || parsed.email);
+              parsed.id = resolveCanonicalUserId(parsed.id, parsed.email);
+              console.log('[Auth:SESSION_RESTORED] Restoring session for:', parsed.name || parsed.email, 'ID:', parsed.id);
               setCurrentUser(parsed);
               return;
             }
@@ -454,345 +480,378 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
-  // Sync initial user data from Firebase Firestore
+  // Função centralizada de sincronização bidirecional (LocalStorage <-> Firebase Firestore)
+  const syncWithCloudDatabase = useCallback(
+    async (user: UserAccount, showFeedbackToast = false) => {
+      if (!user || !user.id) return;
+      const canonicalId = resolveCanonicalUserId(user.id, user.email);
+      console.log(`[Firestore:SYNC] Syncing data with Cloud Firestore for "${user.name}" (Canonical ID: ${canonicalId})...`);
+
+      try {
+        const remoteUser = await getUserFromFirestore(canonicalId);
+        if (remoteUser) {
+          const unifiedUser = { ...user, ...remoteUser, id: canonicalId };
+          setCurrentUser(unifiedUser);
+          localStorage.setItem('haspaho_auth_user', JSON.stringify(unifiedUser));
+          if (unifiedUser.hasSeenWelcome === true) {
+            localStorage.setItem(`haspaho_welcome_completed_${canonicalId}`, 'true');
+            setIsWelcomeOpen(false);
+          }
+        } else {
+          await saveUserToFirestore({ ...user, id: canonicalId });
+        }
+
+        const [remoteDebtors, remotePurchases, remoteInstallments, remoteTombstones] = await Promise.all([
+          getDebtorsFromFirestore(canonicalId).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Debtors read warning:', err);
+            return [];
+          }),
+          getPurchasesFromFirestore(canonicalId).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Purchases read warning:', err);
+            return [];
+          }),
+          getInstallmentsFromFirestore(canonicalId).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Installments read warning:', err);
+            return [];
+          }),
+          getTombstonesFromFirestore(canonicalId).catch((err) => {
+            console.warn('[Firestore:LOAD_DATA] Tombstones read warning:', err);
+            return [];
+          }),
+        ]);
+
+        // Retrieve deleted debtor IDs & Permanent Tombstones
+        const deletedIds = new Set<string>();
+        const localDeletedList = readMergedLocalRecords<Debtor>('haspaho_deleted_debtors', canonicalId, user.email);
+        localDeletedList.forEach((d) => d?.id && deletedIds.add(d.id));
+
+        const tombstones = getPermanentTombstones(canonicalId);
+        if (Array.isArray(remoteTombstones) && remoteTombstones.length > 0) {
+          remoteTombstones.forEach((tId) => {
+            if (tId && typeof tId === 'string') {
+              tombstones.add(tId);
+            }
+          });
+          try {
+            localStorage.setItem(`haspaho_tombstones_${canonicalId}`, JSON.stringify(Array.from(tombstones)));
+          } catch {}
+        }
+        tombstones.forEach((id) => {
+          deletedIds.add(id);
+          saveTombstoneToFirestore(canonicalId, id).catch(() => {});
+        });
+
+        // 1. SMART MERGE DEBTORS
+        const localDebtorsArr = readMergedLocalRecords<Debtor>('haspaho_debtors', canonicalId, user.email).filter(
+          (d) => d && d.id && !deletedIds.has(d.id)
+        );
+        const localDebtorMap = new Map<string, Debtor>();
+        localDebtorsArr.forEach((d) => {
+          if (d && d.id && !deletedIds.has(d.id)) localDebtorMap.set(d.id, d);
+        });
+
+        const mergedDebtorsMap = new Map<string, Debtor>();
+        (remoteDebtors || []).forEach((remoteD) => {
+          if (!remoteD || !remoteD.id) return;
+          if (deletedIds.has(remoteD.id)) {
+            deleteDebtorFromFirestore(canonicalId, remoteD.id).catch(() => {});
+            return;
+          }
+          const localD = localDebtorMap.get(remoteD.id);
+          if (localD) {
+            mergedDebtorsMap.set(remoteD.id, {
+              ...remoteD,
+              ...localD,
+            });
+          } else {
+            mergedDebtorsMap.set(remoteD.id, remoteD);
+          }
+        });
+
+        localDebtorsArr.forEach((localD) => {
+          if (localD && localD.id && !deletedIds.has(localD.id) && !mergedDebtorsMap.has(localD.id)) {
+            mergedDebtorsMap.set(localD.id, localD);
+          }
+        });
+
+        const cleanedDebtors = Array.from(mergedDebtorsMap.values())
+          .filter((d) => !deletedIds.has(d.id))
+          .map((d) => ({
+            ...d,
+            totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : Number(d.totalOwed) || 0,
+            totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : Number(d.totalPaid) || 0,
+            overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : Number(d.overdueCount) || 0,
+            avatar: getCleanDebtorAvatar(d.name, d.avatar),
+          }));
+
+        setDebtors(cleanedDebtors);
+        try {
+          localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(cleanedDebtors));
+          localStorage.setItem('haspaho_debtors', JSON.stringify(cleanedDebtors));
+        } catch {}
+
+        if (cleanedDebtors.length > 0 && !isFirestoreQuotaExhausted()) {
+          await saveDebtorsToFirestore(canonicalId, cleanedDebtors).catch((e) => console.warn('Sync merged debtors note:', e));
+        }
+
+        // 2. SMART MERGE PURCHASES
+        const localPurchasesArr = readMergedLocalRecords<Purchase>('haspaho_purchases', canonicalId, user.email).filter(
+          (p) => p && p.id && !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))
+        );
+        const localPurchaseMap = new Map<string, Purchase>();
+        localPurchasesArr.forEach((p) => {
+          localPurchaseMap.set(p.id, p);
+        });
+
+        const mergedPurchasesMap = new Map<string, Purchase>();
+        (remotePurchases || []).forEach((remoteP) => {
+          if (!remoteP || !remoteP.id) return;
+          if (deletedIds.has(remoteP.id) || (remoteP.debtorId && deletedIds.has(remoteP.debtorId))) {
+            deletePurchaseFromFirestore(canonicalId, remoteP.id).catch(() => {});
+            return;
+          }
+          const localP = localPurchaseMap.get(remoteP.id);
+          if (localP) {
+            mergedPurchasesMap.set(remoteP.id, {
+              ...remoteP,
+              ...localP,
+            });
+          } else {
+            mergedPurchasesMap.set(remoteP.id, remoteP);
+          }
+        });
+
+        localPurchasesArr.forEach((localP) => {
+          if (!mergedPurchasesMap.has(localP.id)) {
+            mergedPurchasesMap.set(localP.id, localP);
+          }
+        });
+
+        const finalPurchases = Array.from(mergedPurchasesMap.values()).filter(
+          (p) => !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))
+        );
+
+        setPurchases(finalPurchases);
+        try {
+          localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(finalPurchases));
+          localStorage.setItem('haspaho_purchases', JSON.stringify(finalPurchases));
+        } catch {}
+
+        if (finalPurchases.length > 0 && !isFirestoreQuotaExhausted()) {
+          await savePurchasesToFirestore(canonicalId, finalPurchases).catch((e) => console.warn('Sync merged purchases note:', e));
+        }
+
+        // 3. SMART MERGE INSTALLMENTS
+        const localInstsArr = readMergedLocalRecords<Installment>('haspaho_installments', canonicalId, user.email).filter(
+          (i) =>
+            i &&
+            i.id &&
+            !deletedIds.has(i.id) &&
+            (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+            (!i.debtorId || !deletedIds.has(i.debtorId))
+        );
+        const localInstMap = new Map<string, Installment>();
+        localInstsArr.forEach((inst) => {
+          localInstMap.set(inst.id, inst);
+        });
+
+        const mergedInstsMap = new Map<string, Installment>();
+        (remoteInstallments || []).forEach((remoteInst) => {
+          if (!remoteInst || !remoteInst.id) return;
+          if (
+            deletedIds.has(remoteInst.id) ||
+            (remoteInst.purchaseId && deletedIds.has(remoteInst.purchaseId)) ||
+            (remoteInst.debtorId && deletedIds.has(remoteInst.debtorId))
+          ) {
+            deleteInstallmentFromFirestore(canonicalId, remoteInst.id).catch(() => {});
+            return;
+          }
+          const localInst = localInstMap.get(remoteInst.id);
+          if (localInst) {
+            if (localInst.status === 'paid' && remoteInst.status !== 'paid') {
+              mergedInstsMap.set(remoteInst.id, localInst);
+            } else if (remoteInst.status === 'paid' && localInst.status !== 'paid') {
+              mergedInstsMap.set(remoteInst.id, remoteInst);
+            } else {
+              mergedInstsMap.set(remoteInst.id, {
+                ...remoteInst,
+                ...localInst,
+                authCode: remoteInst.authCode || localInst.authCode,
+              });
+            }
+          } else {
+            mergedInstsMap.set(remoteInst.id, remoteInst);
+          }
+        });
+
+        localInstsArr.forEach((localInst) => {
+          if (!mergedInstsMap.has(localInst.id)) {
+            mergedInstsMap.set(localInst.id, localInst);
+          }
+        });
+
+        const finalInsts = Array.from(mergedInstsMap.values()).filter(
+          (i) =>
+            !deletedIds.has(i.id) &&
+            (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
+            (!i.debtorId || !deletedIds.has(i.debtorId))
+        );
+
+        const cleanedInsts = finalInsts.map((inst) => {
+          const persistentCode = inst.status === 'paid' && !inst.authCode ? generateAuthCode() : inst.authCode;
+          if (persistentCode && inst.status === 'paid') {
+            registerAuthCode({
+              auth: persistentCode,
+              type: 'recibo',
+              payer: inst.debtorName,
+              amount: `R$ ${safeToFixed(inst.paidAmount || inst.amount).replace('.', ',')}`,
+              date: inst.paidAt || inst.dueDate,
+              bank: inst.paymentMethod || 'Nubank Croma / Asaas IP',
+              item: `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`,
+              destination: 'Tiago Dias (Credor)',
+              status: 'AUTÊNTICO E LIQUIDADO',
+            });
+          }
+          return {
+            ...inst,
+            authCode: persistentCode,
+            debtorAvatar: getCleanDebtorAvatar(inst.debtorName, inst.debtorAvatar),
+          };
+        });
+
+        setInstallments(cleanedInsts);
+        try {
+          localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(cleanedInsts));
+          localStorage.setItem('haspaho_installments', JSON.stringify(cleanedInsts));
+        } catch {}
+
+        if (cleanedInsts.length > 0 && !isFirestoreQuotaExhausted()) {
+          await saveInstallmentsToFirestore(canonicalId, cleanedInsts).catch((e) => console.warn('Sync merged installments note:', e));
+        }
+
+        if (showFeedbackToast) {
+          setToastMessage(
+            `☁️ Banco Firebase Sincronizado! (${cleanedDebtors.length} devedores, ${finalPurchases.length} compras e ${cleanedInsts.length} parcelas na nuvem)`
+          );
+          setTimeout(() => setToastMessage(null), 4500);
+        }
+      } catch (err) {
+        console.warn('[Firestore:LOAD_DATA_OFFLINE]: Operando com cache local enquanto Firestore reconecta:', err);
+        if (showFeedbackToast) {
+          setToastMessage('⚠️ Operando com cache local. Verifique sua conexão com a internet.');
+          setTimeout(() => setToastMessage(null), 4000);
+        }
+      } finally {
+        isInitialLoadRef.current = false;
+      }
+    },
+    []
+  );
+
+  // Sync initial user data from Firebase Firestore & attach real-time listeners
   useEffect(() => {
     const activeUser = currentUser;
     if (!activeUser || !activeUser.id) {
       isInitialLoadRef.current = false;
       return;
     }
-    let isMounted = true;
 
-    async function loadUserData(user: UserAccount) {
-      console.log(`[Firestore:LOAD_DATA] Loading data from database for user "${user.name}" (ID: ${user.id})...`);
-      if (!auth.currentUser && user.authProvider === 'gmail') {
-        console.log(`[Firestore:LOAD_DATA] Operando com sessão Gmail rápida para ${user.id} (${user.email}).`);
-      }
+    const canonicalId = resolveCanonicalUserId(activeUser.id, activeUser.email);
+    syncWithCloudDatabase({ ...activeUser, id: canonicalId }, false);
 
-      try {
-        const remoteUser = await getUserFromFirestore(user.id);
-        if (remoteUser && isMounted) {
-          console.log(`[Firestore:LOAD_DATA] User profile loaded from Firestore:`, remoteUser.email || remoteUser.name);
-          setCurrentUser(remoteUser);
-          localStorage.setItem('haspaho_auth_user', JSON.stringify(remoteUser));
-          if (remoteUser.hasSeenWelcome === true) {
-            localStorage.setItem(`haspaho_welcome_completed_${remoteUser.id}`, 'true');
-            setIsWelcomeOpen(false);
-          }
-        } else if (auth.currentUser) {
-          console.log(`[Firestore:LOAD_DATA] Creating initial user profile in Firestore for ${user.id}...`);
-          await saveUserToFirestore(user);
-        }
-
-        const [remoteDebtors, remotePurchases, remoteInstallments, remoteTombstones] = await Promise.all([
-          getDebtorsFromFirestore(user.id).catch((err) => {
-            console.warn('[Firestore:LOAD_DATA] Debtors read warning:', err);
-            return [];
-          }),
-          getPurchasesFromFirestore(user.id).catch((err) => {
-            console.warn('[Firestore:LOAD_DATA] Purchases read warning:', err);
-            return [];
-          }),
-          getInstallmentsFromFirestore(user.id).catch((err) => {
-            console.warn('[Firestore:LOAD_DATA] Installments read warning:', err);
-            return [];
-          }),
-          getTombstonesFromFirestore(user.id).catch((err) => {
-            console.warn('[Firestore:LOAD_DATA] Tombstones read warning:', err);
-            return [];
-          }),
-        ]);
-
-        console.log(`[Firestore:LOAD_DATA] Retrieved from Firestore:`, {
-          debtors: remoteDebtors?.length || 0,
-          purchases: remotePurchases?.length || 0,
-          installments: remoteInstallments?.length || 0,
-          tombstones: remoteTombstones?.length || 0,
+    // Listener em tempo real (onSnapshot) para refletir mudanças feitas em outro aparelho/navegador
+    const unsubscribeRealtime = subscribeToUserFirestoreRealtime(canonicalId, {
+      onDebtorsSnapshot: (remoteDebtors) => {
+        if (isInitialLoadRef.current) return;
+        const tombstones = getPermanentTombstones(canonicalId);
+        setDebtors((prev) => {
+          const map = new Map<string, Debtor>();
+          prev.forEach((d) => {
+            if (d?.id && !tombstones.has(d.id)) map.set(d.id, d);
+          });
+          let changed = false;
+          remoteDebtors.forEach((rd) => {
+            if (!rd?.id || tombstones.has(rd.id)) return;
+            const existing = map.get(rd.id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(rd)) {
+              map.set(rd.id, { ...existing, ...rd, avatar: getCleanDebtorAvatar(rd.name, rd.avatar) });
+              changed = true;
+            }
+          });
+          if (!changed) return prev;
+          const next = Array.from(map.values());
+          try {
+            localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(next));
+            localStorage.setItem('haspaho_debtors', JSON.stringify(next));
+          } catch {}
+          return next;
         });
-
-        if (isMounted) {
-          const isMaster = user.id === 'usr_thiago_dias' || user.email === 'tiagodias8888@gmail.com';
-
-          // Retrieve deleted debtor IDs e Permanent Tombstones
-          const deletedIds = new Set<string>();
-          try {
-            const savedDel = localStorage.getItem(`haspaho_deleted_debtors_${user.id}`);
-            if (savedDel) {
-              const parsedDel = JSON.parse(savedDel);
-              if (Array.isArray(parsedDel)) {
-                parsedDel.forEach((d: any) => d?.id && deletedIds.add(d.id));
-              }
-            }
-          } catch {}
-          const tombstones = getPermanentTombstones(user.id);
-          // Incorpora tombstones persistidos no Firestore pelo usuário autenticado
-          if (Array.isArray(remoteTombstones) && remoteTombstones.length > 0) {
-            remoteTombstones.forEach((tId) => {
-              if (tId && typeof tId === 'string') {
-                tombstones.add(tId);
-              }
-            });
-            try {
-              localStorage.setItem(`haspaho_tombstones_${user.id}`, JSON.stringify(Array.from(tombstones)));
-            } catch {}
-          }
-          tombstones.forEach((id) => deletedIds.add(id));
-
-          // 1. SMART MERGE DEBTORS (Isolado estritamente por ID de usuário)
-          let localDebtorsArr: Debtor[] = [];
-          try {
-            const saved = localStorage.getItem(`haspaho_debtors_${user.id}`);
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) localDebtorsArr = parsed.filter((d: Debtor) => d && d.id && !deletedIds.has(d.id));
-            }
-          } catch {}
-
-          const localDebtorMap = new Map<string, Debtor>();
-          localDebtorsArr.forEach((d) => {
-            if (d && d.id && !deletedIds.has(d.id)) localDebtorMap.set(d.id, d);
+      },
+      onPurchasesSnapshot: (remotePurchases) => {
+        if (isInitialLoadRef.current) return;
+        const tombstones = getPermanentTombstones(canonicalId);
+        setPurchases((prev) => {
+          const map = new Map<string, Purchase>();
+          prev.forEach((p) => {
+            if (p?.id && !tombstones.has(p.id) && (!p.debtorId || !tombstones.has(p.debtorId))) map.set(p.id, p);
           });
-
-          const mergedDebtorsMap = new Map<string, Debtor>();
-          (remoteDebtors || []).forEach((remoteD) => {
-            if (!remoteD || !remoteD.id) return;
-            // Se foi excluído permanentemente, garante limpeza remota e não restaura
-            if (deletedIds.has(remoteD.id)) {
-              deleteDebtorFromFirestore(user.id, remoteD.id).catch(() => {});
+          let changed = false;
+          remotePurchases.forEach((rp) => {
+            if (!rp?.id || tombstones.has(rp.id) || (rp.debtorId && tombstones.has(rp.debtorId))) return;
+            const existing = map.get(rp.id);
+            if (!existing || JSON.stringify(existing) !== JSON.stringify(rp)) {
+              map.set(rp.id, { ...existing, ...rp });
+              changed = true;
+            }
+          });
+          if (!changed) return prev;
+          const next = Array.from(map.values());
+          try {
+            localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(next));
+            localStorage.setItem('haspaho_purchases', JSON.stringify(next));
+          } catch {}
+          return next;
+        });
+      },
+      onInstallmentsSnapshot: (remoteInstallments) => {
+        if (isInitialLoadRef.current) return;
+        const tombstones = getPermanentTombstones(canonicalId);
+        setInstallments((prev) => {
+          const map = new Map<string, Installment>();
+          prev.forEach((i) => {
+            if (i?.id && !tombstones.has(i.id) && (!i.purchaseId || !tombstones.has(i.purchaseId)) && (!i.debtorId || !tombstones.has(i.debtorId))) {
+              map.set(i.id, i);
+            }
+          });
+          let changed = false;
+          remoteInstallments.forEach((ri) => {
+            if (!ri?.id || tombstones.has(ri.id) || (ri.purchaseId && tombstones.has(ri.purchaseId)) || (ri.debtorId && tombstones.has(ri.debtorId))) {
               return;
             }
-            const localD = localDebtorMap.get(remoteD.id);
-            if (localD) {
-              mergedDebtorsMap.set(remoteD.id, {
-                ...remoteD,
-                ...localD,
-              });
-            } else {
-              mergedDebtorsMap.set(remoteD.id, remoteD);
+            const existing = map.get(ri.id);
+            if (!existing) {
+              map.set(ri.id, { ...ri, debtorAvatar: getCleanDebtorAvatar(ri.debtorName, ri.debtorAvatar) });
+              changed = true;
+            } else if (existing.status !== 'paid' && ri.status === 'paid') {
+              map.set(ri.id, { ...existing, ...ri });
+              changed = true;
             }
           });
-
-          localDebtorsArr.forEach((localD) => {
-            if (localD && localD.id && !deletedIds.has(localD.id) && !mergedDebtorsMap.has(localD.id)) {
-              mergedDebtorsMap.set(localD.id, localD);
-            }
-          });
-
-          let finalDebtors = Array.from(mergedDebtorsMap.values()).filter((d) => !deletedIds.has(d.id));
-
-          const cleanedDebtors = finalDebtors.map((d) => ({
-            ...d,
-            totalOwed: typeof d.totalOwed === 'number' ? d.totalOwed : (Number(d.totalOwed) || 0),
-            totalPaid: typeof d.totalPaid === 'number' ? d.totalPaid : (Number(d.totalPaid) || 0),
-            overdueCount: typeof d.overdueCount === 'number' ? d.overdueCount : (Number(d.overdueCount) || 0),
-            avatar: getCleanDebtorAvatar(d.name, d.avatar),
-          }));
-
-          setDebtors(cleanedDebtors);
+          if (!changed) return prev;
+          const next = Array.from(map.values());
           try {
-            localStorage.setItem(`haspaho_debtors_${user.id}`, JSON.stringify(cleanedDebtors));
-            if (isMaster) localStorage.setItem('haspaho_debtors', JSON.stringify(cleanedDebtors));
+            localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(next));
+            localStorage.setItem('haspaho_installments', JSON.stringify(next));
           } catch {}
-          if ((!remoteDebtors || remoteDebtors.length === 0) && cleanedDebtors.length > 0 && !isFirestoreQuotaExhausted()) {
-            saveDebtorsToFirestore(user.id, cleanedDebtors).catch((e) => console.warn('Sync merged debtors note:', e));
-          }
-
-          // 2. SMART MERGE PURCHASES
-          let localPurchasesArr: Purchase[] = [];
-          try {
-            const saved = localStorage.getItem(`haspaho_purchases_${user.id}`);
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) {
-                localPurchasesArr = parsed.filter(
-                  (p: Purchase) =>
-                    p &&
-                    p.id &&
-                    !deletedIds.has(p.id) &&
-                    (!p.debtorId || !deletedIds.has(p.debtorId))
-                );
-              }
-            }
-          } catch {}
-
-          const localPurchaseMap = new Map<string, Purchase>();
-          localPurchasesArr.forEach((p) => {
-            if (p && p.id && !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))) {
-              localPurchaseMap.set(p.id, p);
-            }
-          });
-
-          const mergedPurchasesMap = new Map<string, Purchase>();
-          (remotePurchases || []).forEach((remoteP) => {
-            if (!remoteP || !remoteP.id) return;
-            if (deletedIds.has(remoteP.id) || (remoteP.debtorId && deletedIds.has(remoteP.debtorId))) {
-              deletePurchaseFromFirestore(user.id, remoteP.id).catch(() => {});
-              return;
-            }
-            const localP = localPurchaseMap.get(remoteP.id);
-            if (localP) {
-              mergedPurchasesMap.set(remoteP.id, {
-                ...remoteP,
-                ...localP,
-              });
-            } else {
-              mergedPurchasesMap.set(remoteP.id, remoteP);
-            }
-          });
-
-          localPurchasesArr.forEach((localP) => {
-            if (
-              localP &&
-              localP.id &&
-              !deletedIds.has(localP.id) &&
-              (!localP.debtorId || !deletedIds.has(localP.debtorId)) &&
-              !mergedPurchasesMap.has(localP.id)
-            ) {
-              mergedPurchasesMap.set(localP.id, localP);
-            }
-          });
-
-          let finalPurchases = Array.from(mergedPurchasesMap.values()).filter(
-            (p) => !deletedIds.has(p.id) && (!p.debtorId || !deletedIds.has(p.debtorId))
-          );
-
-          setPurchases(finalPurchases);
-          try {
-            localStorage.setItem(`haspaho_purchases_${user.id}`, JSON.stringify(finalPurchases));
-            if (isMaster) localStorage.setItem('haspaho_purchases', JSON.stringify(finalPurchases));
-          } catch {}
-          if ((!remotePurchases || remotePurchases.length === 0) && finalPurchases.length > 0 && !isFirestoreQuotaExhausted()) {
-            savePurchasesToFirestore(user.id, finalPurchases).catch((e) => console.warn('Sync merged purchases note:', e));
-          }
-
-          // 3. SMART MERGE INSTALLMENTS (Preserves local paid status on reload)
-          let localInstsArr: Installment[] = [];
-          try {
-            const saved = localStorage.getItem(`haspaho_installments_${user.id}`);
-            if (saved) {
-              const parsed = JSON.parse(saved);
-              if (Array.isArray(parsed)) {
-                localInstsArr = parsed.filter(
-                  (i: Installment) =>
-                    i &&
-                    i.id &&
-                    !deletedIds.has(i.id) &&
-                    (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
-                    (!i.debtorId || !deletedIds.has(i.debtorId))
-                );
-              }
-            }
-          } catch {}
-
-          const localInstMap = new Map<string, Installment>();
-          localInstsArr.forEach((inst) => {
-            if (
-              inst &&
-              inst.id &&
-              !deletedIds.has(inst.id) &&
-              (!inst.purchaseId || !deletedIds.has(inst.purchaseId)) &&
-              (!inst.debtorId || !deletedIds.has(inst.debtorId))
-            ) {
-              localInstMap.set(inst.id, inst);
-            }
-          });
-
-          const mergedInstsMap = new Map<string, Installment>();
-          (remoteInstallments || []).forEach((remoteInst) => {
-            if (!remoteInst || !remoteInst.id) return;
-            if (
-              deletedIds.has(remoteInst.id) ||
-              (remoteInst.purchaseId && deletedIds.has(remoteInst.purchaseId)) ||
-              (remoteInst.debtorId && deletedIds.has(remoteInst.debtorId))
-            ) {
-              deleteInstallmentFromFirestore(user.id, remoteInst.id).catch(() => {});
-              return;
-            }
-            const localInst = localInstMap.get(remoteInst.id);
-            if (localInst) {
-              // If local version is paid while remote is not, preserve local paid status!
-              if (localInst.status === 'paid' && remoteInst.status !== 'paid') {
-                mergedInstsMap.set(remoteInst.id, localInst);
-              } else {
-                mergedInstsMap.set(remoteInst.id, {
-                  ...remoteInst,
-                  ...localInst,
-                  authCode: remoteInst.authCode || localInst.authCode,
-                });
-              }
-            } else {
-              mergedInstsMap.set(remoteInst.id, remoteInst);
-            }
-          });
-
-          localInstsArr.forEach((localInst) => {
-            if (
-              localInst &&
-              localInst.id &&
-              !deletedIds.has(localInst.id) &&
-              (!localInst.purchaseId || !deletedIds.has(localInst.purchaseId)) &&
-              (!localInst.debtorId || !deletedIds.has(localInst.debtorId)) &&
-              !mergedInstsMap.has(localInst.id)
-            ) {
-              mergedInstsMap.set(localInst.id, localInst);
-            }
-          });
-
-          let finalInsts = Array.from(mergedInstsMap.values()).filter(
-            (i) =>
-              !deletedIds.has(i.id) &&
-              (!i.purchaseId || !deletedIds.has(i.purchaseId)) &&
-              (!i.debtorId || !deletedIds.has(i.debtorId))
-          );
-
-          const cleanedInsts = finalInsts.map((inst) => {
-            const persistentCode = inst.status === 'paid' && !inst.authCode ? generateAuthCode() : inst.authCode;
-            if (persistentCode && inst.status === 'paid') {
-              registerAuthCode({
-                auth: persistentCode,
-                type: 'recibo',
-                payer: inst.debtorName,
-                amount: `R$ ${safeToFixed(inst.paidAmount || inst.amount).replace('.', ',')}`,
-                date: inst.paidAt || inst.dueDate,
-                bank: inst.paymentMethod || 'Nubank Croma / Asaas IP',
-                item: `${inst.product} (Parcela ${inst.installmentNumber}/${inst.totalInstallments})`,
-                destination: 'Tiago Dias (Credor)',
-                status: 'AUTÊNTICO E LIQUIDADO',
-              });
-            }
-            return {
-              ...inst,
-              authCode: persistentCode,
-              debtorAvatar: getCleanDebtorAvatar(inst.debtorName, inst.debtorAvatar),
-            };
-          });
-
-          setInstallments(cleanedInsts);
-          try {
-            localStorage.setItem(`haspaho_installments_${user.id}`, JSON.stringify(cleanedInsts));
-            localStorage.setItem('haspaho_installments', JSON.stringify(cleanedInsts));
-          } catch {}
-          if ((!remoteInstallments || remoteInstallments.length === 0) && cleanedInsts.length > 0 && !isFirestoreQuotaExhausted()) {
-            saveInstallmentsToFirestore(user.id, cleanedInsts).catch((e) => console.warn('Sync merged installments note:', e));
-          }
-        }
-      } catch (err) {
-        console.warn('[Firestore:LOAD_DATA_OFFLINE]: Operando com cache local enquanto Firestore reconecta:', err);
-      } finally {
-        if (isMounted) {
-          isInitialLoadRef.current = false;
-          lastSyncSignatureRef.current = `${activeUser?.id || 'default'}_d:${debtors.length}_p:${purchases.length}_i:${installments.length}`;
-          console.log('[Firestore:LOAD_DATA] Initial data load complete. Live auto-sync is ready.');
-        }
-      }
-    }
-
-    loadUserData(activeUser);
+          return next;
+        });
+      },
+    });
 
     return () => {
-      isMounted = false;
+      unsubscribeRealtime();
     };
-  }, [currentUser?.id]);
+  }, [currentUser?.id, syncWithCloudDatabase]);
 
   // Auto-sync subsequent changes to LocalStorage and Firestore
   useEffect(() => {
@@ -3114,15 +3173,17 @@ export default function App() {
     try {
       localStorage.removeItem('haspaho_explicit_logout');
     } catch {}
-    setCurrentUser(user);
-    localStorage.setItem('haspaho_auth_user', JSON.stringify(user));
+    const canonicalId = resolveCanonicalUserId(user.id, user.email);
+    const normalizedUser: UserAccount = { ...user, id: canonicalId };
+    setCurrentUser(normalizedUser);
+    localStorage.setItem('haspaho_auth_user', JSON.stringify(normalizedUser));
     setIsAuthOpen(false);
     setCurrentTab('dashboard');
 
     // Controle estrito de apresentação: exibida APENAS no primeiro acesso de cada usuário
-    const completedLocally = localStorage.getItem(`haspaho_welcome_completed_${user.id}`) === 'true';
-    const completedRemotely = user.hasSeenWelcome === true;
-    const isFirstAccess = (isNewAccount || user.isFirstLogin === true) && !completedLocally && !completedRemotely;
+    const completedLocally = localStorage.getItem(`haspaho_welcome_completed_${canonicalId}`) === 'true';
+    const completedRemotely = normalizedUser.hasSeenWelcome === true;
+    const isFirstAccess = (isNewAccount || normalizedUser.isFirstLogin === true) && !completedLocally && !completedRemotely;
 
     if (isFirstAccess) {
       setIsWelcomeOpen(true);
@@ -3131,11 +3192,90 @@ export default function App() {
     }
 
     try {
-      await saveUserToFirestore(user);
+      await saveUserToFirestore(normalizedUser);
+      await syncWithCloudDatabase(normalizedUser, false);
     } catch (err) {
       console.error('Failed to sync user to Firestore:', err);
     }
-    showToast(`Bem-vindo, ${user.name}!`);
+    showToast(`Bem-vindo, ${normalizedUser.name}! Dados sincronizados com o Firebase.`);
+  };
+
+  const handleManualCloudSync = async () => {
+    if (!currentUser) return;
+    const canonicalId = resolveCanonicalUserId(currentUser.id, currentUser.email);
+    const normalizedUser = { ...currentUser, id: canonicalId };
+    try {
+      await Promise.all([
+        saveUserToFirestore(normalizedUser),
+        saveDebtorsToFirestore(canonicalId, debtors),
+        savePurchasesToFirestore(canonicalId, purchases),
+        saveInstallmentsToFirestore(canonicalId, installments),
+      ]);
+      await syncWithCloudDatabase(normalizedUser, true);
+    } catch (err) {
+      console.error('[Firestore:MANUAL_SYNC] Error:', err);
+      showToast('⚠️ Erro ao sincronizar com o Firebase. Verifique sua conexão.');
+    }
+  };
+
+  const handleImportBackupData = async (imported: {
+    debtors?: Debtor[];
+    purchases?: Purchase[];
+    installments?: Installment[];
+  }) => {
+    if (!currentUser) return;
+    const canonicalId = resolveCanonicalUserId(currentUser.id, currentUser.email);
+
+    const inDebtors = Array.isArray(imported.debtors) ? imported.debtors : [];
+    const inPurchases = Array.isArray(imported.purchases) ? imported.purchases : [];
+    const inInstallments = Array.isArray(imported.installments) ? imported.installments : [];
+
+    // Remove imported IDs from tombstones so they are restored cleanly
+    inDebtors.forEach((d) => d?.id && removePermanentTombstone(canonicalId, d.id));
+    inPurchases.forEach((p) => p?.id && removePermanentTombstone(canonicalId, p.id));
+    inInstallments.forEach((i) => i?.id && removePermanentTombstone(canonicalId, i.id));
+
+    const debtorMap = new Map<string, Debtor>();
+    debtors.forEach((d) => d?.id && debtorMap.set(d.id, d));
+    inDebtors.forEach((d) => d?.id && debtorMap.set(d.id, { ...debtorMap.get(d.id), ...d }));
+    const mergedDebtors = Array.from(debtorMap.values());
+
+    const purchaseMap = new Map<string, Purchase>();
+    purchases.forEach((p) => p?.id && purchaseMap.set(p.id, p));
+    inPurchases.forEach((p) => p?.id && purchaseMap.set(p.id, { ...purchaseMap.get(p.id), ...p }));
+    const mergedPurchases = Array.from(purchaseMap.values());
+
+    const instMap = new Map<string, Installment>();
+    installments.forEach((i) => i?.id && instMap.set(i.id, i));
+    inInstallments.forEach((i) => i?.id && instMap.set(i.id, { ...instMap.get(i.id), ...i }));
+    const mergedInstallments = Array.from(instMap.values());
+
+    setDebtors(mergedDebtors);
+    setPurchases(mergedPurchases);
+    setInstallments(mergedInstallments);
+
+    try {
+      localStorage.setItem(`haspaho_debtors_${canonicalId}`, JSON.stringify(mergedDebtors));
+      localStorage.setItem(`haspaho_purchases_${canonicalId}`, JSON.stringify(mergedPurchases));
+      localStorage.setItem(`haspaho_installments_${canonicalId}`, JSON.stringify(mergedInstallments));
+      localStorage.setItem('haspaho_debtors', JSON.stringify(mergedDebtors));
+      localStorage.setItem('haspaho_purchases', JSON.stringify(mergedPurchases));
+      localStorage.setItem('haspaho_installments', JSON.stringify(mergedInstallments));
+    } catch {}
+
+    try {
+      await Promise.all([
+        saveDebtorsToFirestore(canonicalId, mergedDebtors),
+        savePurchasesToFirestore(canonicalId, mergedPurchases),
+        saveInstallmentsToFirestore(canonicalId, mergedInstallments),
+      ]);
+      showToast(
+        `✅ Backup restaurado e salvo no Firebase (${mergedDebtors.length} clientes, ${mergedPurchases.length} compras, ${mergedInstallments.length} parcelas)!`
+      );
+    } catch (err) {
+      console.error('Erro ao salvar backup importado no Firestore:', err);
+      showToast('✅ Backup restaurado localmente. Sincronizando com o Firebase...');
+    }
   };
 
   const handleLogout = async () => {
@@ -3283,6 +3423,7 @@ export default function App() {
         onOpenAuthLookup={() => setIsAuthLookupOpen(true)}
         onLogout={handleLogout}
         onRestoreAllData={handleRestoreAllData}
+        onSyncFirebase={handleManualCloudSync}
         isDarkMode={theme === 'dark'}
         onToggleTheme={handleToggleTheme}
         titleOverride={
@@ -3688,6 +3829,8 @@ export default function App() {
           deletedDebtors={deletedDebtors}
           onRestoreDebtor={handleRestoreDebtor}
           onPermanentDeleteDebtor={handlePermanentDeleteDebtor}
+          onSyncFirebase={handleManualCloudSync}
+          onImportBackup={handleImportBackupData}
           initialTab={userSettingsTab}
         />
       )}

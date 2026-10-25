@@ -82,6 +82,7 @@ interface HeaderProps {
   onLogout?: () => void;
   onOpenAuthLookup?: () => void;
   onRestoreAllData?: () => void;
+  onSyncFirebase?: () => Promise<void> | void;
   isDarkMode?: boolean;
   onToggleTheme?: () => void;
   onToast?: (msg: string) => void;
@@ -122,6 +123,7 @@ export const Header: React.FC<HeaderProps> = ({
   onLogout,
   onOpenAuthLookup,
   onRestoreAllData,
+  onSyncFirebase,
   isDarkMode,
   onToggleTheme,
   onToast,
@@ -137,15 +139,19 @@ export const Header: React.FC<HeaderProps> = ({
     setIsTestingFirebase(true);
     const start = Date.now();
     try {
-      const ok = await testConnection();
-      const elapsed = Date.now() - start;
-      if (ok) {
-        if (onToast) onToast(`🔥 Conectividade Firebase 100% OK! Ping: ${elapsed}ms • Cloud Firestore Ativo`);
+      if (onSyncFirebase) {
+        await onSyncFirebase();
       } else {
-        if (onToast) onToast('⚠️ Resposta do Firebase não confirmada. Verifique sua conexão.');
+        const ok = await testConnection();
+        const elapsed = Date.now() - start;
+        if (ok) {
+          if (onToast) onToast(`🔥 Conectividade Firebase 100% OK! Ping: ${elapsed}ms • Cloud Firestore Ativo`);
+        } else {
+          if (onToast) onToast('⚠️ Resposta do Firebase não confirmada. Verifique sua conexão.');
+        }
       }
     } catch {
-      if (onToast) onToast('⚠️ Erro ao verificar resposta do Firebase.');
+      if (onToast) onToast('⚠️ Erro ao sincronizar com o Firebase.');
     } finally {
       setIsTestingFirebase(false);
     }
@@ -266,6 +272,19 @@ export const Header: React.FC<HeaderProps> = ({
               isDarkMode={isDarkMode}
             />
 
+            <button
+              type="button"
+              onClick={handleTestFirebase}
+              disabled={isTestingFirebase}
+              className="px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 font-bold text-xs flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
+              title="Sincronizar Agora com o Banco de Dados Firebase Cloud Firestore"
+            >
+              <span className={`material-symbols-outlined text-[16px] ${isTestingFirebase ? 'animate-spin' : ''}`}>
+                cloud_sync
+              </span>
+              <span>{isTestingFirebase ? 'Sincronizando...' : 'Firebase'}</span>
+            </button>
+
             {onOpenCredorScore && (
               <button
                 onClick={onOpenCredorScore}
@@ -326,6 +345,18 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={handleTestFirebase}
+              disabled={isTestingFirebase}
+              className="w-8 h-8 rounded-lg bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-700 flex items-center justify-center cursor-pointer active:scale-95 transition-all"
+              title="Sincronizar Agora com o Firebase"
+              aria-label="Sincronizar com Firebase"
+            >
+              <span className={`material-symbols-outlined text-[16px] ${isTestingFirebase ? 'animate-spin' : ''}`}>
+                cloud_sync
+              </span>
+            </button>
             {onOpenCredorScore && (
               <button
                 onClick={onOpenCredorScore}
