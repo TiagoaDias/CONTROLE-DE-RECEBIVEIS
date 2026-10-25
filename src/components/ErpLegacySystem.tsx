@@ -1453,43 +1453,45 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
         {/* Tab Content Box (PageControl Body) */}
         <div
-          className={`flex-1 border border-t-0 ${activeTab === 'massa' ? 'p-1 sm:p-3' : 'p-2 sm:p-4'} min-h-0 overflow-y-visible sm:overflow-y-auto ${
+          className={`flex-1 border border-t-0 ${activeTab === 'massa' ? 'p-1 sm:p-3' : 'p-1.5 sm:p-3'} min-h-0 overflow-y-visible sm:overflow-y-auto ${
             themeMode === 'classic_delphi'
               ? 'bg-white text-slate-900 border-slate-400 shadow-inner'
-              : 'bg-white text-slate-900 border-slate-300 shadow-xs'
+              : 'bg-gradient-to-b from-white via-slate-50/70 to-slate-100/80 text-slate-900 border-slate-300 shadow-xs'
           }`}
         >
-          {/* TAB 1: FICHA CADASTRAL DO DEVEDOR (DATA ENTRY FORM) */}
+          {/* TAB 1: FICHA CADASTRAL DO DEVEDOR (DATA ENTRY FORM - ULTRA OTIMIZADO NÍVEL HARD) */}
           {activeTab === 'cadastro' && (
-            <div className="space-y-4">
-              {/* Modern Enterprise ERP Record Selector & Financial KPIs Bar */}
+            <div className="space-y-2 sm:space-y-2.5 animate-in">
+              {/* Modern Enterprise ERP Record Selector & Financial KPIs Bar — Fundo Branco Mesclado com Cinza Claro */}
               <div
-                className={`p-3 sm:p-4 rounded-xl border flex flex-col gap-3 transition-all ${
+                className={`p-2 sm:p-2.5 rounded-2xl border flex flex-col gap-2 transition-all ${
                   themeMode === 'classic_delphi'
                     ? 'bg-gradient-to-b from-[#f8f6f0] to-[#eae6d8] border-slate-300 shadow-xs'
-                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 shadow-xs'
+                    : 'bg-gradient-to-br from-white via-slate-50 to-slate-100/90 border-slate-200/90 shadow-sm'
                 }`}
               >
-                {/* Selector Row - Modern ERP Control */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 p-2.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
-                  <div className="flex items-center gap-2.5">
-                    <div className="w-8 h-8 rounded-lg bg-blue-600/10 text-blue-600 dark:text-blue-400 border border-blue-500/20 flex items-center justify-center shrink-0">
-                      <span className="material-symbols-outlined text-lg">badge</span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="font-mono text-[10px] uppercase font-bold tracking-wider text-slate-500 dark:text-slate-400">
-                        Registro Ativo
-                      </span>
-                      <label className="font-bold text-xs sm:text-sm text-slate-900 dark:text-slate-100 flex items-center gap-1.5">
-                        <span>Seletor de Devedor</span>
-                        <span className="text-[10px] font-mono text-slate-400 font-normal hidden sm:inline">
-                          ({debtors.length} cadastrados)
+                {/* Selector Row - Ultra Compacto Nível Hard */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 p-1.5 sm:p-2 rounded-xl bg-gradient-to-r from-white via-slate-50 to-slate-100/90 border border-slate-200/90 shadow-2xs">
+                  <div className="flex items-center justify-between sm:justify-start gap-2">
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-blue-50 to-slate-100 text-blue-600 border border-blue-200/80 flex items-center justify-center shrink-0 shadow-2xs animate-foto-motion">
+                        <span className="material-symbols-outlined text-[16px]">badge</span>
+                      </div>
+                      <div className="flex items-center sm:flex-col sm:items-start gap-1.5 sm:gap-0 leading-none">
+                        <span className="font-mono text-[8.5px] sm:text-[9px] uppercase font-extrabold tracking-wider text-slate-500">
+                          Registro Ativo
                         </span>
-                      </label>
+                        <label className="font-black text-[11px] sm:text-xs text-slate-900 flex items-center gap-1">
+                          <span>Seletor de Devedor</span>
+                          <span className="text-[9.5px] font-mono text-slate-500 font-bold">
+                            ({debtors.length})
+                          </span>
+                        </label>
+                      </div>
                     </div>
                   </div>
 
-                  <div className="flex items-center gap-1.5 flex-1 max-w-full sm:max-w-xl">
+                  <div className="flex items-center gap-1 flex-1 max-w-full sm:max-w-xl">
                     {/* Botão Anterior */}
                     <button
                       type="button"
@@ -1501,10 +1503,10 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           playAppSound('click');
                         }
                       }}
-                      className="h-9 w-9 bg-white hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
+                      className="h-8 w-8 bg-gradient-to-b from-white to-slate-100 hover:from-slate-50 hover:to-slate-200/80 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
                       title="Devedor Anterior (Seta Esquerda)"
                     >
-                      <span className="material-symbols-outlined text-[18px]">chevron_left</span>
+                      <span className="material-symbols-outlined text-[17px]">chevron_left</span>
                     </button>
 
                     <div className="relative flex-1 min-w-0">
@@ -1514,13 +1516,13 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           setSelectedDebtorId(e.target.value);
                           playAppSound('pop');
                         }}
-                        className="w-full h-9 px-3 bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 border border-slate-300 dark:border-slate-700 hover:border-blue-500 dark:hover:border-blue-400 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-2 focus:ring-blue-500/20 rounded-lg font-mono text-xs sm:text-sm font-semibold outline-none transition-all shadow-2xs cursor-pointer truncate"
+                        className="w-full h-8 px-2.5 bg-gradient-to-r from-white via-slate-50 to-white text-slate-900 border border-slate-300 hover:border-blue-500 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 rounded-lg font-mono text-[11px] sm:text-xs font-bold outline-none transition-all shadow-2xs cursor-pointer truncate"
                       >
                         {debtors.map((d, idx) => {
                           const isDemo = d.id === 'DEMO-001' || d.id === 'DEMO-002' || d.relation === 'Demonstração' || (d.id && d.id.startsWith('DEMO-'));
                           return (
-                            <option key={d.id} value={d.id}>
-                              {getDebtorCode(d.id, idx)} — {d.name} {isDemo ? '[Exemplo Fictício]' : ''} — R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {(Number(d.overdueCount) || 0) > 0 ? `(${d.overdueCount} atrasadas)` : '(Em dia)'}
+                            <option key={d.id} value={d.id} className="bg-white text-slate-900">
+                              {getDebtorCode(d.id, idx)} — {d.name} {isDemo ? '[Demo]' : ''} — R$ {(Number(d.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} {(Number(d.overdueCount) || 0) > 0 ? `(${d.overdueCount} atras.)` : '(Em dia)'}
                             </option>
                           );
                         })}
@@ -1538,74 +1540,69 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           playAppSound('click');
                         }
                       }}
-                      className="h-9 w-9 bg-white hover:bg-slate-100 text-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 dark:text-slate-200 border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
+                      className="h-8 w-8 bg-gradient-to-b from-white to-slate-100 hover:from-slate-50 hover:to-slate-200/80 text-slate-700 border border-slate-300 rounded-lg text-xs font-bold transition-all active:scale-95 cursor-pointer flex items-center justify-center shrink-0 shadow-2xs"
                       title="Próximo Devedor (Seta Direita)"
                     >
-                      <span className="material-symbols-outlined text-[18px]">chevron_right</span>
+                      <span className="material-symbols-outlined text-[17px]">chevron_right</span>
                     </button>
                   </div>
                 </div>
 
-                {/* Etiqueta para devedores de demonstração / fictícios - Estilo ERP Corporativo com Máximo Contraste em Verde */}
+                {/* Etiqueta compacta para devedores de demonstração */}
                 {activeDebtor && (activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 bg-emerald-50 border-2 border-emerald-500 rounded-xl px-3.5 py-2.5 text-xs shadow-xs">
-                    <div className="flex items-center gap-2.5 text-emerald-950">
-                      <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
-                        <span className="material-symbols-outlined text-[18px]">verified_user</span>
-                      </div>
-                      <span className="text-emerald-950 font-medium">
-                        <strong className="font-black text-emerald-950 text-xs sm:text-[13px]">Cliente de Demonstração:</strong>{' '}
-                        <span className="text-emerald-900 font-bold">
-                          Registro gerado para testes e homologação de rotinas no sistema.
-                        </span>
+                  <div className="flex items-center justify-between gap-2 bg-gradient-to-r from-emerald-50 via-white to-slate-50 border border-emerald-400 rounded-xl px-2.5 py-1.5 text-[10.5px] shadow-2xs">
+                    <div className="flex items-center gap-1.5 text-emerald-950 min-w-0">
+                      <span className="material-symbols-outlined text-[15px] text-emerald-600 shrink-0">verified_user</span>
+                      <span className="truncate font-semibold">
+                        <strong className="font-black">Cliente Demo:</strong> Registro para testes no sistema.
                       </span>
                     </div>
                     {onRequestDeleteDebtor && (
                       <button
                         type="button"
                         onClick={() => onRequestDeleteDebtor(activeDebtor)}
-                        className="self-end sm:self-auto px-3 py-1.5 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[11px] flex items-center gap-1 shadow-xs cursor-pointer transition-all shrink-0"
+                        className="px-2 py-1 rounded-lg bg-rose-600 hover:bg-rose-700 active:scale-95 text-white font-extrabold text-[9.5px] flex items-center gap-0.5 shadow-2xs cursor-pointer transition-all shrink-0"
                         title="Excluir cliente fictício de exemplo"
                       >
-                        <span className="material-symbols-outlined text-[15px]">delete</span>
-                        <span>Excluir Exemplo</span>
+                        <span className="material-symbols-outlined text-[12px]">delete</span>
+                        <span>Excluir</span>
                       </button>
                     )}
                   </div>
                 )}
 
-                {/* 3 KPI Summary Cards - Modern Enterprise ERP Financial Metrics */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 text-left">
+                {/* 3 KPI Summary Cards — Lado a Lado no Mobile & Desktop (Grid 3 Colunas Ultra-Otimizado, Branco Mesclado com Cinza Claro) */}
+                <div className="grid grid-cols-3 gap-1.5 sm:gap-2.5 text-left">
                   {/* CARD 1: Total a Receber */}
                   <div
                     onClick={() => {
                       playAppSound('pop');
                       onToast(`💸 A Receber: R$ ${(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
                     }}
-                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-rose-400/60 dark:hover:border-rose-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                    className="animate-kpi-card animate-kpi-delay-1 p-2 sm:p-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/90 to-slate-100/90 hover:border-rose-300 shadow-2xs hover:shadow-sm transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                     title="Clique para ver detalhes do saldo a receber"
                   >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-rose-500/10 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-base">account_balance_wallet</span>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-rose-50 text-rose-600 border border-rose-200/70 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[13px] sm:text-[15px]">account_balance_wallet</span>
                         </div>
-                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          Total a Receber
+                        <span className="text-[8.5px] sm:text-[10.5px] font-extrabold uppercase tracking-tight text-slate-600 truncate">
+                          A Receber
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">
-                        Em Aberto
+                      <span className="animate-parcela-badge text-[7.5px] sm:text-[8.5px] font-black uppercase px-1 sm:px-1.5 py-0.2 rounded bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                        Aberto
                       </span>
                     </div>
 
                     <div className="space-y-0.5">
-                      <div className="text-base sm:text-xl font-mono font-black text-rose-600 dark:text-rose-400 tracking-tight tabular-nums">
+                      <div className="text-xs sm:text-lg font-mono font-black text-rose-600 tracking-tight tabular-nums truncate">
                         R$ {(Number(activeDebtor?.totalOwed) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
-                        <span className="material-symbols-outlined text-[13px] text-slate-400">schedule</span>
-                        <span>Saldo devedor ativo na conta</span>
+                      <div className="text-[8px] sm:text-[10px] text-slate-500 flex items-center gap-0.5 font-semibold truncate">
+                        <span className="material-symbols-outlined text-[10px] sm:text-[12px] text-slate-400 shrink-0">schedule</span>
+                        <span className="truncate">Saldo ativo</span>
                       </div>
                     </div>
                   </div>
@@ -1616,71 +1613,71 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       playAppSound('pop');
                       onToast(`🎉 Já Liquidado: R$ ${(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
                     }}
-                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-emerald-400/60 dark:hover:border-emerald-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                    className="animate-kpi-card animate-kpi-delay-2 p-2 sm:p-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/90 to-slate-100/90 hover:border-emerald-300 shadow-2xs hover:shadow-sm transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                     title="Clique para ver total já liquidado"
                   >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-base">check_circle</span>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-emerald-50 text-emerald-600 border border-emerald-200/70 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[13px] sm:text-[15px]">check_circle</span>
                         </div>
-                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          Total Já Liquidado
+                        <span className="text-[8.5px] sm:text-[10.5px] font-extrabold uppercase tracking-tight text-slate-600 truncate">
+                          Liquidado
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      <span className="animate-quitado-badge text-[7.5px] sm:text-[8.5px] font-black uppercase px-1 sm:px-1.5 py-0.2 rounded bg-emerald-50 text-emerald-700 border border-emerald-300 shrink-0">
                         Quitado
                       </span>
                     </div>
 
                     <div className="space-y-0.5">
-                      <div className="text-base sm:text-xl font-mono font-black text-emerald-600 dark:text-emerald-400 tracking-tight tabular-nums">
+                      <div className="text-xs sm:text-lg font-mono font-black text-emerald-600 tracking-tight tabular-nums truncate">
                         R$ {(Number(activeDebtor?.totalPaid) || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                      <div className="text-[10px] text-slate-500 dark:text-slate-400 flex items-center gap-1 font-medium">
-                        <span className="material-symbols-outlined text-[13px] text-emerald-500">verified</span>
-                        <span>Baixas autenticadas com recibo</span>
+                      <div className="text-[8px] sm:text-[10px] text-slate-500 flex items-center gap-0.5 font-semibold truncate">
+                        <span className="material-symbols-outlined text-[10px] sm:text-[12px] text-emerald-500 shrink-0">verified</span>
+                        <span className="truncate">Com recibo</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* CARD 3: Score Crediário & Risco */}
+                  {/* CARD 3: Score de Pontualidade */}
                   <div
                     onClick={() => {
                       playAppSound('pop');
                       onToast(`🚀 Score de Crédito: ${activeDebtor?.score || 800}/1000 — ${
-                        (activeDebtor?.score || 800) >= 700 ? 'Excelente!' : (activeDebtor?.score || 800) >= 500 ? 'Médio Risk' : 'Atenção ao Crédito'
+                        (activeDebtor?.score || 800) >= 700 ? 'Excelente!' : (activeDebtor?.score || 800) >= 500 ? 'Regular' : 'Atenção ao Crédito'
                       }`);
                     }}
-                    className="p-3 sm:p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900/90 hover:border-blue-400/60 dark:hover:border-blue-500/50 shadow-xs hover:shadow-md transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
+                    className="animate-kpi-card animate-kpi-delay-3 p-2 sm:p-3 rounded-xl border border-slate-200/90 bg-gradient-to-br from-white via-slate-50/90 to-slate-100/90 hover:border-blue-300 shadow-2xs hover:shadow-sm transition-all cursor-pointer flex flex-col justify-between group relative overflow-hidden"
                     title="Clique para ver avaliação de score de crédito"
                   >
-                    <div className="flex items-center justify-between gap-2 mb-2">
-                      <div className="flex items-center gap-2">
-                        <div className="w-7 h-7 rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center shrink-0">
-                          <span className="material-symbols-outlined text-base">speed</span>
+                    <div className="flex items-center justify-between gap-1 mb-1">
+                      <div className="flex items-center gap-1 min-w-0">
+                        <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-blue-50 text-blue-600 border border-blue-200/70 flex items-center justify-center shrink-0">
+                          <span className="material-symbols-outlined text-[13px] sm:text-[15px]">speed</span>
                         </div>
-                        <span className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">
-                          Score de Pontualidade
+                        <span className="text-[8.5px] sm:text-[10.5px] font-extrabold uppercase tracking-tight text-slate-600 truncate">
+                          Score
                         </span>
                       </div>
-                      <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20">
+                      <span className="animate-score-badge text-[7.5px] sm:text-[8.5px] font-black uppercase px-1 sm:px-1.5 py-0.2 rounded bg-blue-50 text-blue-700 border border-blue-200 shrink-0">
                         {(activeDebtor?.score || 800) >= 700 ? 'Excelente' : (activeDebtor?.score || 800) >= 500 ? 'Regular' : 'Atenção'}
                       </span>
                     </div>
 
-                    <div className="space-y-1.5">
-                      <div className="flex items-baseline gap-1.5">
-                        <span className="text-base sm:text-xl font-mono font-black text-blue-600 dark:text-blue-400 tracking-tight">
+                    <div className="space-y-1">
+                      <div className="flex items-baseline gap-1 truncate">
+                        <span className="text-xs sm:text-lg font-mono font-black text-blue-600 tracking-tight">
                           {activeDebtor?.score || 800}
                         </span>
-                        <span className="text-[11px] font-mono text-slate-400">/ 1000 pts</span>
+                        <span className="text-[8px] sm:text-[10px] font-mono text-slate-400 font-bold">/1000</span>
                       </div>
-                      
+
                       {/* Subtle Progress Bar */}
-                      <div className="w-full h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                      <div className="w-full h-1.5 bg-slate-200/80 rounded-full overflow-hidden">
                         <div
-                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full"
+                          className="h-full bg-gradient-to-r from-blue-500 to-emerald-500 rounded-full transition-all duration-500"
                           style={{ width: `${Math.min(100, Math.max(0, ((activeDebtor?.score || 800) / 1000) * 100))}%` }}
                         />
                       </div>
@@ -1689,53 +1686,55 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                 </div>
               </div>
 
-              {/* SECTION 1: DADOS DE IDENTIFICAÇÃO PRINCIPAL */}
+              {/* SECTION 1: DADOS DE IDENTIFICAÇÃO PRINCIPAL (COMPACTO E DENSO) */}
               <fieldset
-                className={`p-3 rounded-lg border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
+                className={`p-2 sm:p-2.5 rounded-xl border ${
+                  themeMode === 'classic_delphi'
+                    ? 'border-slate-300 bg-[#fafafa]'
+                    : 'border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/70 shadow-2xs'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-blue-700 uppercase tracking-wider">
+                <legend className="px-2 font-extrabold text-[10px] sm:text-[11px] text-blue-700 uppercase tracking-wider">
                   1. Identificação Principal &amp; Documentos Fiscais
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-2.5 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 gap-1.5 sm:gap-2 pt-0.5">
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Código ERP (CÓD)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Código ERP</label>
                     <input
                       type="text"
                       readOnly
                       value={getDebtorCode(formData.id)}
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 font-mono font-bold text-xs sm:text-[11px] bg-slate-100 border border-slate-300 rounded-lg sm:rounded text-blue-900 outline-none"
+                      className="w-full h-7.5 sm:h-7 px-2 font-mono font-bold text-[11px] bg-slate-100 border border-slate-300 rounded-lg text-blue-900 outline-none"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Tipo Pessoa</label>
-                    <div className="flex items-center gap-3 h-8.5 sm:h-7">
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Tipo Pessoa</label>
+                    <div className="flex items-center gap-2 h-7.5 sm:h-7 bg-white/80 px-2 rounded-lg border border-slate-200">
+                      <label className="flex items-center gap-1 cursor-pointer">
                         <input
                           type="radio"
                           name="personType"
                           checked={formData.personType === 'F'}
                           onChange={() => setFormData({ ...formData, personType: 'F' })}
                         />
-                        <span className="text-xs sm:text-[11px] font-semibold text-slate-800">Física</span>
+                        <span className="text-[10.5px] font-bold text-slate-800">Física</span>
                       </label>
-                      <label className="flex items-center gap-1.5 cursor-pointer">
+                      <label className="flex items-center gap-1 cursor-pointer">
                         <input
                           type="radio"
                           name="personType"
                           checked={formData.personType === 'J'}
                           onChange={() => setFormData({ ...formData, personType: 'J' })}
                         />
-                        <span className="text-xs sm:text-[11px] font-semibold text-slate-800">Jurídica</span>
+                        <span className="text-[10.5px] font-bold text-slate-800">Juríd.</span>
                       </label>
                     </div>
                   </div>
 
-                  <div className="md:col-span-2">
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">
                       Nome Completo / Razão Social *
                     </label>
                     <input
@@ -1743,12 +1742,12 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                       placeholder="EX: JOÃO DA SILVA SA"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-semibold text-xs sm:text-[11px] uppercase outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-bold text-[11px] uppercase outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">
                       {formData.personType === 'F' ? 'CPF' : 'CNPJ'} *
                     </label>
                     <input
@@ -1757,51 +1756,51 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                       value={formData.cpfCnpj}
                       onChange={(e) => setFormData({ ...formData, cpfCnpj: e.target.value })}
                       placeholder="000.000.000-00"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">
-                      {formData.personType === 'F' ? 'RG' : 'Inscrição Estadual'}
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">
+                      {formData.personType === 'F' ? 'RG' : 'Inscr. Estadual'}
                     </label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={formData.rgIe}
                       onChange={(e) => setFormData({ ...formData, rgIe: e.target.value })}
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Apelido / Parentesco</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Apelido / Vínculo</label>
                     <input
                       type="text"
                       value={formData.apelido}
                       onChange={(e) => setFormData({ ...formData, apelido: e.target.value })}
-                      placeholder="Amigo, Primo, Cliente"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      placeholder="Cliente"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Data Nasc. / Abertura</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Data Nasc.</label>
                     <input
                       type="date"
                       value={formData.birthDate}
                       onChange={(e) => setFormData({ ...formData, birthDate: e.target.value })}
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-1.5 border rounded-lg text-[10.5px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
-                  <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Órgão Expedidor</label>
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Órgão Exp.</label>
                     <input
                       type="text"
                       value={formData.orgaoExp}
                       onChange={(e) => setFormData({ ...formData, orgaoExp: e.target.value })}
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1809,25 +1808,27 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 2: DADOS DE CONTATO & CHAVE PIX */}
               <fieldset
-                className={`p-3 rounded-lg border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
+                className={`p-2 sm:p-2.5 rounded-xl border ${
+                  themeMode === 'classic_delphi'
+                    ? 'border-slate-300 bg-[#fafafa]'
+                    : 'border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/70 shadow-2xs'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-emerald-700 uppercase tracking-wider">
+                <legend className="px-2 font-extrabold text-[10px] sm:text-[11px] text-emerald-700 uppercase tracking-wider">
                   2. Contatos, WhatsApp &amp; Chave PIX
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-                  <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Celular / WhatsApp Principal *</label>
-                    <div className="flex gap-1.5">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Celular / WhatsApp *</label>
+                    <div className="flex gap-1">
                       <input
                         type="tel"
                         inputMode="numeric"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         placeholder="(14) 99733-9863"
-                        className="flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                        className="flex-1 min-w-0 h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                       />
                       <button
                         type="button"
@@ -1835,45 +1836,45 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                           const clean = formData.phone.replace(/\D/g, '');
                           window.open(`https://wa.me/55${clean}?text=Olá ${encodeURIComponent(formData.name)}, cobrança amigável HASPAHO`, '_blank');
                         }}
-                        className="px-2.5 h-8.5 sm:h-7 rounded-lg sm:rounded bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-[10px] flex items-center gap-1 cursor-pointer"
-                        title="Abrir WhatsApp Web Oficial"
+                        className="px-2 h-7.5 sm:h-7 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center cursor-pointer shrink-0"
+                        title="Abrir WhatsApp"
                       >
-                        <span className="material-symbols-outlined text-[15px] sm:text-[13px]">chat</span>
+                        <span className="material-symbols-outlined text-[14px]">chat</span>
                       </button>
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Telefone Secundário / Fixo</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Tel. Secundário</label>
                     <input
                       type="tel"
                       inputMode="numeric"
                       value={formData.phoneSecondary}
                       onChange={(e) => setFormData({ ...formData, phoneSecondary: e.target.value })}
                       placeholder="(14) 3642-0000"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">E-mail de Cobrança</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Chave PIX</label>
+                    <input
+                      type="text"
+                      value={formData.pixKey}
+                      onChange={(e) => setFormData({ ...formData, pixKey: e.target.value })}
+                      placeholder="CPF, Tel ou E-mail"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">E-mail de Cobrança</label>
                     <input
                       type="email"
                       value={formData.email}
                       onChange={(e) => setFormData({ ...formData, email: e.target.value })}
                       placeholder="devedor@email.com"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Chave PIX Cadastrada</label>
-                    <input
-                      type="text"
-                      value={formData.pixKey}
-                      onChange={(e) => setFormData({ ...formData, pixKey: e.target.value })}
-                      placeholder="CPF, Telefone ou E-mail"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
@@ -1881,76 +1882,78 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 3: ENDEREÇO & CEP */}
               <fieldset
-                className={`p-3 rounded-lg border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
+                className={`p-2 sm:p-2.5 rounded-xl border ${
+                  themeMode === 'classic_delphi'
+                    ? 'border-slate-300 bg-[#fafafa]'
+                    : 'border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/70 shadow-2xs'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-amber-700 uppercase tracking-wider">
+                <legend className="px-2 font-extrabold text-[10px] sm:text-[11px] text-amber-700 uppercase tracking-wider">
                   3. Endereço Completo &amp; Localização Notarial
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-2.5 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-1.5 sm:gap-2 pt-0.5">
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">CEP *</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">CEP *</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={formData.cep}
                       onChange={(e) => setFormData({ ...formData, cep: e.target.value })}
                       placeholder="17320-000"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded font-mono text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
-                    />
-                  </div>
-
-                  <div className="md:col-span-2">
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Logradouro / Rua</label>
-                    <input
-                      type="text"
-                      value={formData.logradouro}
-                      onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
-                      placeholder="Rua Central"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Número</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Número</label>
                     <input
                       type="text"
                       inputMode="numeric"
                       value={formData.numero}
                       onChange={(e) => setFormData({ ...formData, numero: e.target.value })}
                       placeholder="100"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                    />
+                  </div>
+
+                  <div className="col-span-2">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Logradouro / Rua</label>
+                    <input
+                      type="text"
+                      value={formData.logradouro}
+                      onChange={(e) => setFormData({ ...formData, logradouro: e.target.value })}
+                      placeholder="Rua Central"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Bairro</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Bairro</label>
                     <input
                       type="text"
                       value={formData.bairro}
                       onChange={(e) => setFormData({ ...formData, bairro: e.target.value })}
                       placeholder="Centro"
-                      className="w-full h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-xs sm:text-[10px] font-bold mb-0.5 text-slate-700">Cidade / UF</label>
-                    <div className="flex gap-1.5">
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Cidade / UF</label>
+                    <div className="flex gap-1">
                       <input
                         type="text"
                         value={formData.cidade}
                         onChange={(e) => setFormData({ ...formData, cidade: e.target.value })}
-                        className="flex-1 h-8.5 sm:h-7 px-2.5 sm:px-2 border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                        className="flex-1 min-w-0 h-7.5 sm:h-7 px-2 border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                       />
                       <input
                         type="text"
                         maxLength={2}
                         value={formData.uf}
                         onChange={(e) => setFormData({ ...formData, uf: e.target.value.toUpperCase() })}
-                        className="w-11 sm:w-9 h-8.5 sm:h-7 text-center font-bold uppercase border rounded-lg sm:rounded text-xs sm:text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                        className="w-9 h-7.5 sm:h-7 text-center font-bold uppercase border rounded-lg text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500 shrink-0"
                       />
                     </div>
                   </div>
@@ -1959,115 +1962,119 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
               {/* SECTION 4: PARÂMETROS FINANCEIROS, SCORE & REGRAS */}
               <fieldset
-                className={`p-3 rounded-lg border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
+                className={`p-2 sm:p-2.5 rounded-xl border ${
+                  themeMode === 'classic_delphi'
+                    ? 'border-slate-300 bg-[#fafafa]'
+                    : 'border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/70 shadow-2xs'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-purple-700 uppercase tracking-wider">
+                <legend className="px-2 font-extrabold text-[10px] sm:text-[11px] text-purple-700 uppercase tracking-wider">
                   4. Parâmetros de Crédito, Juros &amp; Políticas de Cobrança
                 </legend>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 sm:gap-2 pt-0.5">
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Limite de Crédito Concedido (R$)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Limite Crédito (R$)</label>
                     <input
                       type="number"
                       value={formData.limiteCredito}
                       onChange={(e) => setFormData({ ...formData, limiteCredito: Number(e.target.value) })}
-                      className="w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7 px-2 border rounded-lg font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Score de Pontualidade (0 - 1000)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Score (0-1000)</label>
                     <input
                       type="number"
                       min={0}
                       max={1000}
                       value={formData.score}
                       onChange={(e) => setFormData({ ...formData, score: Number(e.target.value) })}
-                      className="w-full h-7 px-2 border rounded font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7 px-2 border rounded-lg font-mono font-bold text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Multa por Atraso Fixa (R$)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Multa Fixa (R$)</label>
                     <input
                       type="number"
                       value={formData.multaAtrasoFixa}
                       onChange={(e) => setFormData({ ...formData, multaAtrasoFixa: Number(e.target.value) })}
-                      className="w-full h-7 px-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
 
                   <div>
-                    <label className="block text-[10px] font-bold mb-0.5 text-slate-700">Juros Mensais Padrão (%)</label>
+                    <label className="block text-[10px] font-bold mb-0.5 text-slate-600">Juros Mês (%)</label>
                     <input
                       type="number"
                       step={0.1}
                       value={formData.taxaJurosMensal}
                       onChange={(e) => setFormData({ ...formData, taxaJurosMensal: Number(e.target.value) })}
-                      className="w-full h-7 px-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                      className="w-full h-7 px-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                     />
                   </div>
                 </div>
 
                 {/* Dense Checkboxes & Flags */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2 pt-3 border-t border-slate-200 mt-2 text-slate-800">
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-1.5 pt-2 border-t border-slate-200/80 mt-2 text-slate-800">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold">
                     <input
                       type="checkbox"
                       checked={formData.ativo}
                       onChange={(e) => setFormData({ ...formData, ativo: e.target.checked })}
                     />
-                    <span>[x] Cadastro Ativo no Sistema</span>
+                    <span className="truncate">Cadastro Ativo</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold">
                     <input
                       type="checkbox"
                       checked={formData.permiteCobrancaWhatsApp}
                       onChange={(e) => setFormData({ ...formData, permiteCobrancaWhatsApp: e.target.checked })}
                     />
-                    <span>[x] Disparo Automático via WhatsApp</span>
+                    <span className="truncate">Cobrança WhatsApp</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold">
                     <input
                       type="checkbox"
                       checked={formData.protestarApos30Dias}
                       onChange={(e) => setFormData({ ...formData, protestarApos30Dias: e.target.checked })}
                     />
-                    <span>[x] Encaminhar p/ Protesto se &gt; 30 dias</span>
+                    <span className="truncate">Protesto &gt; 30 dias</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10.5px]">
                     <input
                       type="checkbox"
                       checked={formData.bloqueioPreventivo}
                       onChange={(e) => setFormData({ ...formData, bloqueioPreventivo: e.target.checked })}
                     />
-                    <span className="text-red-600 font-bold">[ ] Bloqueio Preventivo de Crédito</span>
+                    <span className="text-red-600 font-bold truncate">Bloqueio Preventivo</span>
                   </label>
 
-                  <label className="flex items-center gap-2 cursor-pointer text-[11px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-semibold col-span-2 sm:col-span-1">
                     <input
                       type="checkbox"
                       checked={formData.contratoAssinado}
                       onChange={(e) => setFormData({ ...formData, contratoAssinado: e.target.checked })}
                     />
-                    <span>[x] Contrato Confissão Assinado</span>
+                    <span className="truncate">Contrato Assinado</span>
                   </label>
                 </div>
               </fieldset>
 
               {/* SECTION 5: OBSERVAÇÕES & HISTÓRICO DE NEGOCIAÇÃO */}
               <fieldset
-                className={`p-3 rounded-lg border ${
-                  themeMode === 'classic_delphi' ? 'border-slate-300 bg-[#fafafa]' : 'border-slate-200 bg-slate-50/70'
+                className={`p-2 sm:p-2.5 rounded-xl border ${
+                  themeMode === 'classic_delphi'
+                    ? 'border-slate-300 bg-[#fafafa]'
+                    : 'border-slate-200/90 bg-gradient-to-br from-white via-slate-50/70 to-slate-100/70 shadow-2xs'
                 }`}
               >
-                <legend className="px-2 font-bold text-[11px] text-slate-600 uppercase tracking-wider">
+                <legend className="px-2 font-extrabold text-[10px] sm:text-[11px] text-slate-600 uppercase tracking-wider">
                   5. Parecer Contábil &amp; Histórico de Negociações
                 </legend>
                 <textarea
@@ -2075,28 +2082,28 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   value={formData.observacoes}
                   onChange={(e) => setFormData({ ...formData, observacoes: e.target.value })}
                   placeholder="Anotações internas, promessas de pagamento, datas combinadas..."
-                  className="w-full p-2 border rounded font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
+                  className="w-full p-2 border rounded-lg font-mono text-[11px] outline-none bg-white border-slate-300 text-slate-900 focus:border-blue-500"
                 />
               </fieldset>
 
               {/* Bottom Action Footer for the Form */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-3 border-t border-slate-800/60">
-                <div className="text-[10px] text-slate-400 font-mono hidden sm:block">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-2 border-t border-slate-200">
+                <div className="text-[10px] text-slate-500 font-mono hidden sm:block">
                   Atalhos: F2: Novo | F3: Gravar | F4: Cancelar | F5: Excluir | Esc: Voltar
                 </div>
-                <div className="grid grid-cols-3 sm:flex items-center gap-2">
+                <div className="grid grid-cols-3 sm:flex items-center gap-1.5">
                   <button
                     type="button"
                     onClick={handleNewDebtor}
-                    className="h-9 sm:h-auto px-3 py-2 sm:py-1.5 rounded-xl sm:rounded bg-slate-700 hover:bg-slate-600 text-white font-bold text-xs sm:text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 shadow-xs"
+                    className="h-8.5 sm:h-auto px-3 py-1.5 rounded-xl sm:rounded-lg bg-gradient-to-b from-white to-slate-100 hover:from-slate-50 hover:to-slate-200 text-slate-800 border border-slate-300 font-bold text-xs sm:text-[11px] cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95 shadow-2xs"
                   >
-                    <span className="material-symbols-outlined text-[15px]">add</span>
+                    <span className="material-symbols-outlined text-[15px] text-emerald-600">add</span>
                     <span>Novo</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleSaveDebtor}
-                    className="h-9 sm:h-auto px-4 py-2 sm:py-1.5 rounded-xl sm:rounded bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-[11px] shadow-sm cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
+                    className="h-8.5 sm:h-auto px-4 py-1.5 rounded-xl sm:rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-[11px] shadow-xs cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
                   >
                     <span className="material-symbols-outlined text-[15px]">save</span>
                     <span>Gravar</span>
@@ -2104,7 +2111,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   <button
                     type="button"
                     onClick={handleDeleteDebtor}
-                    className="h-9 sm:h-auto px-3 py-2 sm:py-1.5 rounded-xl sm:rounded bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-[11px] shadow-sm cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
+                    className="h-8.5 sm:h-auto px-3 py-1.5 rounded-xl sm:rounded-lg bg-red-600 hover:bg-red-700 text-white font-bold text-xs sm:text-[11px] shadow-xs cursor-pointer flex items-center justify-center gap-1 transition-all active:scale-95"
                     title="Excluir cadastro ativo no ERP (F5)"
                   >
                     <span className="material-symbols-outlined text-[15px]">delete</span>
@@ -2117,44 +2124,30 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
 
           {/* TAB 2: DBGRID DE CLIENTES & CONSULTA AVANÇADA */}
           {activeTab === 'pesquisa' && (
-            <div className="space-y-3">
+            <div className="space-y-2.5 animate-in">
               {/* Filter and Search Bar */}
-              <div className={`flex flex-wrap items-center justify-between gap-2.5 p-2 rounded border ${
-                themeMode === 'classic_delphi'
-                  ? 'bg-[#f8fafc] border-slate-300 text-slate-800'
-                  : 'bg-black/20 border-slate-800 text-white'
-              }`}>
+              <div className="flex flex-wrap items-center justify-between gap-2 p-2 rounded-xl border bg-gradient-to-r from-white via-slate-50 to-slate-100 border-slate-200/90 text-slate-800 shadow-2xs">
                 <div className="flex items-center gap-2 flex-1 min-w-[200px] max-w-md">
-                  <span className={`material-symbols-outlined text-[16px] ${
-                    themeMode === 'classic_delphi' ? 'text-blue-600' : 'text-slate-400'
-                  }`}>filter_alt</span>
+                  <span className="material-symbols-outlined text-[16px] text-blue-600">filter_alt</span>
                   <input
                     type="search"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
                     placeholder="Pesquisar por Código, Nome, CPF ou Telefone..."
-                    className={`w-full h-7 px-2.5 rounded text-[11px] outline-none border ${
-                      themeMode === 'classic_delphi'
-                        ? 'bg-white border-slate-300 text-slate-900 placeholder:text-slate-500'
-                        : 'bg-slate-800 border-slate-700 text-white'
-                    }`}
+                    className="w-full h-7 px-2.5 rounded-lg text-[11px] outline-none border bg-white border-slate-300 text-slate-900 placeholder:text-slate-400 focus:border-blue-500"
                   />
                 </div>
 
-                <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className={`text-[11px] font-bold ${
-                    themeMode === 'classic_delphi' ? 'text-slate-700' : 'text-slate-300'
-                  }`}>Filtro:</span>
+                <div className="flex items-center gap-1 flex-wrap">
+                  <span className="text-[10.5px] font-bold text-slate-700">Filtro:</span>
                   {(['todos', 'adimplente', 'atrasado', 'quitado'] as const).map((st) => (
                     <button
                       key={st}
                       onClick={() => setFilterStatus(st)}
-                      className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
+                      className={`px-2 py-0.5 rounded-lg text-[10px] font-bold uppercase transition-colors cursor-pointer border ${
                         filterStatus === st
-                          ? 'bg-blue-600 text-white border-blue-600 shadow-xs'
-                          : themeMode === 'classic_delphi'
-                          ? 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
-                          : 'bg-slate-800 text-slate-400 border-slate-700 hover:bg-slate-700'
+                          ? 'bg-blue-600 text-white border-blue-600 shadow-2xs'
+                          : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
                       }`}
                     >
                       {st}
@@ -2164,72 +2157,52 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
               </div>
 
               {/* Seletor de Modo no Mobile (Listinha Planilha vs Grade Ampla) */}
-              <div className={`flex sm:hidden items-center justify-between p-2 rounded border text-xs ${
-                themeMode === 'classic_delphi'
-                  ? 'bg-[#f8fafc] border-slate-300 text-slate-800'
-                  : 'bg-slate-900/90 border-slate-700 text-slate-300'
-              }`}>
-                <span className="font-bold flex items-center gap-1.5">
-                  <span className="material-symbols-outlined text-[16px] text-blue-600">table_rows</span>
+              <div className="flex sm:hidden items-center justify-between p-1.5 px-2 rounded-xl border text-xs bg-gradient-to-r from-white via-slate-50 to-slate-100 border-slate-200/90 text-slate-800 shadow-2xs">
+                <span className="font-bold flex items-center gap-1 text-[11px]">
+                  <span className="material-symbols-outlined text-[15px] text-blue-600">table_rows</span>
                   <span>Modo ARP Mobile:</span>
                 </span>
-                <div className={`flex items-center gap-1 p-0.5 rounded border ${
-                  themeMode === 'classic_delphi'
-                    ? 'bg-white border-slate-300'
-                    : 'bg-slate-800 border-slate-700'
-                }`}>
+                <div className="flex items-center gap-1 p-0.5 rounded-lg border bg-white border-slate-300">
                   <button
                     type="button"
                     onClick={() => setMobileViewMode('cards')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[9.5px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
                       mobileViewMode === 'cards'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : themeMode === 'classic_delphi'
-                        ? 'text-slate-600 hover:text-slate-900'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[13px]">view_list</span>
+                    <span className="material-symbols-outlined text-[12px]">view_list</span>
                     <span>Listinha Planilha</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setMobileViewMode('table')}
-                    className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
+                    className={`px-2 py-0.5 rounded text-[9.5px] font-bold flex items-center gap-1 transition-colors cursor-pointer ${
                       mobileViewMode === 'table'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : themeMode === 'classic_delphi'
-                        ? 'text-slate-600 hover:text-slate-900'
-                        : 'text-slate-400 hover:text-white'
+                        ? 'bg-blue-600 text-white shadow-2xs'
+                        : 'text-slate-600 hover:text-slate-900'
                     }`}
                   >
-                    <span className="material-symbols-outlined text-[13px]">table_chart</span>
+                    <span className="material-symbols-outlined text-[12px]">table_chart</span>
                     <span>Grade DBGrid</span>
                   </button>
                 </div>
               </div>
 
-              {/* Modo Listinha Tipo Planilha Mobile (Compacto, Profissional, Delphiano e Clarinho) */}
+              {/* Modo Listinha Tipo Planilha Mobile (Compacto, Profissional, Fundo Branco Mesclado com Cinza Claro) */}
               {mobileViewMode === 'cards' && (
-                <div className={`sm:hidden border rounded-lg overflow-hidden font-sans shadow-xs select-none ${
-                  themeMode === 'classic_delphi'
-                    ? 'bg-white border-slate-300'
-                    : 'bg-slate-950/60 border-slate-700'
-                }`}>
+                <div className="sm:hidden border border-slate-200/90 rounded-xl overflow-hidden font-sans shadow-xs select-none bg-gradient-to-b from-white via-slate-50/70 to-slate-100/80">
                   {/* Cabeçalho de Colunas da Planilha Mobile */}
-                  <div className={`grid grid-cols-12 gap-1 px-2 py-1.5 border-b text-[10.5px] font-mono font-bold uppercase ${
-                    themeMode === 'classic_delphi'
-                      ? 'bg-slate-100 border-slate-300 text-slate-700'
-                      : 'bg-slate-950 border-slate-700 text-slate-400'
-                  }`}>
-                    <div className="col-span-1 text-center pr-0.5 border-r border-slate-300/60 dark:border-slate-700/60">Cód</div>
-                    <div className="col-span-5 px-1 border-r border-slate-300/60 dark:border-slate-700/60">Cliente / Doc</div>
-                    <div className="col-span-3 text-center px-1 border-r border-slate-300/60 dark:border-slate-700/60">Saldo / Status</div>
+                  <div className="grid grid-cols-12 gap-1 px-2 py-1.5 border-b text-[10px] font-mono font-bold uppercase bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-slate-200 text-slate-700">
+                    <div className="col-span-1 text-center pr-0.5 border-r border-slate-300/60">Cód</div>
+                    <div className="col-span-5 px-1 border-r border-slate-300/60">Cliente / Doc</div>
+                    <div className="col-span-3 text-center px-1 border-r border-slate-300/60">Saldo / Status</div>
                     <div className="col-span-3 text-center px-1">Ações ERP</div>
                   </div>
 
                   {/* Linhas da Planilha */}
-                  <div className={`divide-y ${themeMode === 'classic_delphi' ? 'divide-slate-200' : 'divide-slate-800/80'}`}>
+                  <div className="divide-y divide-slate-200/80">
                     {filteredDebtors.length === 0 ? (
                       <div className="p-6 text-center text-slate-500 text-xs">
                         Nenhum devedor encontrado com os filtros atuais.
@@ -2244,33 +2217,21 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                             onClick={() => setSelectedDebtorId(d.id)}
                             className={`grid grid-cols-12 gap-1 px-1.5 py-1 items-center cursor-pointer transition-all ${
                               isSelected
-                                ? themeMode === 'classic_delphi'
-                                  ? 'bg-blue-100/90 border-l-4 border-l-blue-600 shadow-inner'
-                                  : 'bg-blue-950/80 border-l-3 border-l-blue-500 shadow-inner'
+                                ? 'bg-blue-50/90 border-l-3 border-l-blue-600 shadow-inner'
                                 : index % 2 === 0
-                                ? themeMode === 'classic_delphi'
-                                  ? 'bg-white hover:bg-blue-50/50'
-                                  : 'bg-slate-900/60 hover:bg-slate-800/80'
-                                : themeMode === 'classic_delphi'
-                                ? 'bg-[#fcfbf9] hover:bg-blue-50/50'
-                                : 'bg-slate-950/40 hover:bg-slate-800/80'
+                                ? 'bg-white hover:bg-blue-50/40'
+                                : 'bg-slate-50/80 hover:bg-blue-50/40'
                             }`}
                           >
                             {/* Coluna 1: Cód ID (Puramente Numérico Sequencial 01, 02, 03...) */}
-                            <div className={`col-span-1 font-mono text-[10.5px] font-bold truncate text-center pr-0.5 border-r ${
-                              themeMode === 'classic_delphi' ? 'border-slate-200 text-slate-600' : 'border-slate-800 text-slate-400'
-                            }`}>
+                            <div className="col-span-1 font-mono text-[10.5px] font-bold truncate text-center pr-0.5 border-r border-slate-200 text-slate-600">
                               {getDebtorCode(d.id, index)}
                             </div>
 
                             {/* Coluna 2: Nome do Devedor & Doc / Telefone com ícone no mobile */}
-                            <div className={`col-span-5 min-w-0 px-1 border-r ${
-                              themeMode === 'classic_delphi' ? 'border-slate-200' : 'border-slate-800'
-                            }`}>
+                            <div className="col-span-5 min-w-0 px-1 border-r border-slate-200">
                               <div className="flex items-center gap-1 min-w-0">
-                                <span className={`font-extrabold text-xs truncate leading-tight shrink min-w-0 ${
-                                  themeMode === 'classic_delphi' ? 'text-slate-900' : 'text-white'
-                                }`} title={d.name}>
+                                <span className="font-extrabold text-xs truncate leading-tight shrink min-w-0 text-slate-900" title={d.name}>
                                   {formatSmartShortName(d.name)}
                                 </span>
                                 <span className={`px-1 py-0.2 rounded text-[7.5px] font-bold font-mono inline-flex items-center gap-0.5 shrink-0 whitespace-nowrap ${
@@ -2309,21 +2270,17 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                             </div>
 
                             {/* Coluna 3: Saldo & Status (Valor Já Quitado em cima do Valor Devedor) */}
-                            <div className={`col-span-3 text-center min-w-0 px-1 border-r ${
-                              themeMode === 'classic_delphi' ? 'border-slate-200' : 'border-slate-800'
-                            }`}>
+                            <div className="col-span-3 text-center min-w-0 px-1 border-r border-slate-200">
                               {/* Valor Já Quitado (Verde) em cima */}
                               <div
-                                className="font-mono font-black text-xs truncate text-emerald-600 dark:text-emerald-400 leading-tight"
+                                className="font-mono font-black text-xs truncate text-emerald-600 leading-tight"
                                 title="Valor Já Quitado / Liquidado pelo cliente"
                               >
                                 R$ {(Number(d.totalPaid) || 0).toFixed(0)}
                               </div>
                               {/* Valor Devedor (Vermelho) embaixo do valor quitado */}
                               <div className={`font-mono font-black text-xs truncate leading-tight mt-0.5 ${
-                                Number(d.totalOwed) > 0
-                                  ? themeMode === 'classic_delphi' ? 'text-red-600' : 'text-red-400'
-                                  : themeMode === 'classic_delphi' ? 'text-emerald-700' : 'text-emerald-400'
+                                Number(d.totalOwed) > 0 ? 'text-red-600' : 'text-emerald-700'
                               }`} title="Saldo Devedor pendente">
                                 R$ {(Number(d.totalOwed) || 0).toFixed(0)}
                               </div>
@@ -2551,11 +2508,7 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
                   </div>
 
                   {/* Rodapé da Planilha Mobile */}
-                  <div className={`px-2.5 py-1.5 border-t text-[10px] flex items-center justify-between font-mono ${
-                    themeMode === 'classic_delphi'
-                      ? 'bg-slate-100 border-slate-300 text-slate-700'
-                      : 'bg-slate-950 border-slate-800 text-slate-400'
-                  }`}>
+                  <div className="px-2.5 py-1.5 border-t text-[10px] flex items-center justify-between font-mono bg-gradient-to-r from-slate-100 via-slate-50 to-slate-100 border-slate-200 text-slate-700">
                     <span>{filteredDebtors.length} devedor(es) listados</span>
                     <span className="text-blue-600 font-bold">Toque na linha para selecionar</span>
                   </div>
@@ -3882,12 +3835,12 @@ export const ErpLegacySystem: React.FC<ErpLegacySystemProps> = ({
         </div>
       </div>
 
-      {/* Classic Windows ERP Status Bar (TStatusBar - Reenquadrado no Mobile) */}
+      {/* Classic Windows ERP Status Bar (TStatusBar - Reenquadrado no Mobile com Fundo Branco Mesclado com Cinza Claro) */}
       <div
         className={`w-full px-2.5 sm:px-3 py-1.5 sm:py-1 border-t text-[10.5px] sm:text-[10px] font-mono select-none ${
           themeMode === 'classic_delphi'
             ? 'bg-slate-100 text-slate-800 border-slate-300'
-            : 'bg-slate-950 text-slate-400 border-slate-800'
+            : 'bg-gradient-to-r from-white via-slate-100 to-slate-200/80 text-slate-700 border-slate-300'
         }`}
       >
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 sm:gap-2">

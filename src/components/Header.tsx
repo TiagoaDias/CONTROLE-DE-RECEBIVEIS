@@ -329,10 +329,10 @@ export const Header: React.FC<HeaderProps> = ({
             {onOpenCredorScore && (
               <button
                 onClick={onOpenCredorScore}
-                className="px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-[11px] shadow-sm flex items-center gap-1 cursor-pointer"
+                className="animate-score-badge px-2.5 py-1.5 rounded-lg bg-gradient-to-r from-violet-600 to-indigo-600 text-white font-bold text-[11px] shadow-sm flex items-center gap-1 cursor-pointer active:scale-95 transition-all"
                 title="Score do Credor"
               >
-                <span className="material-symbols-outlined text-[14px]">auto_awesome</span>
+                <span className="material-symbols-outlined text-[14px] text-amber-300 animate-icon-sparkle">auto_awesome</span>
                 <span>Score</span>
               </button>
             )}

@@ -81,10 +81,12 @@ export const ProofModal: React.FC<ProofModalProps> = ({
     'Parcela marcada como paga com sucesso! Quitação autenticada.'
   );
   const [localDisplayData, setLocalDisplayData] = useState<ProofModalProps['data']>(data);
+  const [isConfirmingNextQuitar, setIsConfirmingNextQuitar] = useState(false);
 
   useEffect(() => {
     setLocalDisplayData(data);
-  }, [data]);
+    setIsConfirmingNextQuitar(false);
+  }, [data, isOpen]);
 
   const activeData = localDisplayData || data;
 
@@ -290,6 +292,7 @@ export const ProofModal: React.FC<ProofModalProps> = ({
 
   const handleQuickMarkNextAsPaid = () => {
     if (!nextPendingInstallment) return;
+    setIsConfirmingNextQuitar(false);
     const todayStr = new Date().toLocaleDateString('pt-BR');
     const amountFormatted = `R$ ${(nextPendingInstallment.originalAmount || nextPendingInstallment.amount || 0)
       .toFixed(2)
@@ -639,7 +642,7 @@ _Recibo emitido com eficácia probatória plena de quitação nos termos do Arti
               {nextPendingInstallment && (onConfirmPayment || onSettleInstallment) && (
                 <button
                   type="button"
-                  onClick={handleQuickMarkNextAsPaid}
+                  onClick={() => setIsConfirmingNextQuitar(true)}
                   className={`shrink-0 px-2.5 py-1.5 rounded-xl font-black text-[10.5px] flex items-center gap-1 cursor-pointer active:scale-95 transition-all shadow-xs ${
                     isGlowActive
                       ? 'bg-amber-400 hover:bg-amber-300 text-slate-950'
@@ -651,6 +654,51 @@ _Recibo emitido com eficácia probatória plena de quitação nos termos do Arti
                   <span>Quitar #{nextPendingInstallment.installmentNumber}</span>
                 </button>
               )}
+            </div>
+          )}
+
+          {/* Caixa de Confirmação Obrigatória ("Tem certeza? Sim ou Não") ao clicar em Quitar #N */}
+          {isConfirmingNextQuitar && nextPendingInstallment && (
+            <div className="w-full max-w-lg mx-auto rounded-2xl p-3.5 sm:p-4 bg-white border-2 border-amber-400 shadow-[0_10px_30px_rgba(245,158,11,0.28)] ring-2 ring-amber-300/60 animate-in zoom-in-95 duration-150 flex flex-col gap-3">
+              <div className="flex items-start gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 border border-amber-300 text-amber-700 flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-[20px]">help</span>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <h4 className="text-xs sm:text-sm font-black text-slate-900 leading-tight">
+                    Tem certeza que deseja quitar a Parcela #{nextPendingInstallment.installmentNumber}/{nextPendingInstallment.totalInstallments}?
+                  </h4>
+                  <p className="text-[11px] text-slate-600 mt-0.5 leading-snug">
+                    Produto: <strong className="text-slate-900">{nextPendingInstallment.product}</strong> • Valor:{' '}
+                    <strong className="text-emerald-700 font-mono">
+                      R${' '}
+                      {(nextPendingInstallment.originalAmount || nextPendingInstallment.amount || 0)
+                        .toFixed(2)
+                        .replace('.', ',')}
+                    </strong>{' '}
+                    (Venc: {nextPendingInstallment.dueDate})
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-1 border-t border-slate-100">
+                <button
+                  type="button"
+                  onClick={() => setIsConfirmingNextQuitar(false)}
+                  className="px-3.5 py-1.5 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-800 font-black text-xs border border-slate-300 cursor-pointer transition-all flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[15px] text-red-600">close</span>
+                  <span>Não</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleQuickMarkNextAsPaid}
+                  className="px-4 py-1.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white font-black text-xs shadow-sm border border-emerald-500 cursor-pointer transition-all flex items-center gap-1"
+                >
+                  <span className="material-symbols-outlined text-[15px]">check_circle</span>
+                  <span>Sim, Quitar #{nextPendingInstallment.installmentNumber}</span>
+                </button>
+              </div>
             </div>
           )}
 

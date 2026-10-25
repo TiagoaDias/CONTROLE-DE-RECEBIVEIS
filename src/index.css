@@ -811,6 +811,415 @@
   animation: sparkle-pulse 1.8s ease-in-out infinite;
 }
 
+/* ==========================================================================
+   ANIMAÇÕES DE MOVIMENTO PARA QUITAR, RECIBO E A VENCER
+   ========================================================================== */
 
+@keyframes quitar-motion-pulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45), 0 2px 6px rgba(5, 150, 105, 0.35);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.04);
+    box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2), 0 4px 12px rgba(16, 185, 129, 0.55);
+  }
+}
+
+@keyframes quitar-shimmer-sweep {
+  0% {
+    transform: translateX(-130%) skewX(-18deg);
+  }
+  55%, 100% {
+    transform: translateX(220%) skewX(-18deg);
+  }
+}
+
+@keyframes recibo-motion-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 1px 4px rgba(16, 185, 129, 0.2);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.03);
+    box-shadow: 0 3px 10px rgba(16, 185, 129, 0.4), 0 0 8px rgba(52, 211, 153, 0.35);
+  }
+}
+
+@keyframes vencer-motion-wave {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.35), 0 1px 4px rgba(245, 158, 11, 0.25);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.04);
+    box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.22), 0 3px 10px rgba(245, 158, 11, 0.45);
+  }
+}
+
+@keyframes icon-clock-swing {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  25% {
+    transform: rotate(-16deg) scale(1.1);
+  }
+  75% {
+    transform: rotate(16deg) scale(1.1);
+  }
+}
+
+@keyframes icon-check-pop {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.22) rotate(-8deg);
+  }
+}
+
+@keyframes icon-receipt-tilt {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-1px) rotate(-10deg) scale(1.12);
+  }
+}
+
+.animate-quitar-btn {
+  position: relative;
+  overflow: hidden;
+  animation: quitar-motion-pulse 2s ease-in-out infinite;
+}
+
+.animate-quitar-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: quitar-shimmer-sweep 2.6s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-recibo-btn {
+  position: relative;
+  overflow: hidden;
+  animation: recibo-motion-float 2.4s ease-in-out infinite;
+}
+
+.animate-recibo-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(16, 185, 129, 0.25), transparent);
+  animation: quitar-shimmer-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-vencer-badge {
+  position: relative;
+  overflow: hidden;
+  animation: vencer-motion-wave 2.1s ease-in-out infinite;
+}
+
+.animate-icon-clock {
+  display: inline-block;
+  animation: icon-clock-swing 1.8s ease-in-out infinite;
+}
+
+.animate-icon-check {
+  display: inline-block;
+  animation: icon-check-pop 1.6s ease-in-out infinite;
+}
+
+.animate-icon-receipt {
+  display: inline-block;
+  animation: icon-receipt-tilt 2s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   ANIMAÇÕES DE MOVIMENTO PARA NOMES, DATAS, PARCELAS E FOTOS
+   ========================================================================== */
+
+@keyframes parcela-motion-pulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4), 0 1px 4px rgba(37, 99, 235, 0.3);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.04);
+    box-shadow: 0 0 0 2.5px rgba(96, 165, 250, 0.25), 0 3px 10px rgba(59, 130, 246, 0.5);
+  }
+}
+
+@keyframes data-motion-wave {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 1px 4px rgba(245, 158, 11, 0.3);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.03);
+    box-shadow: 0 3px 9px rgba(245, 158, 11, 0.5), 0 0 6px rgba(251, 191, 36, 0.35);
+  }
+}
+
+@keyframes nome-motion-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 1px 3px rgba(14, 165, 233, 0.12);
+  }
+  50% {
+    transform: translateY(-1.5px) scale(1.03);
+    box-shadow: 0 3px 8px rgba(6, 182, 212, 0.28);
+  }
+}
+
+@keyframes foto-avatar-motion {
+  0%, 100% {
+    transform: translateY(0) scale(1) rotate(0deg);
+    filter: drop-shadow(0 2px 5px rgba(6, 182, 212, 0.28));
+  }
+  50% {
+    transform: translateY(-2.5px) scale(1.05) rotate(1.5deg);
+    filter: drop-shadow(0 5px 12px rgba(59, 130, 246, 0.45));
+  }
+}
+
+@keyframes icon-calendar-bounce {
+  0%, 100% {
+    transform: translateY(0) rotate(0deg) scale(1);
+  }
+  50% {
+    transform: translateY(-1.5px) rotate(-10deg) scale(1.15);
+  }
+}
+
+@keyframes edit-badge-pop {
+  0%, 100% {
+    transform: scale(1) rotate(0deg);
+  }
+  50% {
+    transform: scale(1.18) rotate(12deg);
+  }
+}
+
+.animate-parcela-badge {
+  position: relative;
+  overflow: hidden;
+  animation: parcela-motion-pulse 2.2s ease-in-out infinite;
+}
+
+.animate-parcela-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.45), transparent);
+  animation: quitar-shimmer-sweep 2.8s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-data-badge {
+  position: relative;
+  overflow: hidden;
+  animation: data-motion-wave 2.4s ease-in-out infinite;
+}
+
+.animate-data-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  animation: quitar-shimmer-sweep 3.1s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-nome-badge {
+  position: relative;
+  overflow: hidden;
+  animation: nome-motion-float 2.5s ease-in-out infinite;
+}
+
+.animate-nome-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(56, 189, 248, 0.25), transparent);
+  animation: quitar-shimmer-sweep 3.3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-foto-motion {
+  animation: foto-avatar-motion 2.6s ease-in-out infinite;
+}
+
+.animate-icon-calendar {
+  display: inline-block;
+  animation: icon-calendar-bounce 1.9s ease-in-out infinite;
+}
+
+.animate-edit-badge {
+  animation: edit-badge-pop 2s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   ANIMAÇÕES DE MOVIMENTO PARA SCORE E QUITADO / LIQUIDADO
+   ========================================================================== */
+
+@keyframes score-motion-float {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.45), 0 3px 10px rgba(124, 58, 237, 0.35);
+  }
+  50% {
+    transform: translateY(-2px) scale(1.05);
+    box-shadow: 0 0 0 3.5px rgba(167, 139, 250, 0.28), 0 6px 16px rgba(124, 58, 237, 0.55);
+  }
+}
+
+@keyframes quitado-motion-pulse {
+  0%, 100% {
+    transform: translateY(0) scale(1);
+    box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.35), 0 1px 4px rgba(5, 150, 105, 0.2);
+  }
+  50% {
+    transform: translateY(-0.5px) scale(1.015);
+    box-shadow: 0 0 0 2px rgba(52, 211, 153, 0.22), 0 3px 8px rgba(16, 185, 129, 0.35);
+  }
+}
+
+@keyframes icon-sparkle-spin {
+  0%, 100% {
+    transform: rotate(0deg) scale(1);
+  }
+  50% {
+    transform: rotate(18deg) scale(1.22);
+    filter: drop-shadow(0 0 4px rgba(255, 255, 255, 0.9));
+  }
+}
+
+.animate-score-badge {
+  position: relative;
+  overflow: hidden;
+  animation: score-motion-float 2.1s ease-in-out infinite;
+}
+
+.animate-score-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.48), transparent);
+  animation: quitar-shimmer-sweep 2.5s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-quitado-badge {
+  position: relative;
+  overflow: hidden;
+  animation: quitado-motion-pulse 2.2s ease-in-out infinite;
+}
+
+.animate-quitado-badge::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 45%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.5), transparent);
+  animation: quitar-shimmer-sweep 2.7s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-icon-sparkle {
+  display: inline-block;
+  animation: icon-sparkle-spin 1.8s ease-in-out infinite;
+}
+
+/* ==========================================================================
+   ANIMAÇÕES ANIMATE-IN E MOVIMENTO CONTÍNUO DO PAINEL OPERACIONAL
+   ========================================================================== */
+
+@keyframes screen-animate-in {
+  0% {
+    opacity: 0;
+    transform: translateY(10px) scale(0.98);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes kpi-card-float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@keyframes kpi-shimmer-pass {
+  0% {
+    transform: translateX(-140%) skewX(-16deg);
+  }
+  50%, 100% {
+    transform: translateX(240%) skewX(-16deg);
+  }
+}
+
+.animate-in {
+  animation: screen-animate-in 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.animate-kpi-card {
+  position: relative;
+  overflow: hidden;
+  animation: screen-animate-in 0.4s cubic-bezier(0.16, 1, 0.3, 1) both, kpi-card-float 3s ease-in-out 0.4s infinite;
+}
+
+.animate-kpi-card::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+  animation: kpi-shimmer-pass 3.4s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.animate-kpi-delay-1 {
+  animation-delay: 0.05s, 0.45s;
+}
+.animate-kpi-delay-2 {
+  animation-delay: 0.12s, 0.65s;
+}
+.animate-kpi-delay-3 {
+  animation-delay: 0.18s, 0.85s;
+}
+.animate-kpi-delay-4 {
+  animation-delay: 0.24s, 1.05s;
+}
 
 

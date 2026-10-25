@@ -250,30 +250,30 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
   return (
     <>
-      <div className={`flex flex-col w-full gap-2 sm:gap-2.5 pb-16 transition-colors duration-300 ${
+      <div className={`flex flex-col w-full gap-2 sm:gap-2.5 pb-16 transition-colors duration-300 animate-in fade-in slide-in-from-bottom-2 ${
         isDarkMode ? 'text-white' : 'text-slate-850'
       }`}>
         
         {/* ============================================================ */}
         {/* 1. PAINEL OPERACIONAL ENRAIZADO NO DEVEDOR ATIVO (COM LUZ)   */}
         {/* ============================================================ */}
-        <div className="financial-container relative overflow-hidden bg-slate-900/95 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2 sm:p-3 text-white shadow-[0_0_24px_rgba(6,182,212,0.22)] border-2 border-cyan-400/60 ring-1 ring-cyan-400/40 flex flex-col gap-1.5 sm:gap-2">
+        <div className="financial-container relative overflow-hidden bg-slate-900/95 backdrop-blur-xl rounded-xl sm:rounded-2xl p-2 sm:p-3 text-white shadow-[0_0_24px_rgba(6,182,212,0.22)] border-2 border-cyan-400/60 ring-1 ring-cyan-400/40 flex flex-col gap-1.5 sm:gap-2 animate-in fade-in zoom-in-95 duration-300">
           <CardMeteor variant="multi" />
           <div className="absolute inset-0 opacity-15 pointer-events-none bg-[radial-gradient(#22d3ee_1px,transparent_1px)] [background-size:16px_16px]"></div>
           
-          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-2">
+          <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-1.5 sm:gap-2 animate-in fade-in duration-300">
             <div className="flex flex-col gap-0.5 min-w-0 flex-1">
               <h2 className="text-xs sm:text-sm font-black text-white leading-tight flex items-center gap-1.5 flex-wrap">
-                <span>Painel Operacional</span>
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
+                <span className="animate-nome-badge px-1.5 py-0.5 rounded-md bg-white/5 border border-cyan-400/30">Painel Operacional</span>
+                <span className="animate-parcela-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-cyan-500/25 text-cyan-300 border border-cyan-400/50 shadow-[0_0_10px_rgba(6,182,212,0.3)]">
                   Oficial
                 </span>
-                <span className="text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
+                <span className="animate-quitado-badge text-[9px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-500/25 text-emerald-300 border border-emerald-400/50 shadow-[0_0_10px_rgba(16,185,129,0.3)] flex items-center gap-1">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   100% Interativo
                 </span>
                 {selectedPrimaryDebtor && (
-                  <span className="text-[10px] font-bold text-cyan-200 bg-cyan-950/90 px-2 py-0.5 rounded-full border border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.35)] flex items-center gap-1 truncate">
+                  <span className="animate-nome-badge text-[10px] font-bold text-cyan-200 bg-cyan-950/90 px-2 py-0.5 rounded-full border border-cyan-400/50 shadow-[0_0_12px_rgba(6,182,212,0.35)] flex items-center gap-1 truncate">
                     <span className="material-symbols-outlined text-[12px] text-cyan-400">person</span>
                     <span>{selectedPrimaryDebtor.name}</span>
                   </span>
@@ -293,10 +293,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                     playAppSound('pop');
                     setIsDebtorSelectModalOpen(true);
                   }}
-                  className="flex items-center gap-1.5 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border-2 border-cyan-400/80 hover:border-cyan-300 rounded-xl px-2.5 py-1 text-[11px] font-black text-white shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all cursor-pointer active:scale-95 group"
+                  className="animate-nome-badge flex items-center gap-1.5 bg-gradient-to-r from-slate-800 to-slate-900 hover:from-slate-700 hover:to-slate-800 border-2 border-cyan-400/80 hover:border-cyan-300 rounded-xl px-2.5 py-1 text-[11px] font-black text-white shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all cursor-pointer active:scale-95 group"
                   title="Toque para abrir a lista interativa de clientes"
                 >
-                  <span className="material-symbols-outlined text-[15px] text-cyan-400 group-hover:scale-110 transition-transform">person_search</span>
+                  <span className="material-symbols-outlined text-[15px] text-cyan-400 group-hover:scale-110 transition-transform animate-foto-motion">person_search</span>
                   <span className="text-[10px] text-cyan-200 font-bold uppercase tracking-wider hidden sm:inline">Cliente:</span>
                   <span className="text-white font-extrabold max-w-[125px] sm:max-w-[170px] truncate">
                     {selectedPrimaryDebtor ? selectedPrimaryDebtor.name : 'Todos os Clientes'}
@@ -312,7 +312,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   try { playAppSound('pop'); } catch {}
                   onNavigate('erp-legacy');
                 }}
-                className="px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-300/80 group"
+                className="animate-data-badge px-2.5 py-1 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black rounded-xl text-[11px] flex items-center gap-1 transition-all cursor-pointer shadow-[0_0_14px_rgba(245,158,11,0.4)] active:scale-95 shrink-0 border border-amber-300/80 group"
                 title="Abrir Sistema ERP Corporativo / Delphi Desktop"
               >
                 <span className="material-symbols-outlined text-[15px] text-slate-950 group-hover:scale-110 transition-transform">desktop_windows</span>
@@ -321,7 +321,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             </div>
           </div>
 
-          {/* 4 BOTÕES INTERATIVOS BRANCOS ENRAIZADOS NO DEVEDOR ATIVO (GRADE COMPACTA 2x2 NO MOBILE) */}
+          {/* 4 BOTÕES INTERATIVOS BRANCOS ENRAIZADOS NO DEVEDOR ATIVO (GRADE COMPACTA 2x2 NO MOBILE COM ANIMATE-IN E MOVIMENTO) */}
           <div className="relative z-10 grid grid-cols-2 lg:grid-cols-4 gap-1.5 sm:gap-2 w-full">
             {/* 1. Total em Aberto */}
             <button
@@ -330,7 +330,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 playAppSound('pop');
                 setActiveKpiModal('open');
               }}
-              className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-cyan-400/80 shadow-[0_0_14px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-cyan-400 hover:ring-2 hover:ring-cyan-400/60 hover:shadow-[0_0_24px_rgba(6,182,212,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
+              className="animate-kpi-card animate-kpi-delay-1 indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-cyan-400/80 shadow-[0_0_14px_rgba(6,182,212,0.2)] ring-1 ring-cyan-400/30 flex flex-col justify-between gap-1 text-slate-850 select-none hover:border-cyan-400 hover:ring-2 hover:ring-cyan-400/60 hover:shadow-[0_0_24px_rgba(6,182,212,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
               title={`Toque para ver o total em aberto de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
@@ -338,22 +338,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-cyan-300/30 to-transparent skew-x-12" />
 
               <div className="relative z-10 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-black text-cyan-800 uppercase tracking-wider truncate group-hover:text-cyan-950 transition-colors">
-                    EM ABERTO
-                  </span>
-                  <span className="hidden sm:inline-flex text-[8px] font-black uppercase tracking-wide px-1 py-0.2 rounded-full bg-cyan-100 text-cyan-800 border border-cyan-300 items-center gap-0.5 shrink-0">
-                    <span className="w-1 h-1 rounded-full bg-cyan-500 animate-pulse"></span>
-                    Ativo
-                  </span>
-                </div>
-                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-cyan-50 text-cyan-700 flex items-center justify-center shrink-0 border border-cyan-200 group-hover:bg-cyan-500 group-hover:text-white transition-all">
+                <span className="animate-parcela-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-cyan-600 text-white text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider truncate">
+                  EM ABERTO
+                </span>
+                <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-cyan-50 text-cyan-700 flex items-center justify-center shrink-0 border border-cyan-200 group-hover:bg-cyan-500 group-hover:text-white transition-all animate-foto-motion">
                   <span className="material-symbols-outlined text-[13px]">account_balance_wallet</span>
                 </div>
               </div>
 
               {/* Babadinho de Identificação da Pessoa */}
-              <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-gradient-to-r from-cyan-50 to-cyan-100/90 border border-cyan-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-cyan-900 max-w-full">
+              <div className="animate-nome-badge relative z-10 flex items-center gap-1 bg-gradient-to-r from-cyan-50 to-cyan-100/90 border border-cyan-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-cyan-900 max-w-full">
                 <span className="material-symbols-outlined text-[11px] text-cyan-600 shrink-0">person</span>
                 <span className="truncate">{debtorFullName}</span>
               </div>
@@ -366,9 +360,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {pendingCount} pendente(s) • <strong className="text-cyan-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
-              <div className="relative z-10 mt-1 pt-1 border-t border-cyan-100/80 flex items-center justify-between text-[9px] font-bold text-cyan-700 group-hover:text-cyan-900 transition-colors">
+              <div className="relative z-10 pt-1 border-t border-cyan-100/80 flex items-center justify-between text-[9px] font-bold text-cyan-700 group-hover:text-cyan-900 transition-colors">
                 <span className="flex items-center gap-0.5 truncate">
-                  <span className="material-symbols-outlined text-[11px] text-cyan-600">touch_app</span>
+                  <span className="material-symbols-outlined text-[11px] text-cyan-600 animate-icon-receipt">touch_app</span>
                   <span className="truncate">Ver faturas</span>
                 </span>
                 <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform text-cyan-500 shrink-0">chevron_right</span>
@@ -382,7 +376,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 playAppSound('success');
                 setActiveKpiModal('paid');
               }}
-              className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-emerald-400/80 shadow-[0_0_14px_rgba(16,185,129,0.2)] ring-1 ring-emerald-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/60 hover:shadow-[0_0_24px_rgba(16,185,129,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
+              className="animate-kpi-card animate-kpi-delay-2 indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-emerald-400/80 shadow-[0_0_14px_rgba(16,185,129,0.2)] ring-1 ring-emerald-400/30 flex flex-col justify-between gap-1 text-slate-850 select-none hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/60 hover:shadow-[0_0_24px_rgba(16,185,129,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
               title={`Toque para ver o total quitado de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
@@ -390,22 +384,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-emerald-300/30 to-transparent skew-x-12" />
 
               <div className="relative z-10 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-black text-emerald-800 uppercase tracking-wider truncate group-hover:text-emerald-950 transition-colors">
-                    TOTAL QUITADO
-                  </span>
-                  <span className="hidden sm:inline-flex text-[8px] font-black uppercase tracking-wide px-1 py-0.2 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-300 items-center gap-0.5 shrink-0">
-                    <span className="w-1 h-1 rounded-full bg-emerald-500 animate-pulse"></span>
-                    Ativo
-                  </span>
-                </div>
+                <span className="animate-quitado-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider truncate">
+                  TOTAL QUITADO
+                </span>
                 <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-emerald-50 text-emerald-700 flex items-center justify-center shrink-0 border border-emerald-200 group-hover:bg-emerald-500 group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-[13px]">check_circle</span>
+                  <span className="material-symbols-outlined text-[13px] animate-icon-check">check_circle</span>
                 </div>
               </div>
 
               {/* Babadinho de Identificação da Pessoa */}
-              <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-gradient-to-r from-emerald-50 to-emerald-100/90 border border-emerald-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-emerald-900 max-w-full">
+              <div className="animate-nome-badge relative z-10 flex items-center gap-1 bg-gradient-to-r from-emerald-50 to-emerald-100/90 border border-emerald-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-emerald-900 max-w-full">
                 <span className="material-symbols-outlined text-[11px] text-emerald-600 shrink-0">person</span>
                 <span className="truncate">{debtorFullName}</span>
               </div>
@@ -418,9 +406,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {paidCount} liquidada(s) • <strong className="text-emerald-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
-              <div className="relative z-10 mt-1 pt-1 border-t border-emerald-100/80 flex items-center justify-between text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900 transition-colors">
+              <div className="relative z-10 pt-1 border-t border-emerald-100/80 flex items-center justify-between text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900 transition-colors">
                 <span className="flex items-center gap-0.5 truncate">
-                  <span className="material-symbols-outlined text-[11px] text-emerald-600">touch_app</span>
+                  <span className="material-symbols-outlined text-[11px] text-emerald-600 animate-icon-receipt">touch_app</span>
                   <span className="truncate">Ver liquidadas</span>
                 </span>
                 <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform text-emerald-500 shrink-0">chevron_right</span>
@@ -434,7 +422,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 playAppSound('alert');
                 setActiveKpiModal('overdue');
               }}
-              className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-red-400/80 shadow-[0_0_14px_rgba(239,68,68,0.2)] ring-1 ring-red-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-red-400 hover:ring-2 hover:ring-red-400/60 hover:shadow-[0_0_24px_rgba(239,68,68,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
+              className="animate-kpi-card animate-kpi-delay-3 indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-red-400/80 shadow-[0_0_14px_rgba(239,68,68,0.2)] ring-1 ring-red-400/30 flex flex-col justify-between gap-1 text-slate-850 select-none hover:border-red-400 hover:ring-2 hover:ring-red-400/60 hover:shadow-[0_0_24px_rgba(239,68,68,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
               title={`Toque para ver o total em atraso de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
@@ -442,22 +430,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-red-300/30 to-transparent skew-x-12" />
 
               <div className="relative z-10 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-black text-red-800 uppercase tracking-wider truncate group-hover:text-red-950 transition-colors">
-                    EM ATRASO
-                  </span>
-                  <span className="hidden sm:inline-flex text-[8px] font-black uppercase tracking-wide px-1 py-0.2 rounded-full bg-red-100 text-red-800 border border-red-300 items-center gap-0.5 shrink-0">
-                    <span className="w-1 h-1 rounded-full bg-red-500 animate-pulse"></span>
-                    Ativo
-                  </span>
-                </div>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-red-50 text-red-800 border border-red-200 text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider truncate">
+                  EM ATRASO
+                </span>
                 <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-red-50 text-red-700 flex items-center justify-center shrink-0 border border-red-200 group-hover:bg-red-500 group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-[13px]">warning</span>
+                  <span className="material-symbols-outlined text-[13px] animate-bounce">warning</span>
                 </div>
               </div>
 
               {/* Babadinho de Identificação da Pessoa */}
-              <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-gradient-to-r from-red-50 to-red-100/90 border border-red-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-red-900 max-w-full">
+              <div className="animate-nome-badge relative z-10 flex items-center gap-1 bg-gradient-to-r from-red-50 to-red-100/90 border border-red-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-red-900 max-w-full">
                 <span className="material-symbols-outlined text-[11px] text-red-600 shrink-0">person</span>
                 <span className="truncate">{debtorFullName}</span>
               </div>
@@ -470,9 +452,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                   {overdueInstallments.length} vencida(s) • <strong className="text-red-800 font-bold">{debtorFirstName}</strong>
                 </span>
               </div>
-              <div className="relative z-10 mt-1 pt-1 border-t border-red-100/80 flex items-center justify-between text-[9px] font-bold text-red-700 group-hover:text-red-900 transition-colors">
+              <div className="relative z-10 pt-1 border-t border-red-100/80 flex items-center justify-between text-[9px] font-bold text-red-700 group-hover:text-red-900 transition-colors">
                 <span className="flex items-center gap-0.5 truncate">
-                  <span className="material-symbols-outlined text-[11px] text-red-600">touch_app</span>
+                  <span className="material-symbols-outlined text-[11px] text-red-600 animate-icon-receipt">touch_app</span>
                   <span className="truncate">Ver atrasos</span>
                 </span>
                 <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform text-red-500 shrink-0">chevron_right</span>
@@ -486,7 +468,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
                 playAppSound('cheerful');
                 setActiveKpiModal('month');
               }}
-              className="indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-amber-400/80 shadow-[0_0_14px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/30 flex flex-col justify-between text-slate-850 select-none hover:border-amber-400 hover:ring-2 hover:ring-amber-400/60 hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
+              className="animate-kpi-card animate-kpi-delay-4 indicator-card financial-container w-full text-left relative overflow-hidden bg-white/95 backdrop-blur-md p-2 sm:p-2.5 rounded-xl border-2 border-amber-400/80 shadow-[0_0_14px_rgba(245,158,11,0.2)] ring-1 ring-amber-400/30 flex flex-col justify-between gap-1 text-slate-850 select-none hover:border-amber-400 hover:ring-2 hover:ring-amber-400/60 hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] hover:scale-[1.01] active:scale-95 transition-all duration-300 cursor-pointer group"
               title={`Toque para ver as faturas do mês atual de ${debtorFullName}`}
             >
               {/* Animação de brilho suave e halo radial */}
@@ -494,22 +476,16 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-amber-300/30 to-transparent skew-x-12" />
 
               <div className="relative z-10 flex items-center justify-between gap-1">
-                <div className="flex items-center gap-1 min-w-0">
-                  <span className="text-[9px] sm:text-[10px] font-black text-amber-800 uppercase tracking-wider truncate group-hover:text-amber-950 transition-colors">
-                    MÊS ({currentMonthAbbr})
-                  </span>
-                  <span className="hidden sm:inline-flex text-[8px] font-black uppercase tracking-wide px-1 py-0.2 rounded-full bg-amber-100 text-amber-800 border border-amber-300 items-center gap-0.5 shrink-0">
-                    <span className="w-1 h-1 rounded-full bg-amber-500 animate-pulse"></span>
-                    Ativo
-                  </span>
-                </div>
+                <span className="animate-data-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-gradient-to-r from-amber-500 to-orange-500 text-white text-[8.5px] sm:text-[9.5px] font-black uppercase tracking-wider truncate">
+                  MÊS ({currentMonthAbbr})
+                </span>
                 <div className="w-5 h-5 sm:w-6 sm:h-6 rounded-md bg-amber-50 text-amber-700 flex items-center justify-center shrink-0 border border-amber-200 group-hover:bg-amber-500 group-hover:text-white transition-all">
-                  <span className="material-symbols-outlined text-[13px]">calendar_month</span>
+                  <span className="material-symbols-outlined text-[13px] animate-icon-calendar">calendar_month</span>
                 </div>
               </div>
 
               {/* Babadinho de Identificação da Pessoa */}
-              <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-gradient-to-r from-amber-50 to-amber-100/90 border border-amber-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-amber-900 max-w-full">
+              <div className="animate-nome-badge relative z-10 flex items-center gap-1 bg-gradient-to-r from-amber-50 to-amber-100/90 border border-amber-300/90 px-1.5 py-0.5 rounded-md text-[9px] font-extrabold text-amber-900 max-w-full">
                 <span className="material-symbols-outlined text-[11px] text-amber-600 shrink-0">person</span>
                 <span className="truncate">{debtorFullName}</span>
               </div>
@@ -524,7 +500,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </div>
               <div className="relative z-10 mt-1 pt-1 border-t border-amber-100/80 flex items-center justify-between text-[9px] font-bold text-amber-700 group-hover:text-amber-900 transition-colors">
                 <span className="flex items-center gap-0.5 truncate">
-                  <span className="material-symbols-outlined text-[11px] text-amber-600">touch_app</span>
+                  <span className="material-symbols-outlined text-[11px] text-amber-600 animate-icon-receipt">touch_app</span>
                   <span className="truncate">Ver faturas</span>
                 </span>
                 <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform text-amber-500 shrink-0">chevron_right</span>

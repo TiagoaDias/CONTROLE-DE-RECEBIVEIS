@@ -540,6 +540,14 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
     const hasOverdue = overdueCount > 0 || (activeDebtor.overdueCount || 0) > 0;
     const isPaidOff = totalDevido <= 0 && totalCount > 0;
 
+    const computedScore = isPaidOff
+      ? 1000
+      : hasOverdue
+      ? Math.max(480, (activeDebtor.score || 820) - overdueCount * 40)
+      : Math.min(990, Math.max(activeDebtor.score || 900, 850 + paidCount * 10));
+    const scoreLabel =
+      computedScore >= 900 ? 'EXCELENTE' : computedScore >= 750 ? 'ÓTIMO' : computedScore >= 600 ? 'BOM' : 'ATENÇÃO';
+
     return {
       totalCount,
       paidCount,
@@ -552,6 +560,8 @@ export const ParcelasView: React.FC<ParcelasViewProps> = ({
       unitaryItems,
       hasOverdue,
       isPaidOff,
+      score: computedScore,
+      scoreLabel,
     };
   }, [activeDebtor, installments, purchases]);
 
@@ -1064,9 +1074,9 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
             <div className="lg:col-span-4 xl:col-span-4 flex flex-col gap-3.5 sticky top-4">
               
               {/* BARRINHA DE SELEÇÃO POR DROPDOWN (MENU SUSPENSO INTERATIVO) */}
-              <div className="w-full flex flex-col gap-2 relative">
+              <div className="w-full flex flex-col gap-2 relative animate-in fade-in slide-in-from-bottom-2 duration-300">
                 {/* A Barra com Dropdown de Devedor e Dropdown de Produto (Sem Lupa) */}
-                <div className="bg-white/95 p-2 sm:p-2.5 rounded-2xl border border-cyan-300/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 gap-2 w-full select-none">
+                <div className="animate-in fade-in zoom-in-95 duration-300 bg-white/95 p-2 sm:p-2.5 rounded-2xl border border-cyan-300/80 shadow-xs grid grid-cols-1 sm:grid-cols-2 gap-2 w-full select-none">
                   {/* 1. DROPDOWN "Devedores" (Seleção intuitiva de pessoas/devedores) */}
                   <SearchableDropdown
                     title="Devedores"
@@ -1147,8 +1157,9 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       <span>{activeDebtorStats.overdueCount} atrasada(s)</span>
                     </span>
                   ) : activeDebtorStats.isPaidOff ? (
-                    <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-blue-50 text-blue-700 border border-blue-200 font-bold text-[10.5px]">
-                      <span>Liquidado</span>
+                    <span className="animate-quitado-badge inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-gradient-to-r from-emerald-500 via-teal-500 to-emerald-600 text-white border border-emerald-400 font-black text-[10.5px] shadow-xs">
+                      <span className="material-symbols-outlined text-[12px] animate-icon-check">check_circle</span>
+                      <span>Quitado • Liquidado</span>
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-bold text-[10.5px]">
@@ -1158,47 +1169,74 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                   )}
                 </div>
 
-                {/* Identificação Principal (Avatar, Nome, Relação) */}
-                <div className="flex items-center gap-3.5">
-                  <div className="relative shrink-0">
-                    <SafeDebtorAvatar
-                      name={activeDebtor.name}
-                      avatar={activeDebtor.avatar}
-                      size="md"
-                      status={activeDebtorStats.hasOverdue ? 'late' : 'ok'}
-                      className="ring-2 ring-cyan-400 shadow-sm"
-                    />
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1d9bf0] text-white flex items-center justify-center text-[9px] font-black ring-1 ring-white shadow-xs">
-                      ✓
-                    </span>
+                {/* Identificação Principal (Avatar, Nome, Relação + Score com Movimento no Círculo Direito) */}
+                <div className="flex items-center justify-between gap-2.5">
+                  <div className="flex items-center gap-3 min-w-0 flex-1">
+                    <div className="relative shrink-0 animate-foto-motion">
+                      <SafeDebtorAvatar
+                        name={activeDebtor.name}
+                        avatar={activeDebtor.avatar}
+                        size="md"
+                        status={activeDebtorStats.hasOverdue ? 'late' : 'ok'}
+                        className="ring-2 ring-cyan-400 shadow-sm"
+                      />
+                      <span className="animate-edit-badge absolute -bottom-1 -right-1 w-4 h-4 rounded-full bg-[#1d9bf0] text-white flex items-center justify-center text-[9px] font-black ring-1 ring-white shadow-xs">
+                        ✓
+                      </span>
+                    </div>
+
+                    <div className="flex flex-col min-w-0 leading-tight">
+                      <h3 className="animate-nome-badge inline-flex items-center px-2 py-0.5 rounded-lg bg-gradient-to-r from-cyan-50/90 via-white to-blue-50/90 border border-cyan-200/80 font-black text-slate-900 text-sm sm:text-base truncate max-w-full w-fit">
+                        {activeDebtor.name}
+                      </h3>
+                      <span className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
+                        {activeDebtor.relation || 'Cliente'} • Cadastrado(a)
+                      </span>
+                      {(activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-black text-[10px]">
+                            <span>🏷️ Cliente Fictício (Exemplo)</span>
+                          </span>
+                          {onRequestDeleteDebtor && (
+                            <button
+                              type="button"
+                              onClick={() => onRequestDeleteDebtor(activeDebtor)}
+                              className="px-2 py-0.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
+                              title="Excluir usuário de exemplo"
+                            >
+                              <span className="material-symbols-outlined text-[12px]">delete</span>
+                              <span>Excluir Exemplo</span>
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div className="flex flex-col min-w-0 leading-tight">
-                    <h3 className="font-black text-slate-900 text-base sm:text-lg truncate">
-                      {activeDebtor.name}
-                    </h3>
-                    <span className="text-[11px] text-slate-500 font-medium truncate mt-0.5">
-                      {activeDebtor.relation || 'Cliente'} • Cadastrado(a)
+                  {/* Badge de Score com Movimento (Área circulada à direita do nome) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      playAppSound('success');
+                      setActiveKpiModal('paid');
+                      if (onToast) {
+                        onToast(`⭐ Score de ${activeDebtor.name}: ${activeDebtorStats.score}/1000 (${activeDebtorStats.scoreLabel})`);
+                      }
+                    }}
+                    className="animate-score-badge shrink-0 px-2.5 py-1.5 rounded-2xl bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-600 text-white border border-violet-300/70 shadow-md flex flex-col items-center justify-center leading-none gap-0.5 cursor-pointer active:scale-95 transition-all"
+                    title={`Score de pontualidade de ${activeDebtor.name}: ${activeDebtorStats.score} pts (${activeDebtorStats.scoreLabel})`}
+                  >
+                    <div className="flex items-center gap-1">
+                      <span className="material-symbols-outlined text-[14px] text-amber-300 animate-icon-sparkle">auto_awesome</span>
+                      <span className="text-[10px] font-extrabold uppercase tracking-wider text-violet-100">Score</span>
+                    </div>
+                    <span className="font-mono font-black text-xs sm:text-sm text-white tracking-tight">
+                      {activeDebtorStats.score} <span className="text-[8.5px] font-bold text-amber-300">pts</span>
                     </span>
-                    {(activeDebtor.id === 'DEMO-001' || activeDebtor.id === 'DEMO-002' || activeDebtor.relation === 'Demonstração' || activeDebtor.id?.startsWith('DEMO-')) && (
-                      <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-100 text-amber-900 border border-amber-300 font-black text-[10px]">
-                          <span>🏷️ Cliente Fictício (Exemplo)</span>
-                        </span>
-                        {onRequestDeleteDebtor && (
-                          <button
-                            type="button"
-                            onClick={() => onRequestDeleteDebtor(activeDebtor)}
-                            className="px-2 py-0.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-black text-[10px] flex items-center gap-1 shadow-xs cursor-pointer active:scale-95 transition-all"
-                            title="Excluir usuário de exemplo"
-                          >
-                            <span className="material-symbols-outlined text-[12px]">delete</span>
-                            <span>Excluir Exemplo</span>
-                          </button>
-                        )}
-                      </div>
-                    )}
-                  </div>
+                    <span className="px-1.5 py-0.2 rounded-full bg-white/20 text-[7.5px] font-black uppercase tracking-widest text-amber-200">
+                      {activeDebtorStats.scoreLabel}
+                    </span>
+                  </button>
                 </div>
 
                 {/* Dados de Contato e Documentos */}
@@ -1234,44 +1272,48 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                   ) : null}
                 </div>
 
-                {/* Métricas Financeiras Completas */}
-                <div className="grid grid-cols-2 gap-2.5">
+                {/* Métricas Financeiras Completas (Sem sobreposição e sem corte de texto) */}
+                <div className="grid grid-cols-2 gap-2.5 items-stretch">
                   <button
                     type="button"
                     onClick={() => {
                       playAppSound('pop');
                       setActiveKpiModal('open');
                     }}
-                    className="indicator-card financial-container p-3 rounded-2xl bg-amber-50/70 hover:bg-amber-100/90 border-2 border-amber-200/90 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/50 hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden"
+                    className="indicator-card financial-container p-2.5 sm:p-3 rounded-2xl bg-amber-50/70 hover:bg-amber-100/90 border-2 border-amber-200/90 hover:border-amber-400 hover:ring-2 hover:ring-amber-400/50 hover:shadow-[0_0_24px_rgba(245,158,11,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden flex flex-col justify-between gap-1.5"
                     title={`Toque para ver o detalhamento do total em aberto de ${activeDebtor.name}`}
                   >
                     {/* Animação de brilho suave e halo radial */}
                     <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-amber-400/30" />
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-amber-300/30 to-transparent skew-x-12" />
 
-                    <div className="relative z-10 flex items-center justify-between gap-1">
-                      <span className="text-[10px] uppercase font-bold text-amber-800 block truncate group-hover:text-amber-950 transition-colors">Total em Aberto</span>
-                      <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-amber-200/90 text-amber-900 border border-amber-300 shrink-0 flex items-center gap-0.5 group-hover:bg-amber-300/90 transition-colors">
-                        <span className="w-1 h-1 rounded-full bg-amber-600 animate-pulse"></span>
-                        Interativo
+                    {/* Topo: Título completo sem corte */}
+                    <div className="relative z-10 flex items-center justify-between gap-1 w-full">
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-200/80 text-amber-950 border border-amber-300 text-[9.5px] sm:text-[10px] uppercase font-black tracking-tight leading-tight">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-600 animate-pulse shrink-0" />
+                        <span>Total em Aberto</span>
                       </span>
                     </div>
 
-                    {/* Babadinho com o Nome da Pessoa */}
-                    <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-amber-100/90 border border-amber-300/80 px-2 py-0.5 rounded-lg text-[9.5px] font-extrabold text-amber-950 max-w-full shadow-2xs">
-                      <span className="material-symbols-outlined text-[12px] text-amber-700 shrink-0">person</span>
+                    {/* Nome da Pessoa */}
+                    <div className="relative z-10 flex items-center gap-1 bg-amber-100/90 border border-amber-300/80 px-2 py-1 rounded-lg text-[10px] font-extrabold text-amber-950 w-full shadow-2xs">
+                      <span className="material-symbols-outlined text-[13px] text-amber-700 shrink-0">person</span>
                       <span className="truncate">{activeDebtor.name}</span>
                     </div>
 
-                    <span className="relative z-10 text-base font-black font-mono text-amber-700 block mt-0.5 group-hover:text-amber-800 transition-colors">
-                      R$ {activeDebtorStats.totalDevido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="relative z-10 text-[10px] text-amber-600 font-medium block">
-                      {activeDebtorStats.pendingCount} parcela(s) pendente(s)
-                    </span>
-                    <div className="relative z-10 mt-1 pt-1 border-t border-amber-200/60 flex items-center justify-between text-[9px] font-bold text-amber-700 group-hover:text-amber-900">
-                      <span>Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
-                      <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                    {/* Valor e Quantidade */}
+                    <div className="relative z-10 flex flex-col gap-0.5 pt-0.5">
+                      <span className="text-sm sm:text-base font-black font-mono text-amber-800 bg-amber-100/60 border border-amber-200/80 px-2 py-0.5 rounded-lg w-fit leading-tight">
+                        R$ {activeDebtorStats.totalDevido.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[10px] text-amber-700 font-semibold block mt-0.5">
+                        {activeDebtorStats.pendingCount} parcela(s) pendente(s)
+                      </span>
+                    </div>
+
+                    <div className="relative z-10 pt-1 border-t border-amber-200/60 flex items-center justify-between text-[9.5px] font-bold text-amber-800 group-hover:text-amber-950 w-full">
+                      <span className="truncate">Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
+                      <span className="material-symbols-outlined text-[12px] shrink-0 group-hover:translate-x-0.5 transition-transform">chevron_right</span>
                     </div>
                   </button>
 
@@ -1281,58 +1323,63 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                       playAppSound('success');
                       setActiveKpiModal('paid');
                     }}
-                    className="indicator-card financial-container p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100/90 border-2 border-emerald-200/90 hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/50 hover:shadow-[0_0_24px_rgba(16,185,129,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden"
+                    className="indicator-card financial-container p-2.5 sm:p-3 rounded-2xl bg-emerald-50/70 hover:bg-emerald-100/90 border-2 border-emerald-200/90 hover:border-emerald-400 hover:ring-2 hover:ring-emerald-400/50 hover:shadow-[0_0_24px_rgba(16,185,129,0.45)] text-left transition-all duration-300 active:scale-95 cursor-pointer group shadow-2xs relative overflow-hidden flex flex-col justify-between gap-1.5"
                     title={`Toque para ver o detalhamento do total quitado de ${activeDebtor.name}`}
                   >
                     {/* Animação de brilho suave e halo radial */}
                     <div className="absolute -top-8 -right-8 w-20 h-20 rounded-full blur-xl opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-emerald-400/30" />
                     <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-emerald-300/30 to-transparent skew-x-12" />
 
-                    <div className="relative z-10 flex items-center justify-between gap-1">
-                      <span className="text-[10px] uppercase font-bold text-emerald-800 block truncate group-hover:text-emerald-950 transition-colors">Total Quitado</span>
-                      <span className="text-[8px] font-black uppercase px-1.5 py-0.5 rounded-full bg-emerald-200/90 text-emerald-900 border border-emerald-300 shrink-0 flex items-center gap-0.5 group-hover:bg-emerald-300/90 transition-colors">
-                        <span className="w-1 h-1 rounded-full bg-emerald-600 animate-pulse"></span>
-                        Interativo
+                    {/* Topo: Título Total Quitado completo com animação e sem sobreposição */}
+                    <div className="relative z-10 flex items-center justify-between gap-1 w-full">
+                      <span className="animate-quitado-badge inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-[9.5px] sm:text-[10px] uppercase font-black tracking-tight leading-tight shadow-2xs">
+                        <span className="material-symbols-outlined text-[11px] animate-icon-check shrink-0">verified</span>
+                        <span>Total Quitado</span>
                       </span>
                     </div>
 
-                    {/* Babadinho com o Nome da Pessoa */}
-                    <div className="relative z-10 mt-1 mb-0.5 flex items-center gap-1 bg-emerald-100/90 border border-emerald-300/80 px-2 py-0.5 rounded-lg text-[9.5px] font-extrabold text-emerald-950 max-w-full shadow-2xs">
-                      <span className="material-symbols-outlined text-[12px] text-emerald-700 shrink-0">person</span>
+                    {/* Nome da Pessoa */}
+                    <div className="relative z-10 flex items-center gap-1 bg-emerald-100/90 border border-emerald-300/80 px-2 py-1 rounded-lg text-[10px] font-extrabold text-emerald-950 w-full shadow-2xs">
+                      <span className="material-symbols-outlined text-[13px] text-emerald-700 shrink-0">person</span>
                       <span className="truncate">{activeDebtor.name}</span>
                     </div>
 
-                    <span className="relative z-10 text-base font-black font-mono text-emerald-700 block mt-0.5 group-hover:text-emerald-800 transition-colors">
-                      R$ {activeDebtorStats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                    </span>
-                    <span className="relative z-10 text-[10px] text-emerald-600 font-medium block">
-                      {activeDebtorStats.paidCount} parcela(s) liquidada(s)
-                    </span>
-                    <div className="relative z-10 mt-1 pt-1 border-t border-emerald-200/60 flex items-center justify-between text-[9px] font-bold text-emerald-700 group-hover:text-emerald-900">
-                      <span>Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
-                      <span className="material-symbols-outlined text-[11px] group-hover:translate-x-0.5 transition-transform">chevron_right</span>
+                    {/* Valor e Quantidade */}
+                    <div className="relative z-10 flex flex-col gap-0.5 pt-0.5">
+                      <span className="animate-quitado-badge text-sm sm:text-base font-black font-mono text-emerald-800 bg-emerald-100/90 border border-emerald-300 px-2 py-0.5 rounded-lg w-fit leading-tight">
+                        R$ {activeDebtorStats.totalPaid.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                      </span>
+                      <span className="text-[10px] text-emerald-700 font-bold block mt-0.5">
+                        {activeDebtorStats.paidCount} parcela(s) quitada(s)
+                      </span>
+                    </div>
+
+                    <div className="relative z-10 pt-1 border-t border-emerald-200/60 flex items-center justify-between text-[9.5px] font-bold text-emerald-800 group-hover:text-emerald-950 w-full">
+                      <span className="truncate">Ver faturas de {activeDebtor.name.split(' ')[0]}</span>
+                      <span className="material-symbols-outlined text-[12px] shrink-0 group-hover:translate-x-0.5 transition-transform">chevron_right</span>
                     </div>
                   </button>
                 </div>
 
-                {/* Barra de Progresso Geral de Quitação (Interativa com Brilho Suave) */}
+                {/* Barra de Progresso Geral de Quitação (Interativa com Brilho Suave e Sem Colisão) */}
                 <button
                   type="button"
                   onClick={() => {
                     playAppSound('success');
                     setActiveKpiModal('paid');
                   }}
-                  className="indicator-card financial-container flex flex-col gap-1.5 p-2 rounded-xl bg-slate-50/80 hover:bg-cyan-50/60 border border-slate-200 hover:border-cyan-300 hover:shadow-[0_0_18px_rgba(6,182,212,0.3)] transition-all duration-300 cursor-pointer text-left group relative overflow-hidden"
+                  className="indicator-card financial-container flex flex-col gap-1.5 p-2.5 rounded-xl bg-slate-50/80 hover:bg-cyan-50/60 border border-slate-200 hover:border-cyan-300 hover:shadow-[0_0_18px_rgba(6,182,212,0.3)] transition-all duration-300 cursor-pointer text-left group relative overflow-hidden"
                   title="Toque para ver o histórico e percentual detalhado de quitação"
                 >
                   <div className="absolute inset-0 -translate-x-full group-hover:translate-x-full transition-transform duration-1000 ease-out pointer-events-none bg-gradient-to-r from-transparent via-cyan-300/20 to-transparent skew-x-12" />
-                  <div className="relative z-10 flex items-center justify-between text-[11px] font-bold">
-                    <span className="text-slate-600 group-hover:text-slate-900 flex items-center gap-1 truncate">
-                      <span>Progresso Geral</span>
-                      <span className="text-[8px] font-black uppercase px-1 py-0.2 rounded bg-cyan-100 text-cyan-800 shrink-0">Interativo</span>
+                  <div className="relative z-10 flex items-center justify-between gap-2 text-[11px] font-bold w-full">
+                    <span className="text-slate-700 group-hover:text-slate-900 flex items-center gap-1.5 min-w-0 flex-1">
+                      <span className="shrink-0">Progresso Geral</span>
                       <span className="text-[10px] text-cyan-800 font-bold truncate">• {activeDebtor.name}</span>
                     </span>
-                    <span className="font-mono text-cyan-700 group-hover:text-cyan-800 font-black shrink-0">{activeDebtorStats.percentPaid}% pago</span>
+                    <span className="font-mono text-cyan-700 group-hover:text-cyan-800 font-black shrink-0 bg-cyan-50 px-1.5 py-0.2 rounded border border-cyan-200 text-[10.5px]">
+                      {activeDebtorStats.percentPaid}% pago
+                    </span>
                   </div>
                   <div className="relative z-10 w-full h-2.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
                     <div
@@ -1450,9 +1497,9 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
           {/* ============================================================ */}
           <div className={`${activeDebtor && activeDebtorStats ? 'lg:col-span-8 xl:col-span-8' : 'lg:col-span-12'} flex flex-col gap-3 min-w-0 w-full`}>
             <div id="parcelas-spreadsheet-table" className="bg-white/90 backdrop-blur-md rounded-xl sm:rounded-2xl border-2 border-cyan-400/60 ring-2 ring-cyan-400/30 shadow-[0_0_28px_rgba(6,182,212,0.2)] overflow-hidden w-full">
-          {/* Barra de Informação da Planilha Compacta - TEMA BRANCO PADRONIZADO */}
-          <div className="px-3.5 py-2.5 bg-white/95 backdrop-blur-md border-b border-slate-200 text-slate-850 flex items-center justify-between font-bold flex-wrap gap-2 shadow-xs">
-            <div className="flex items-center gap-2.5 min-w-0">
+          {/* Barra de Informação da Planilha Compacta - TEMA BRANCO PADRONIZADO (Com Score e Movimento no Círculo Direito) */}
+          <div className="px-3 py-2.5 bg-white/95 backdrop-blur-md border-b border-slate-200 text-slate-850 flex items-center justify-between font-bold gap-2 shadow-xs">
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-700 border border-cyan-200/80 flex items-center justify-center shrink-0 shadow-2xs">
                 <span className="material-symbols-outlined text-[17px]">table_chart</span>
               </div>
@@ -1464,44 +1511,57 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                 <span className="text-cyan-700 font-black text-xs sm:text-sm uppercase tracking-wider">
                   {activeDebtor?.name || 'Cliente'}
                 </span>
-                <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] font-mono font-bold ml-1">
+                <span className="px-2 py-0.5 rounded-full bg-cyan-50 text-cyan-800 border border-cyan-200 text-[10px] font-mono font-bold">
                   {filteredInstallments.length} {filteredInstallments.length === 1 ? 'item' : 'itens'}
                 </span>
               </div>
             </div>
+
+            {/* Badge de Score com Movimento no canto direito da Planilha Financeira (Área circulada) */}
+            <button
+              type="button"
+              onClick={() => {
+                playAppSound('success');
+                setActiveKpiModal('paid');
+                if (onToast && activeDebtor && activeDebtorStats) {
+                  onToast(`⭐ Score de ${activeDebtor.name}: ${activeDebtorStats.score}/1000 (${activeDebtorStats.scoreLabel})`);
+                }
+              }}
+              className="animate-score-badge shrink-0 px-2.5 py-1 rounded-xl bg-gradient-to-r from-violet-600 via-purple-600 to-indigo-600 text-white border border-violet-300/70 shadow-sm flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
+              title="Score de Pontualidade do Devedor"
+            >
+              <span className="material-symbols-outlined text-[14px] text-amber-300 animate-icon-sparkle">auto_awesome</span>
+              <div className="flex flex-col items-start leading-none">
+                <span className="text-[8.5px] font-extrabold uppercase tracking-wider text-violet-100">Score</span>
+                <span className="font-mono font-black text-[11px] sm:text-xs text-white">
+                  {activeDebtorStats?.score || 1000} <span className="text-[8.5px] text-amber-300">pts</span>
+                </span>
+              </div>
+            </button>
           </div>
 
           <div className="w-full overflow-x-auto scrollbar-thin px-1 sm:px-2 pb-4">
             <table className="w-full text-center text-xs border-collapse min-w-[340px] max-w-full">
               <thead>
                 <tr className="bg-slate-50/95 text-slate-700 font-extrabold uppercase text-[9px] sm:text-[10px] tracking-wider border-b border-slate-200/80 select-none shadow-2xs">
-                  {/* Col 1: PARCELAS / VENC. */}
-                  <th className="py-2.5 px-2 text-center w-[18%] sm:w-28 whitespace-nowrap text-cyan-800">
-                    <span className="sm:hidden">PARC. / VENC.</span>
-                    <span className="hidden sm:inline">PARCELAS / VENC.</span>
+                  {/* Col 1: PARCELAS / VENC. / ITEM */}
+                  <th className="py-2.5 px-2 text-center w-[36%] sm:w-40 whitespace-nowrap text-cyan-800">
+                    <span className="sm:hidden">PARC. / VENC. / ITEM</span>
+                    <span className="hidden sm:inline">PARCELA / VENC. / ITEM</span>
                   </th>
                   {/* Col 2: DEVEDOR */}
-                  <th className="py-2.5 px-2 text-center w-[18%] sm:w-32 whitespace-nowrap text-slate-800">
+                  <th className="py-2.5 px-2 text-center w-[28%] sm:w-32 whitespace-nowrap text-slate-800">
                     DEVEDOR
                   </th>
-                  {/* Col 3: ITEM / PRODUTO */}
-                  <th className="py-2.5 px-2 text-center w-[20%] sm:w-36 whitespace-nowrap text-cyan-800">
-                    ITEM / PRODUTO
-                  </th>
-                  {/* Col 4: CARTÃO (Desktop) */}
+                  {/* Col 3: CARTÃO (Desktop) */}
                   <th className="hidden md:table-cell py-2.5 px-2 text-center md:w-36 whitespace-nowrap text-slate-700">
                     CARTÃO / FORMA
                   </th>
-                  {/* Col 5: QUITAR / RECIBO */}
-                  <th className="py-2.5 px-2 text-center w-[20%] sm:w-28 whitespace-nowrap text-emerald-800 font-black">
-                    <span className="sm:hidden">QUITAR</span>
-                    <span className="hidden sm:inline">QUITAR / RECIBO</span>
-                  </th>
-                  {/* Col 6: SITUAÇÃO & VALOR */}
-                  <th className="py-2.5 px-2 text-center w-[24%] sm:w-32 whitespace-nowrap text-slate-700">
+                  {/* Col 4: SITUAÇÃO & VALOR */}
+                  <th className="py-2.5 px-2 text-center w-[36%] sm:w-36 whitespace-nowrap text-slate-700">
                     SITUAÇÃO &amp; VALOR
                   </th>
-                  {/* Col 7: AÇÕES (Desktop) */}
+                  {/* Col 5: AÇÕES (Desktop) */}
                   <th className="hidden sm:table-cell py-2.5 px-2 text-center sm:w-28 whitespace-nowrap text-cyan-800">
                     AÇÕES
                   </th>
@@ -1525,14 +1585,14 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     <React.Fragment key={item.id}>
                       {isNewDebtor && selectedDebtorId === 'all' && (
                         <tr className="bg-slate-100 text-slate-800 font-bold select-none border-t border-slate-200">
-                          <td colSpan={7} className="py-1.5 px-2 sm:px-3 text-left">
+                          <td colSpan={5} className="py-1.5 px-2 sm:px-3 text-left">
                             <div className="flex items-center justify-between">
                               <div className="flex items-center gap-2">
-                                <span className="material-symbols-outlined text-[15px] text-amber-600">person</span>
-                                <span className="font-extrabold text-xs sm:text-sm uppercase tracking-wide text-slate-900">
+                                <span className="material-symbols-outlined text-[15px] text-amber-600 animate-bounce">person</span>
+                                <span className="animate-nome-badge px-2 py-0.5 rounded-md bg-white/90 border border-slate-200 font-extrabold text-xs sm:text-sm uppercase tracking-wide text-slate-900">
                                   {item.debtorName || 'Devedor'}
                                 </span>
-                                <span className="text-[9.5px] sm:text-[10px] bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full font-mono font-bold">
+                                <span className="animate-parcela-badge text-[9.5px] sm:text-[10px] bg-blue-50 text-blue-800 border border-blue-200 px-2 py-0.5 rounded-full font-mono font-bold">
                                   {filteredInstallments.filter((i) => (i.debtorName || '').toLowerCase() === itemDebtorName).length} parcelas sequenciais
                                 </span>
                               </div>
@@ -1571,44 +1631,64 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                             : 'bg-gradient-to-r from-white via-slate-50/40 to-white hover:from-slate-50 hover:to-white'
                         }`}
                       >
-                        {/* Coluna 1: PARCELAS E VENCIMENTO com linha de ramificação */}
-                        <td className="py-2 pl-3 pr-1 sm:px-2 text-center align-middle whitespace-nowrap">
-                          <div className="flex items-center gap-2 justify-center">
+                        {/* Coluna 1: PARCELAS, VENCIMENTO E ITEM/PRODUTO DEBAIXO */}
+                        <td className="py-2 pl-2 pr-1 sm:px-2 text-center align-middle whitespace-nowrap">
+                          <div className="flex items-center gap-1.5 justify-center">
                             {/* Linha de ramificação interligando os elementos (Estilo Ramificado) */}
-                            <div className="relative w-4 self-stretch min-h-[36px] flex items-center justify-center shrink-0">
+                            <div className="relative w-3.5 self-stretch min-h-[48px] flex items-center justify-center shrink-0">
                               {/* Linha vertical tracejada */}
-                              <div className="absolute top-0 bottom-0 left-2 w-[1.5px] border-l-2 border-dashed border-cyan-400/40" />
+                              <div className="absolute top-0 bottom-0 left-1.5 w-[1.5px] border-l-2 border-dashed border-cyan-400/40" />
                               {/* Linha horizontal tracejada para conectar ao card */}
-                              <div className="absolute top-1/2 left-2 w-2 h-[1.5px] border-t-2 border-dashed border-cyan-400/40" />
+                              <div className="absolute top-1/2 left-1.5 w-2 h-[1.5px] border-t-2 border-dashed border-cyan-400/40" />
                               {/* Ponto focal de junção iluminado */}
-                              <div className="absolute top-1/2 left-2 -translate-x-[2px] -translate-y-[2px] w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee] z-10" />
+                              <div className="absolute top-1/2 left-1.5 -translate-x-[2px] -translate-y-[2px] w-1.5 h-1.5 rounded-full bg-cyan-400 shadow-[0_0_6px_#22d3ee] z-10" />
                             </div>
 
                             <div className="flex flex-col items-center justify-center leading-tight gap-1">
-                              {/* Número da parcela - Badge vibrante e moderno */}
-                              <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-lg bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-mono text-[10px] sm:text-[11px] font-black leading-none shadow-sm border border-blue-400">
+                              {/* 1. Número da parcela - Badge vibrante com animação de movimento */}
+                              <span className="animate-parcela-badge inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 text-white font-mono text-[9.5px] sm:text-[10.5px] font-black leading-none border border-blue-400">
                                 {item.installmentNumber}/{item.totalInstallments}
                               </span>
-                              {/* Data do vencimento - Badge vibrante e moderno */}
-                              <div className={`inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-lg font-mono text-[9.5px] sm:text-[10.5px] font-black leading-none shadow-sm border ${
+
+                              {/* 2. Data do vencimento - Badge vibrante com animação de movimento */}
+                              <div className={`animate-data-badge inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-black leading-none border ${
                                 isOverdue
                                   ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-400'
                                   : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-300'
                               }`}>
-                                <span className="material-symbols-outlined text-[11px] sm:text-[12px] shrink-0 text-white">
+                                <span className="material-symbols-outlined text-[10px] sm:text-[11px] shrink-0 text-white animate-icon-calendar">
                                   calendar_today
                                 </span>
                                 <span className="sm:hidden">{formatDueDateShort(item.dueDate)}</span>
                                 <span className="hidden sm:inline">{item.dueDate}</span>
                               </div>
+
+                              {/* 3. Item do Produto logo debaixo da parcela e do vencimento */}
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
+                                }}
+                                className="inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50/95 hover:bg-blue-100 text-blue-900 border border-blue-200/90 font-bold text-[8.5px] sm:text-[10px] shadow-2xs leading-tight max-w-[105px] sm:max-w-[145px] transition-all cursor-pointer group active:scale-95"
+                                title={`Clique para visualizar o print da compra de ${item.product}`}
+                              >
+                                <span className="material-symbols-outlined text-[11px] sm:text-[12px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
+                                  {itemIconName}
+                                </span>
+                                <span className="truncate">{item.product}</span>
+                                <span className="material-symbols-outlined text-[10px] text-blue-400 group-hover:text-blue-700 shrink-0" title="Ver print da compra">
+                                  photo_camera
+                                </span>
+                              </button>
                             </div>
                           </div>
                         </td>
 
-                        {/* Coluna 2: DEVEDOR (Com opção de edição ao clicar na foto) */}
+                        {/* Coluna 2: DEVEDOR (Com movimento na foto e no nome) */}
                         <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
                           <div className="flex flex-col items-center justify-center leading-tight gap-1 min-w-0">
-                            {/* Avatar interativo clicável que abre opção de edição */}
+                            {/* Avatar interativo clicável com animação de movimento */}
                             <div
                               onClick={(e) => {
                                 e.stopPropagation();
@@ -1640,7 +1720,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                   });
                                 }
                               }}
-                              className="relative group cursor-pointer inline-block"
+                              className="animate-foto-motion relative group cursor-pointer inline-block"
                               title={`Toque na foto para abrir opções de edição de ${item.debtorName}`}
                             >
                               <SafeDebtorAvatar
@@ -1650,40 +1730,17 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                 className="shrink-0 shadow-xs group-hover:scale-105 group-hover:ring-2 group-hover:ring-blue-400 transition-all"
                               />
                               {/* Selo interativo de edição no canto da foto */}
-                              <span className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[9px] shadow-sm border border-white dark:border-slate-800 group-hover:scale-110 transition-transform">
+                              <span className="animate-edit-badge absolute -top-1 -right-1 w-4 h-4 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center text-[9px] shadow-sm border border-white dark:border-slate-800 group-hover:scale-110 transition-transform">
                                 <span className="material-symbols-outlined text-[10px]">edit</span>
                               </span>
                             </div>
 
                             <div
-                              className="inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-slate-50 text-slate-900 border border-slate-200/90 font-bold text-[9px] sm:text-[10px] shadow-2xs leading-none truncate max-w-[75px] sm:max-w-[100px]"
+                              className="animate-nome-badge inline-flex items-center justify-center px-1.5 py-0.5 rounded-md bg-gradient-to-r from-slate-50 via-cyan-50/70 to-slate-50 text-slate-900 border border-cyan-200/90 font-extrabold text-[9px] sm:text-[10px] leading-none truncate max-w-[78px] sm:max-w-[105px]"
                               title={item.debtorName}
                             >
                               {item.debtorName.trim().split(/\s+/)[0]}
                             </div>
-                          </div>
-                        </td>
-
-                        {/* Coluna 3: ITEM / PRODUTO */}
-                        <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
-                          <div className="flex items-center justify-center">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
-                              }}
-                              className="inline-flex items-center justify-center gap-1 px-2.5 py-1.5 rounded-lg bg-blue-50/90 hover:bg-blue-100 text-blue-900 border border-blue-200/90 font-bold text-[9.5px] sm:text-[11px] shadow-2xs leading-tight max-w-[120px] sm:max-w-[160px] transition-all cursor-pointer group active:scale-95"
-                              title={`Clique para visualizar o print da compra de ${item.product}`}
-                            >
-                              <span className="material-symbols-outlined text-[13px] sm:text-[14px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
-                                {itemIconName}
-                              </span>
-                              <span className="truncate">{item.product}</span>
-                              <span className="material-symbols-outlined text-[11px] text-blue-400 group-hover:text-blue-700 shrink-0 ml-0.5" title="Ver print da compra">
-                                photo_camera
-                              </span>
-                            </button>
                           </div>
                         </td>
 
@@ -1697,21 +1754,45 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           </span>
                         </td>
 
-                        {/* Coluna 5: BOTÃO DE QUITAR NA TELA */}
-                        <td className="py-2.5 px-1 sm:px-2 text-center align-middle whitespace-nowrap">
-                          <div className="flex items-center justify-center">
+                        {/* Coluna 5: SITUAÇÃO, QUITAR / RECIBO ABAIXO DA SITUAÇÃO & VALOR */}
+                        <td className="py-2 px-1.5 sm:px-2 text-center align-middle whitespace-nowrap">
+                          <div className="flex flex-col items-center justify-center gap-1">
+                            {/* 1. Situação (PAGO/QUITADO / ATRASADA / A VENCER / EM DIA) */}
+                            {isPaid ? (
+                              <span className="animate-quitado-badge inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-100 text-emerald-800 border border-emerald-300 text-[9.5px] sm:text-[10px] font-black leading-none shadow-2xs">
+                                <span className="material-symbols-outlined text-[11px] text-emerald-600 animate-icon-check">check_circle</span>
+                                <span>PAGO</span>
+                              </span>
+                            ) : isOverdue ? (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-300 text-[9.5px] sm:text-[10px] font-black animate-pulse leading-none shadow-2xs">
+                                <span className="material-symbols-outlined text-[11px] animate-bounce">warning</span>
+                                <span>ATRASADA</span>
+                              </span>
+                            ) : isSoon ? (
+                              <span className="animate-vencer-badge inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-amber-50 via-amber-100 to-amber-50 text-amber-900 border border-amber-400 text-[9.5px] sm:text-[10px] font-extrabold leading-none">
+                                <span className="material-symbols-outlined text-[11px] text-amber-600 animate-icon-clock">schedule</span>
+                                <span>A VENCER</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[9.5px] sm:text-[10px] font-medium leading-none">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
+                                <span>EM DIA</span>
+                              </span>
+                            )}
+
+                            {/* 2. Botão Quitar ou Recibo logo debaixo da Situação / PAGO com animação de movimento */}
                             {!isPaid ? (
-                               <button
+                              <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
                                   playAppSound('coin');
                                   onSettleInstallment(item);
                                 }}
-                                className="px-1.5 py-0.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 active:scale-95 text-white rounded text-[8.5px] font-black shadow-xs flex items-center justify-center gap-0.5 cursor-pointer border border-emerald-500/60 transition-all uppercase tracking-wider"
+                                className="animate-quitar-btn px-2 py-0.5 bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 hover:from-emerald-500 hover:to-teal-400 active:scale-95 text-white rounded-md text-[8.5px] sm:text-[9px] font-black inline-flex items-center justify-center gap-0.5 cursor-pointer border border-emerald-400/80 transition-all uppercase tracking-wider leading-tight"
                                 title="Quitar / Dar baixa nesta parcela"
                               >
-                                <span className="material-symbols-outlined text-[10px]">check</span>
+                                <span className="material-symbols-outlined text-[10px] animate-icon-check">check</span>
                                 <span>Quitar</span>
                               </button>
                             ) : (
@@ -1733,42 +1814,15 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                                     setSelectedInstallmentForDetail(item);
                                   }
                                 }}
-                                className="px-1.5 py-0.5 bg-emerald-50 hover:bg-emerald-100 active:scale-95 text-emerald-800 rounded text-[9px] font-bold border border-emerald-300 shadow-2xs flex items-center justify-center gap-0.5 cursor-pointer transition-all"
+                                className="animate-recibo-btn px-2 py-0.5 bg-gradient-to-r from-emerald-50 via-teal-50 to-emerald-50 hover:from-emerald-100 hover:to-teal-100 active:scale-95 text-emerald-800 rounded-md text-[8.5px] sm:text-[9px] font-extrabold border border-emerald-300 inline-flex items-center justify-center gap-0.5 cursor-pointer transition-all leading-tight"
                                 title="Visualizar recibo oficial"
                               >
-                                <span className="material-symbols-outlined text-[11px] text-emerald-600">receipt_long</span>
+                                <span className="material-symbols-outlined text-[10px] text-emerald-600 animate-icon-receipt">receipt_long</span>
                                 <span>Recibo</span>
                               </button>
                             )}
-                          </div>
-                        </td>
 
-                        {/* Coluna 6: SITUAÇÃO & VALOR (Exibição única sem duplicidade) */}
-                        <td className="py-2.5 px-2 text-center align-middle whitespace-nowrap">
-                          <div className="flex flex-col items-center justify-center gap-0.5">
-                            {isPaid ? (
-                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
-                                <span className="material-symbols-outlined text-[12px]">check_circle</span>
-                                <span>PAGO</span>
-                              </span>
-                            ) : isOverdue ? (
-                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-red-50 text-red-700 border border-red-300 text-[10px] font-black animate-pulse">
-                                <span className="material-symbols-outlined text-[12px]">warning</span>
-                                <span>ATRASADA</span>
-                              </span>
-                            ) : isSoon ? (
-                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-300 text-[10px] font-bold">
-                                <span className="material-symbols-outlined text-[12px]">schedule</span>
-                                <span>A VENCER</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-slate-100 text-slate-700 border border-slate-200 text-[10px] font-medium">
-                                <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
-                                <span>EM DIA</span>
-                              </span>
-                            )}
-
-                            {/* Valor a quitar debaixo do status: Verde se pago, Vermelho se não pago */}
+                            {/* 3. Valor da parcela */}
                             <span
                               className={`font-mono text-[9px] sm:text-[10px] font-bold px-1.5 py-0.2 rounded-md shadow-2xs inline-flex items-center justify-center leading-tight ${
                                 isPaid
@@ -1859,7 +1913,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
 
                 {filteredInstallments.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="py-12 text-center text-slate-500">
+                    <td colSpan={5} className="py-12 text-center text-slate-500">
                       <div className="flex flex-col items-center justify-center gap-2 max-w-md mx-auto px-4">
                         <span className="material-symbols-outlined text-[36px] text-slate-300">
                           search_off
@@ -1916,14 +1970,14 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
               {filteredInstallments.length > 0 && (
                 <tfoot>
                   <tr className="bg-slate-100/90 font-bold text-slate-800 text-[10px] sm:text-xs border-t border-slate-200">
-                    <td colSpan={2} className="py-2 px-2 sm:px-3 text-left">
+                    <td className="py-2 px-2 sm:px-3 text-left">
                       <span className="font-mono font-bold">Total: {filteredInstallments.length} parcelas</span>
                     </td>
-                    <td className="py-2 px-2 text-left text-[10px] text-slate-500">
+                    <td className="py-2 px-2 text-center text-[10px] text-slate-500">
                       <span>Soma Geral:</span>
                     </td>
                     <td className="hidden md:table-cell" />
-                    <td className="py-2 px-2 text-right">
+                    <td className="py-2 px-2 text-center">
                       <span className="font-mono text-xs sm:text-sm font-black text-slate-900 leading-none block">
                         R${' '}
                         {filteredInstallments
@@ -1932,7 +1986,6 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                           .replace('.', ',')}
                       </span>
                     </td>
-                    <td className="hidden sm:table-cell" />
                     <td className="hidden sm:table-cell py-2 px-2 sm:px-3 text-right text-[9px] sm:text-[11px] text-slate-500">
                       Haspaho Grid
                     </td>
@@ -2108,7 +2161,7 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                               installment: item
                             });
                           }}
-                          className="cursor-pointer shrink-0 group relative"
+                          className="animate-foto-motion cursor-pointer shrink-0 group relative"
                           title="Clique na foto para editar o devedor"
                         >
                           <SafeDebtorAvatar
@@ -2118,12 +2171,12 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                             status={isOverdue ? 'late' : 'ok'}
                             className="shrink-0 ring-1.5 ring-blue-500/30 group-hover:ring-blue-600 transition-all shadow-xs"
                           />
-                          <span className="absolute -bottom-1 -right-1 w-3 h-3 bg-blue-600 text-white rounded-full flex items-center justify-center text-[7px] font-bold shadow-xs">
+                          <span className="animate-edit-badge absolute -bottom-1 -right-1 w-3 h-3 bg-blue-600 text-white rounded-full flex items-center justify-center text-[7px] font-bold shadow-xs">
                             ✎
                           </span>
                         </div>
                         <div className="flex flex-col min-w-0">
-                          <span className="text-[11px] font-bold text-slate-900 truncate leading-tight" title={item.debtorName}>
+                          <span className="animate-nome-badge inline-flex items-center px-1.5 py-0.5 rounded bg-gradient-to-r from-slate-50 via-cyan-50/70 to-slate-50 border border-cyan-200/80 text-[10.5px] font-extrabold text-slate-900 truncate leading-tight w-fit" title={item.debtorName}>
                             {item.debtorName}
                           </span>
                           <span className="text-[9px] text-slate-500 font-medium truncate">
@@ -2132,52 +2185,105 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                         </div>
                       </div>
 
-                      {/* Status & Parcela Badge */}
-                      <div className="flex items-center gap-1 shrink-0">
-                        <span className="px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono text-[9.5px] font-black leading-none shadow-xs" title="Número da Parcela">
-                          #{item.installmentNumber}/{item.totalInstallments}
-                        </span>
-                        {isPaid ? (
-                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-emerald-100 text-emerald-800 font-bold text-[8.5px] leading-none border border-emerald-200">
-                            PAGO
-                          </span>
-                        ) : isOverdue ? (
-                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[8.5px] leading-none border border-red-200">
-                            ATRASO
-                          </span>
-                        ) : isSoon ? (
-                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-amber-100 text-amber-800 font-bold text-[8.5px] leading-none border border-amber-200">
-                            VENCE LOGO
-                          </span>
-                        ) : (
-                          <span className="inline-flex items-center gap-0.5 px-1 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[8.5px] leading-none border border-slate-200">
-                            EM DIA
-                          </span>
-                        )}
+                      {/* Status & Situação + Quitar/Recibo debaixo da Situação */}
+                      <div className="flex items-start gap-1.5 shrink-0">
+                        <div className="flex flex-col items-center gap-1">
+                          {isPaid ? (
+                            <span className="animate-quitado-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-gradient-to-r from-emerald-50 to-emerald-100 text-emerald-800 font-black text-[8.5px] leading-none border border-emerald-300">
+                              <span className="material-symbols-outlined text-[9px] text-emerald-600 animate-icon-check">check_circle</span>
+                              <span>PAGO</span>
+                            </span>
+                          ) : isOverdue ? (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-red-100 text-red-700 font-bold text-[8.5px] leading-none border border-red-200 animate-pulse">
+                              <span className="material-symbols-outlined text-[9px] animate-bounce">warning</span>
+                              <span>ATRASO</span>
+                            </span>
+                          ) : isSoon ? (
+                            <span className="animate-vencer-badge inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 font-extrabold text-[8.5px] leading-none border border-amber-300">
+                              <span className="material-symbols-outlined text-[9px] text-amber-700 animate-icon-clock">schedule</span>
+                              <span>A VENCER</span>
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-medium text-[8.5px] leading-none border border-slate-200">
+                              EM DIA
+                            </span>
+                          )}
+
+                          {!isPaid ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playAppSound('coin');
+                                onSettleInstallment(item);
+                              }}
+                              className="animate-quitar-btn px-1.5 py-0.5 rounded bg-gradient-to-r from-emerald-600 via-teal-500 to-emerald-600 hover:from-emerald-500 hover:to-teal-400 text-white font-black text-[8px] leading-none flex items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer uppercase"
+                              title="Quitar parcela"
+                            >
+                              <span className="material-symbols-outlined text-[9px] animate-icon-check">check</span>
+                              <span>Quitar</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                playAppSound('click');
+                                if (onShowProof) {
+                                  onShowProof(
+                                    item.debtorName,
+                                    `R$ ${safeFormatCurrency(finalAmount)}`,
+                                    item.dueDate,
+                                    'Banco Central / Asaas IP',
+                                    authCode,
+                                    item.product
+                                  );
+                                } else {
+                                  setSelectedInstallmentForDetail(item);
+                                }
+                              }}
+                              className="animate-recibo-btn px-1.5 py-0.5 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 font-bold text-[8px] leading-none flex items-center justify-center gap-0.5 active:scale-95 transition-all cursor-pointer"
+                              title="Visualizar recibo oficial"
+                            >
+                              <span className="material-symbols-outlined text-[9px] text-emerald-600 animate-icon-receipt">receipt_long</span>
+                              <span>Recibo</span>
+                            </button>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    {/* Linha 2: Produto/Print & Data de Vencimento */}
-                    <div className="flex items-center justify-between gap-1.5 bg-slate-50/80 px-2 py-1 rounded-lg border border-slate-100 text-[10px]">
+                    {/* Linha 2: Parcela + Vencimento em cima e Item do Produto debaixo */}
+                    <div className="flex flex-col items-start gap-1 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-100 text-[10px]">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="animate-parcela-badge px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono text-[9.5px] font-black leading-none" title="Número da Parcela">
+                          #{item.installmentNumber}/{item.totalInstallments}
+                        </span>
+                        <div className="animate-data-badge flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-mono font-bold shrink-0 border border-amber-300 leading-none">
+                          <span className="material-symbols-outlined text-[10px] animate-icon-calendar">calendar_today</span>
+                          <span>Venc: {item.dueDate}</span>
+                        </div>
+                      </div>
+
                       <button
                         type="button"
                         onClick={(e) => {
                           e.stopPropagation();
                           handleOpenProductPrint(item.product, item.debtorName, item.purchaseId);
                         }}
-                        className="flex items-center gap-1 min-w-0 text-left hover:text-blue-600 transition-colors cursor-pointer group"
+                        className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-blue-50/95 hover:bg-blue-100 text-blue-900 border border-blue-200/90 font-bold text-[9.5px] shadow-2xs max-w-full transition-all cursor-pointer group active:scale-95"
                         title={`Visualizar print da compra de ${item.product}`}
                       >
-                        <span className="material-symbols-outlined text-[13px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
+                        <span className="material-symbols-outlined text-[12px] text-blue-600 group-hover:scale-110 transition-transform shrink-0">
                           {itemIconName}
                         </span>
-                        <span className="font-bold text-slate-800 group-hover:text-blue-600 truncate underline decoration-dotted decoration-blue-400" title={item.product}>
+                        <span className="truncate" title={item.product}>
                           {item.product}
                         </span>
+                        <span className="material-symbols-outlined text-[10px] text-blue-400 group-hover:text-blue-700 shrink-0">
+                          photo_camera
+                        </span>
                       </button>
-                      <div className="flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-mono font-bold shrink-0 border border-amber-200">
-                        <span>Venc: {item.dueDate}</span>
-                      </div>
                     </div>
 
                     {/* Linha 3: Valor & Botões de Ação */}

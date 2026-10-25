@@ -29,9 +29,15 @@ import {
   getDocs,
   getDocFromServer,
   writeBatch,
+  setLogLevel,
+  disableNetwork,
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 import { UserAccount, Debtor, Purchase, Installment } from '../types';
+
+try {
+  setLogLevel('silent');
+} catch {}
 
 // Active Firebase Configuration with support for Vercel/Vite environment variables and fallback to firebase-applet-config.json
 const getEnvVar = (key: string): string | undefined => {
@@ -964,14 +970,12 @@ try {
     const today = new Date().toISOString().slice(0, 10);
     if (parsed.exhausted && parsed.date === today) {
       firestoreQuotaExhausted = true;
+      disableNetwork(db).catch(() => {});
     }
   }
 } catch {}
 
 export function isFirestoreQuotaExhausted(): boolean {
-  if (getSafeLocalStorage('haspaho_force_enable_firestore_writes') === 'true') {
-    return false;
-  }
   return firestoreQuotaExhausted;
 }
 
@@ -980,7 +984,9 @@ export function setFirestoreQuotaExhausted(val: boolean): void {
   try {
     const today = new Date().toISOString().slice(0, 10);
     if (val) {
+      removeSafeLocalStorage('haspaho_force_enable_firestore_writes');
       setSafeLocalStorage(QUOTA_STORAGE_KEY, JSON.stringify({ exhausted: true, date: today }));
+      disableNetwork(db).catch(() => {});
     } else {
       removeSafeLocalStorage(QUOTA_STORAGE_KEY);
     }

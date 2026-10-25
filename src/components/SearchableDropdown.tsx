@@ -148,7 +148,7 @@ export function SearchableDropdown<T = any>({
   const renderItemVisual = (item: DropdownItem<T> | null, isSelected: boolean, size: 'sm' | 'md' = 'md') => {
     if (!item) {
       return (
-        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 flex items-center justify-center shrink-0 border-2 border-cyan-300 shadow-2xs">
+        <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-cyan-100 to-blue-100 text-cyan-700 flex items-center justify-center shrink-0 border-2 border-cyan-300 shadow-2xs animate-foto-motion">
           <span className="material-symbols-outlined text-[18px]">
             {disabled ? 'lock' : 'bolt'}
           </span>
@@ -164,13 +164,13 @@ export function SearchableDropdown<T = any>({
           src={item.avatar}
           alt=""
           referrerPolicy="no-referrer"
-          className={`${sizeClasses} rounded-xl object-cover shadow-xs border-2 border-cyan-400 shrink-0`}
+          className={`${sizeClasses} rounded-xl object-cover shadow-xs border-2 border-cyan-400 shrink-0 animate-foto-motion`}
         />
       );
     }
 
     return (
-      <div className={`${sizeClasses} rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs ${
+      <div className={`${sizeClasses} rounded-xl flex items-center justify-center shrink-0 border-2 shadow-2xs animate-foto-motion ${
         isSelected
           ? 'bg-gradient-to-br from-cyan-500 to-blue-600 text-white border-cyan-400 shadow-xs'
           : 'bg-gradient-to-br from-cyan-100 via-sky-50 to-blue-100 text-cyan-900 border-cyan-300'
@@ -183,7 +183,7 @@ export function SearchableDropdown<T = any>({
   };
 
   return (
-    <div ref={containerRef} className={`relative flex flex-col min-w-0 select-none ${className}`}>
+    <div ref={containerRef} className={`relative flex flex-col min-w-0 select-none animate-in ${className}`}>
       {/* Campo / Botão do Dropdown */}
       <button
         type="button"
@@ -211,12 +211,12 @@ export function SearchableDropdown<T = any>({
                         {title}:
                       </span>
                     )}
-                    <span className="font-black text-slate-950 truncate bg-cyan-100/80 px-2 py-0.5 rounded-lg border border-cyan-300 text-slate-950 shadow-2xs">
+                    <span className="animate-nome-badge font-black text-slate-950 truncate bg-cyan-100/80 px-2 py-0.5 rounded-lg border border-cyan-300 text-slate-950 shadow-2xs">
                       {selectedItem.label}
                     </span>
                   </>
                 ) : (
-                  <span className="font-extrabold text-slate-900 truncate">
+                  <span className="animate-nome-badge font-extrabold text-slate-900 truncate px-1.5 py-0.5 rounded-lg">
                     {title ? title : placeholder}
                   </span>
                 )}
@@ -250,7 +250,7 @@ export function SearchableDropdown<T = any>({
         {/* Lado Direito: Seta em formato de V com Animação */}
         <div className="flex items-center gap-2 shrink-0 pl-1">
           {selectedItem?.badge && (
-            <span className={`text-xs px-3 py-1 rounded-xl border font-mono font-black hidden sm:inline shadow-2xs ${getBadgeStyle(selectedItem.badgeType)}`}>
+            <span className={`animate-parcela-badge text-xs px-3 py-1 rounded-xl border font-mono font-black hidden sm:inline shadow-2xs ${getBadgeStyle(selectedItem.badgeType)}`}>
               {selectedItem.badge}
             </span>
           )}
