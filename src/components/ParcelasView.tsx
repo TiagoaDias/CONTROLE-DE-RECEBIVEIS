@@ -1701,17 +1701,29 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                             </div>
 
                             <div className="flex flex-col items-center justify-center leading-tight gap-1">
-                              {/* 1. Número da parcela - Badge vibrante com animação de movimento */}
-                              <span className="animate-parcela-badge inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 text-white font-mono text-[9.5px] sm:text-[10.5px] font-black leading-none border border-blue-400">
-                                {item.installmentNumber}/{item.totalInstallments}
+                              {/* 1. Número da parcela - Badge vibrante com P de Parcela */}
+                              <span
+                                className="animate-parcela-badge inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-600 text-white font-mono text-[9.5px] sm:text-[10.5px] font-black leading-none border border-blue-400"
+                                title={`Parcela ${item.installmentNumber} de ${item.totalInstallments}`}
+                              >
+                                <span className="px-1 py-0.2 rounded bg-white/25 text-white font-black text-[8.5px] sm:text-[9px] leading-none">
+                                  P
+                                </span>
+                                <span>{item.installmentNumber}/{item.totalInstallments}</span>
                               </span>
 
-                              {/* 2. Data do vencimento - Badge vibrante com animação de movimento */}
-                              <div className={`animate-data-badge inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-black leading-none border ${
-                                isOverdue
-                                  ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-400'
-                                  : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-300'
-                              }`}>
+                              {/* 2. Data do vencimento - Badge vibrante com V de Vencimento */}
+                              <div
+                                className={`animate-data-badge inline-flex items-center justify-center gap-1 px-1.5 py-0.5 rounded-md font-mono text-[9px] sm:text-[10px] font-black leading-none border ${
+                                  isOverdue
+                                    ? 'bg-gradient-to-r from-red-600 to-rose-600 text-white border-red-400'
+                                    : 'bg-gradient-to-r from-amber-500 to-orange-500 text-white border-amber-300'
+                                }`}
+                                title={`Vencimento: ${item.dueDate}`}
+                              >
+                                <span className="px-1 py-0.2 rounded bg-white/25 text-white font-black text-[8.5px] sm:text-[9px] leading-none">
+                                  V
+                                </span>
                                 <span className="material-symbols-outlined text-[10px] sm:text-[11px] shrink-0 text-white animate-icon-calendar">
                                   calendar_today
                                 </span>
@@ -2331,12 +2343,14 @@ Por gentileza, após a transferência, envie o comprovante por aqui. Muito obrig
                     {/* Linha 2: Parcela + Vencimento em cima e Item do Produto debaixo */}
                     <div className="flex flex-col items-start gap-1 bg-slate-50/80 px-2 py-1.5 rounded-lg border border-slate-100 text-[10px]">
                       <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="animate-parcela-badge px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono text-[9.5px] font-black leading-none" title="Número da Parcela">
-                          #{item.installmentNumber}/{item.totalInstallments}
+                        <span className="animate-parcela-badge inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-blue-600 text-white font-mono text-[9.5px] font-black leading-none" title="Número da Parcela">
+                          <span className="px-1 py-0.2 rounded bg-white/25 text-white font-black text-[8px] leading-none">P</span>
+                          <span>{item.installmentNumber}/{item.totalInstallments}</span>
                         </span>
-                        <div className="animate-data-badge flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-mono font-bold shrink-0 border border-amber-300 leading-none">
+                        <div className="animate-data-badge flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-100 text-amber-900 text-[9px] font-mono font-bold shrink-0 border border-amber-300 leading-none" title="Data de Vencimento">
+                          <span className="px-1 py-0.2 rounded bg-amber-500 text-white font-black text-[8px] leading-none">V</span>
                           <span className="material-symbols-outlined text-[10px] animate-icon-calendar">calendar_today</span>
-                          <span>Venc: {item.dueDate}</span>
+                          <span>{item.dueDate}</span>
                         </div>
                       </div>
 

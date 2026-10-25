@@ -578,16 +578,21 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                 {/* Linha 1: Parcela, Vencimento & Badge Situação com Valor a Quitar Debaixo */}
                                 <div className="flex items-center justify-between gap-2">
                                   <div className="flex items-center gap-1.5 flex-wrap">
-                                    {/* Caixinha do número de parcelas com corzinha suave */}
-                                    <span className="text-xs font-bold font-mono px-2 py-0.5 rounded-lg bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/90 dark:border-indigo-800/80 shadow-2xs">
-                                      {inst.installmentNumber}/{inst.totalInstallments}
+                                    {/* Caixinha do número de parcelas com P de Parcela */}
+                                    <span className="inline-flex items-center gap-1 text-xs font-bold font-mono px-2 py-0.5 rounded-lg bg-indigo-50/90 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200/90 dark:border-indigo-800/80 shadow-2xs" title="Parcela">
+                                      <span className="px-1 py-0.2 rounded bg-indigo-600 text-white font-black text-[9px] leading-none">P</span>
+                                      <span>{inst.installmentNumber}/{inst.totalInstallments}</span>
                                     </span>
-                                    {/* Caixinha da data de vencimento com corzinha suave */}
-                                    <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-mono shadow-2xs font-semibold ${
-                                      isLate
-                                        ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
-                                        : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
-                                    }`}>
+                                    {/* Caixinha da data de vencimento com V de Vencimento */}
+                                    <div
+                                      className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10.5px] font-mono shadow-2xs font-semibold ${
+                                        isLate
+                                          ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
+                                          : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
+                                      }`}
+                                      title="Data de Vencimento"
+                                    >
+                                      <span className={`px-1 py-0.2 rounded text-white font-black text-[9px] leading-none ${isLate ? 'bg-rose-600' : 'bg-amber-500'}`}>V</span>
                                       <span className="material-symbols-outlined text-[12px]">calendar_today</span>
                                       <span>{inst.dueDate}</span>
                                     </div>
@@ -818,16 +823,21 @@ export const DevedoresView: React.FC<DevedoresViewProps> = ({
                                         </div>
 
                                         <div className="flex flex-col items-center justify-center gap-1">
-                                          {/* Caixinha número de parcelas - corzinha suave */}
-                                          <span className="inline-flex items-center justify-center px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 border border-indigo-200/90 font-mono text-[10px] font-bold shadow-2xs">
-                                            {inst.installmentNumber}/{inst.totalInstallments}
+                                          {/* Caixinha número de parcelas - P de Parcela */}
+                                          <span className="inline-flex items-center justify-center gap-1 px-2 py-0.5 rounded-md bg-indigo-50/90 text-indigo-700 border border-indigo-200/90 font-mono text-[10px] font-bold shadow-2xs" title="Parcela">
+                                            <span className="px-1 py-0.2 rounded bg-indigo-600 text-white font-black text-[8.5px] leading-none">P</span>
+                                            <span>{inst.installmentNumber}/{inst.totalInstallments}</span>
                                           </span>
-                                          {/* Caixinha data de vencimento - corzinha suave */}
-                                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[9.5px] font-semibold shadow-2xs ${
-                                            isLate
-                                              ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
-                                              : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
-                                          }`}>
+                                          {/* Caixinha data de vencimento - V de Vencimento */}
+                                          <div
+                                            className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-mono text-[9.5px] font-semibold shadow-2xs ${
+                                              isLate
+                                                ? 'bg-rose-50/90 text-rose-800 border border-rose-200/90'
+                                                : 'bg-amber-50/90 text-amber-800 border border-amber-200/90'
+                                            }`}
+                                            title="Data de Vencimento"
+                                          >
+                                            <span className={`px-1 py-0.2 rounded text-white font-black text-[8.5px] leading-none ${isLate ? 'bg-rose-600' : 'bg-amber-500'}`}>V</span>
                                             <span className="material-symbols-outlined text-[11px]">calendar_today</span>
                                             <span>{inst.dueDate}</span>
                                           </div>

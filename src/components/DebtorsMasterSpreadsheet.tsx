@@ -1846,9 +1846,10 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                                       {itemDisplayName}
                                     </span>
                                     <div className="flex items-center gap-1.5 mt-0.5">
-                                      {/* Caixinha número de parcelas - corzinha suave */}
-                                      <span className={`${scaleConfig.fontSizeSub} font-extrabold text-indigo-700 bg-indigo-50/90 px-1 py-0.2 rounded border border-indigo-200 font-mono shrink-0 shadow-2xs`}>
-                                        {installmentSeq}
+                                      {/* Caixinha número de parcelas - P de Parcela */}
+                                      <span className={`${scaleConfig.fontSizeSub} inline-flex items-center gap-1 font-extrabold text-indigo-700 bg-indigo-50/90 px-1.5 py-0.2 rounded border border-indigo-200 font-mono shrink-0 shadow-2xs`} title="Parcela">
+                                        <span className="px-1 py-0.2 rounded bg-indigo-600 text-white font-black text-[8px] leading-none">P</span>
+                                        <span>{installmentSeq}</span>
                                       </span>
                                       {boxShowCardName && (
                                         <span className={`${scaleConfig.fontSizeSub} text-slate-500 font-normal truncate`}>
@@ -1911,6 +1912,7 @@ export const DebtorsMasterSpreadsheet: React.FC<DebtorsMasterSpreadsheetProps> =
                                   ? 'bg-amber-50/90 border-amber-200 text-amber-900'
                                   : 'bg-blue-50/70 border-blue-200/80 text-blue-950'
                               }`}>
+                                <span className={`px-1 py-0.2 rounded text-white font-black text-[8px] leading-none mr-0.5 ${isOverdue ? 'bg-red-600' : 'bg-amber-500'}`}>V</span>
                                 <span className="sm:hidden">{formatDueDateShort(item.dueDate)}</span>
                                 <span className="hidden sm:inline">{item.dueDate}</span>
                                 {isOverdue && (

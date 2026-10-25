@@ -489,11 +489,13 @@ export const DebtorUnitaryItemsModal: React.FC<DebtorUnitaryItemsModalProps> = (
                                   }`}
                                 >
                                   <div className="flex items-center gap-2 min-w-0">
-                                    <span className="font-mono font-bold text-[10.5px] px-1.5 py-0.2 rounded bg-slate-100 border border-slate-200 text-slate-700">
-                                      #{inst.installmentNumber}/{inst.totalInstallments}
+                                    <span className="inline-flex items-center gap-1 font-mono font-bold text-[10.5px] px-1.5 py-0.5 rounded bg-blue-600 text-white border border-blue-500" title="Parcela">
+                                      <span className="px-1 py-0.2 rounded bg-white/25 text-white font-black text-[8.5px] leading-none">P</span>
+                                      <span>{inst.installmentNumber}/{inst.totalInstallments}</span>
                                     </span>
-                                    <span className="font-mono text-[11px] text-slate-600 flex items-center gap-0.5">
-                                      <span className="material-symbols-outlined text-[12px] text-slate-400">calendar_today</span>
+                                    <span className="font-mono text-[11px] text-amber-900 bg-amber-100 border border-amber-300 px-1.5 py-0.5 rounded flex items-center gap-1 font-bold" title="Data de Vencimento">
+                                      <span className="px-1 py-0.2 rounded bg-amber-500 text-white font-black text-[8.5px] leading-none">V</span>
+                                      <span className="material-symbols-outlined text-[12px] text-amber-700">calendar_today</span>
                                       <span>{inst.dueDate}</span>
                                     </span>
                                     <span className="font-mono font-black text-slate-900 text-xs">

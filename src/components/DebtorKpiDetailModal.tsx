@@ -522,13 +522,17 @@ export const DebtorKpiDetailModal: React.FC<DebtorKpiDetailModalProps> = ({
                           className={`p-2 rounded-xl border border-slate-200/70 bg-white hover:bg-slate-50/80 transition-all flex items-center justify-between gap-2 shadow-2xs hover:shadow-xs relative z-[${10 - instIdx}] cursor-pointer group`}
                         >
                           <div className="flex items-center gap-2 min-w-0">
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-slate-100 text-slate-800 border border-slate-200 shrink-0">
-                              #{inst.installmentNumber}/{inst.totalInstallments}
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-blue-600 text-white border border-blue-500 shrink-0" title="Parcela">
+                              <span className="px-1 py-0.2 rounded bg-white/25 text-white font-black text-[8.5px] leading-none">P</span>
+                              <span>{inst.installmentNumber}/{inst.totalInstallments}</span>
                             </span>
 
                             <div className="min-w-0">
                               <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-800 flex-wrap">
-                                <span>Venc: {inst.dueDate}</span>
+                                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-amber-100 text-amber-900 border border-amber-300 font-mono text-[10px]" title="Data de Vencimento">
+                                  <span className="px-1 py-0.2 rounded bg-amber-500 text-white font-black text-[8.5px] leading-none">V</span>
+                                  <span>{inst.dueDate}</span>
+                                </span>
                                 {isPaid && (
                                   <span className="text-[9px] px-1.5 py-0.2 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200 font-extrabold uppercase">
                                     Paga
