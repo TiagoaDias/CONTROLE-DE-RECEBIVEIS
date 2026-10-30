@@ -80,6 +80,7 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
   const [role, setRole] = useState(currentUser.role || (isMaster ? 'Desenvolvedor Full Stack' : 'Usuário Gestor'));
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [confirmPermanentDeleteId, setConfirmPermanentDeleteId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -1295,17 +1296,38 @@ export const UserSettingsModal: React.FC<UserSettingsModalProps> = ({
                         )}
 
                         {onPermanentDeleteDebtor && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              onPermanentDeleteDebtor(d.id);
-                              onToast(`Devedor "${d.name}" removido permanentemente.`);
-                            }}
-                            className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
-                            title="Excluir Definitivamente"
-                          >
-                            <span className="material-symbols-outlined text-[18px]">delete_forever</span>
-                          </button>
+                          confirmPermanentDeleteId === d.id ? (
+                            <div className="flex items-center gap-1 bg-red-50 border border-red-200 rounded-xl px-2 py-1">
+                              <span className="text-[10px] font-extrabold text-red-700">Tem certeza?</span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setConfirmPermanentDeleteId(null);
+                                  onPermanentDeleteDebtor(d.id);
+                                  onToast(`Devedor "${d.name}" removido permanentemente.`);
+                                }}
+                                className="px-2 py-1 bg-red-600 hover:bg-red-700 text-white rounded-lg text-[10px] font-black cursor-pointer"
+                              >
+                                Sim
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => setConfirmPermanentDeleteId(null)}
+                                className="px-1.5 py-1 bg-white hover:bg-slate-100 text-slate-600 border border-slate-200 rounded-lg text-[10px] font-bold cursor-pointer"
+                              >
+                                Não
+                              </button>
+                            </div>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setConfirmPermanentDeleteId(d.id)}
+                              className="p-1.5 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-colors cursor-pointer"
+                              title="Excluir Definitivamente"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">delete_forever</span>
+                            </button>
+                          )
                         )}
                       </div>
                     </div>

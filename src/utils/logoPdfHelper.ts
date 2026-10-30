@@ -59,6 +59,18 @@ const HASPAHO_CRYSTAL_SVG_GRAPHIC = `
 
 function svgStringToPngDataUrl(svgString: string, width: number, height: number): Promise<string> {
   return new Promise((resolve) => {
+    let settled = false;
+    const finish = (val: string) => {
+      if (!settled) {
+        settled = true;
+        resolve(val);
+      }
+    };
+
+    const timer = setTimeout(() => {
+      finish('');
+    }, 700);
+
     try {
       const img = new Image();
       img.crossOrigin = 'anonymous';
@@ -66,6 +78,7 @@ function svgStringToPngDataUrl(svgString: string, width: number, height: number)
       const url = `data:image/svg+xml;charset=utf-8,${encoded}`;
 
       img.onload = () => {
+        clearTimeout(timer);
         try {
           const canvas = document.createElement('canvas');
           canvas.width = width * 2;
@@ -75,24 +88,26 @@ function svgStringToPngDataUrl(svgString: string, width: number, height: number)
             ctx.scale(2, 2);
             ctx.drawImage(img, 0, 0, width, height);
             const png = canvas.toDataURL('image/png');
-            resolve(png);
+            finish(png);
             return;
           }
         } catch (e) {
           console.warn('Canvas rasterize error:', e);
         }
-        resolve('');
+        finish('');
       };
 
       img.onerror = (err) => {
+        clearTimeout(timer);
         console.warn('SVG img load error:', err);
-        resolve('');
+        finish('');
       };
 
       img.src = url;
     } catch (err) {
+      clearTimeout(timer);
       console.warn('svgStringToPngDataUrl error:', err);
-      resolve('');
+      finish('');
     }
   });
 }
@@ -101,6 +116,14 @@ function svgStringToPngDataUrl(svgString: string, width: number, height: number)
 let cachedWatermarkDataUrl = '';
 let cachedFullHeaderDataUrl = '';
 let cachedLogoDataUrl = '';
+
+export function getCachedPdfHeaderAssets(): { headerUrl: string; watermarkUrl: string; logoUrl: string } {
+  return {
+    headerUrl: cachedFullHeaderDataUrl,
+    watermarkUrl: cachedWatermarkDataUrl,
+    logoUrl: cachedLogoDataUrl,
+  };
+}
 
 /**
  * Generates an ultra high-definition PNG Data URL of the 3D HASPAHO crystal icon

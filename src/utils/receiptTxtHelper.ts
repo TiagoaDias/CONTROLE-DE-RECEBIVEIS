@@ -158,13 +158,15 @@ export async function triggerUniversalFileDownload(
   filename: string
 ): Promise<void> {
   try {
+    const ua = typeof navigator !== 'undefined' ? navigator.userAgent || '' : '';
     const isAndroidWebView =
       typeof window !== 'undefined' &&
-      (/wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent || '') ||
+      (/wv|Android.*Version\/[0-9.]+|Haspaho/i.test(ua) ||
         Boolean((window as any).Capacitor?.isNativePlatform?.()));
+    const isMobileDevice = /Android|iPhone|iPad|iPod/i.test(ua);
 
-    // Em WebViews Android que bloqueiam blob: URLs, tenta Web Share API de arquivo se disponível
-    if (isAndroidWebView && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
+    // 1. Em WebViews Android ou dispositivos móveis com Web Share API de arquivo, tenta compartilhar/salvar nativamente
+    if ((isAndroidWebView || isMobileDevice) && typeof navigator !== 'undefined' && typeof navigator.share === 'function') {
       try {
         const file = new File([blob], filename, { type: blob.type || 'application/octet-stream' });
         if (!navigator.canShare || navigator.canShare({ files: [file] })) {
@@ -176,10 +178,42 @@ export async function triggerUniversalFileDownload(
         }
       } catch (shareErr) {
         if ((shareErr as Error)?.name === 'AbortError') return;
-        // Prossegue para o download padrão se o share não for suportado
+        // Prossegue para o download direto caso o Web Share não esteja disponível ou falhe
       }
     }
 
+    // 2. Em Android WebView onde blob: URLs são ignoradas pelo DownloadListener nativo, usa data: URI via FileReader
+    if (isAndroidWebView) {
+      const dataUrl = await new Promise<string>((resolve) => {
+        try {
+          const reader = new FileReader();
+          reader.onloadend = () => resolve(typeof reader.result === 'string' ? reader.result : '');
+          reader.onerror = () => resolve('');
+          reader.readAsDataURL(blob);
+        } catch {
+          resolve('');
+        }
+      });
+
+      if (dataUrl) {
+        const dataLink = document.createElement('a');
+        dataLink.href = dataUrl;
+        dataLink.download = filename;
+        dataLink.style.display = 'none';
+        document.body.appendChild(dataLink);
+        dataLink.click();
+        setTimeout(() => {
+          try {
+            if (dataLink.parentNode) document.body.removeChild(dataLink);
+          } catch {
+            // ignore
+          }
+        }, 1500);
+        return;
+      }
+    }
+
+    // 3. Download padrão via Object URL (Web e navegadores mobile padrão)
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;

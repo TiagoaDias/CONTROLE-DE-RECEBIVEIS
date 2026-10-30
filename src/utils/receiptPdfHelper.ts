@@ -385,9 +385,14 @@ export async function downloadStatementPdfDirect(
   addDocumentHeader(currentPage);
   y = 66;
 
+  const debtorAddress =
+    [debtor?.address, debtor?.neighborhood, debtor?.city, debtor?.state]
+      .filter(Boolean)
+      .join(', ') || 'Não informado';
+
   doc.setFillColor(248, 250, 252);
   doc.setDrawColor(203, 213, 225);
-  doc.roundedRect(marginX, y, contentWidth, 30, 2, 2, 'FD');
+  doc.roundedRect(marginX, y, contentWidth, 34, 2, 2, 'FD');
 
   doc.setTextColor(15, 23, 42);
   doc.setFont('helvetica', 'bold');
@@ -396,23 +401,24 @@ export async function downloadStatementPdfDirect(
 
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`CPF/CNPJ: ${debtorDocument}  |  Tel/WhatsApp: ${debtorPhone}`, marginX + 4, y + 12);
+  doc.text(`CPF/CNPJ: ${debtorDocument}  |  Tel/WhatsApp: ${debtorPhone}`, marginX + 4, y + 11.5);
+  doc.text(`Endereço: ${debtorAddress.slice(0, 85)}`, marginX + 4, y + 16.5);
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(9);
-  doc.text(`PRODUTO / OPERAÇÃO: ${productName}`, marginX + 4, y + 19);
+  doc.text(`PRODUTO / OPERAÇÃO: ${productName}`, marginX + 4, y + 22.5);
   doc.setFont('helvetica', 'normal');
   doc.setFontSize(8);
-  doc.text(`Loja/Origem: ${storeName}  |  Forma: ${cardName}`, marginX + 4, y + 25);
+  doc.text(`Loja/Origem: ${storeName}  |  Forma: ${cardName}`, marginX + 4, y + 27.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(22, 101, 52);
   doc.text(
-    `VALOR TOTAL LIQUIDADO: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${paidCount}/${totalInstallmentsCount} pagas)`,
-    marginX + 90,
-    25 + y
+    `VALOR TOTAL LIQUIDADO: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${paidCount}/${totalInstallmentsCount} pagas)  |  SALDO RESTANTE: R$ ${safeToFixed(totalPendingAmount).replace('.', ',')}`,
+    marginX + 4,
+    y + 32
   );
 
-  y += 35;
+  y += 39;
 
   const renderTableHeader = (currentY: number) => {
     doc.setFillColor(30, 41, 59);

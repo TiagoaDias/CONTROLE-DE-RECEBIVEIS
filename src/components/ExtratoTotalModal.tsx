@@ -65,18 +65,36 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
     return `${dateStr} às ${timeStr}`;
   }, [isOpen]);
 
+  const [preloadedLogoUrl, setPreloadedLogoUrl] = useState('');
+  const [preloadedWatermarkUrl, setPreloadedWatermarkUrl] = useState('');
+  const [preloadedPixQrUrl, setPreloadedPixQrUrl] = useState('');
+
   // Sort installments chronologically 1..N and guarantee persistent authCodes for each installment
   const sortedInstallments = useMemo(() => {
     if (!installments || installments.length === 0) return [];
     
-    // Filter only for the current purchase if provided
+    // Filter for the current purchase if provided (matching by purchaseId OR normalized product name), with fallback to all provided installments
     let filtered = [...installments];
-    if (purchase?.id) {
-      filtered = filtered.filter(inst => inst.purchaseId === purchase.id);
+    if (purchase?.id || purchase?.product) {
+      const normProd = (purchase.product || '').trim().toLowerCase();
+      const byPurchase = filtered.filter((inst) => {
+        if (purchase.id && inst.purchaseId === purchase.id) return true;
+        if (
+          normProd &&
+          (inst.product || '').trim().toLowerCase() === normProd &&
+          (!purchase.debtorId || !inst.debtorId || inst.debtorId === purchase.debtorId)
+        ) {
+          return true;
+        }
+        return false;
+      });
+      if (byPurchase.length > 0) {
+        filtered = byPurchase;
+      }
     }
 
     return filtered
-      .sort((a, b) => a.installmentNumber - b.installmentNumber)
+      .sort((a, b) => (Number(a.installmentNumber) || 1) - (Number(b.installmentNumber) || 1))
       .map((item) => {
         if (!item.authCode) {
           const seed = (item.id || `${item.installmentNumber}`).replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || '5779';
@@ -85,7 +103,7 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
         }
         return item;
       });
-  }, [installments, purchase?.id]);
+  }, [installments, purchase?.id, purchase?.product, purchase?.debtorId]);
 
   // Calculated Metrics
   const totalInstallmentsCount = sortedInstallments.length || purchase?.installmentsTotal || 0;
@@ -164,13 +182,35 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
   }, [totalInstallmentsCount, paidCount, overdueCount]);
 
   const debtorName = debtor?.name || sortedInstallments[0]?.debtorName || 'Devedor não identificado';
-  const debtorDocument = debtor?.documentNumber || 'Não informado';
+  const debtorDocument = debtor?.cpfCnpj || debtor?.documentNumber || 'Não informado';
   const debtorPhone = debtor?.phone || 'Não informado';
-  const debtorAddress = 'Não informado';
+  const debtorAddress =
+    [debtor?.address, debtor?.neighborhood, debtor?.city, debtor?.state]
+      .filter(Boolean)
+      .join(', ') || 'Não informado';
 
   const productName = purchase?.product || sortedInstallments[0]?.product || 'Produto/Serviço Geral';
   const storeName = purchase?.store || 'Loja Física/Online';
   const cardName = purchase?.cardName || sortedInstallments[0]?.cardName || 'Cartão/Crediário';
+
+  // Pre-warm PDF header, watermark, and PIX QR code as soon as the modal opens
+  useEffect(() => {
+    if (!isOpen) return;
+    let active = true;
+    Promise.all([
+      generateHaspahoFullHeaderPngDataUrl().catch(() => ''),
+      generateHaspahoWatermarkDataUrl().catch(() => ''),
+      generatePixQrCodeDataUrl('(14) 99733-9863', totalPendingAmount, 'Tiago Dias').catch(() => ''),
+    ]).then(([logo, wm, qr]) => {
+      if (!active) return;
+      if (logo) setPreloadedLogoUrl(logo);
+      if (wm) setPreloadedWatermarkUrl(wm);
+      if (qr) setPreloadedPixQrUrl(qr);
+    });
+    return () => {
+      active = false;
+    };
+  }, [isOpen, totalPendingAmount]);
 
   // Registra o Extrato e todas as parcelas pagas no Registro Central Oficial de Autenticações
   useEffect(() => {
@@ -220,16 +260,18 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
       const marginX = 14;
       const contentWidth = pageWidth - marginX * 2;
 
-      // Render full official header banner and watermark
-      let logoDataUrl = '';
-      let watermarkDataUrl = '';
-      try {
-        [logoDataUrl, watermarkDataUrl] = await Promise.all([
-          generateHaspahoFullHeaderPngDataUrl(),
-          generateHaspahoWatermarkDataUrl(),
-        ]);
-      } catch (err) {
-        console.warn('Erro ao gerar imagens para PDF:', err);
+      // Render full official header banner and watermark (using preloaded cache if ready)
+      let logoDataUrl = preloadedLogoUrl;
+      let watermarkDataUrl = preloadedWatermarkUrl;
+      if (!logoDataUrl || !watermarkDataUrl) {
+        try {
+          [logoDataUrl, watermarkDataUrl] = await Promise.all([
+            generateHaspahoFullHeaderPngDataUrl(),
+            generateHaspahoWatermarkDataUrl(),
+          ]);
+        } catch (err) {
+          console.warn('Erro ao gerar imagens para PDF:', err);
+        }
       }
 
       let y = 10;
@@ -273,7 +315,7 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
       // Section 1: Debtor & Purchase Card Box
       doc.setFillColor(248, 250, 252); // Slate 50
       doc.setDrawColor(203, 213, 225); // Slate 300
-      doc.roundedRect(marginX, y, contentWidth, 32, 2, 2, 'FD');
+      doc.roundedRect(marginX, y, contentWidth, 34, 2, 2, 'FD');
 
       doc.setTextColor(15, 23, 42);
       doc.setFont('helvetica', 'bold');
@@ -282,20 +324,20 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
       
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text(`CPF/CNPJ: ${debtorDocument}  |  Tel/WhatsApp: ${debtorPhone}`, marginX + 4, y + 12);
-      doc.text(`Endereço: ${debtorAddress}`, marginX + 4, y + 17);
+      doc.text(`CPF/CNPJ: ${debtorDocument}  |  Tel/WhatsApp: ${debtorPhone}`, marginX + 4, y + 11.5);
+      doc.text(`Endereço: ${debtorAddress.slice(0, 85)}`, marginX + 4, y + 16.5);
 
       doc.setFont('helvetica', 'bold');
       doc.setFontSize(9);
-      doc.text(`PRODUTO / OPERAÇÃO: ${productName}`, marginX + 4, y + 24);
+      doc.text(`PRODUTO / OPERAÇÃO: ${productName}`, marginX + 4, y + 22.5);
       doc.setFont('helvetica', 'normal');
       doc.setFontSize(8);
-      doc.text(`Loja/Origem: ${storeName}  |  Forma: ${cardName}`, marginX + 4, y + 29);
+      doc.text(`Loja/Origem: ${storeName}  |  Forma: ${cardName}`, marginX + 4, y + 27.5);
       doc.setFont('helvetica', 'bold');
       doc.setTextColor(22, 101, 52);
-      doc.text(`VALOR TOTAL LIQUIDADO: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${paidCount}/${totalInstallmentsCount} pagas)`, marginX + 90, y + 29);
+      doc.text(`VALOR TOTAL LIQUIDADO: R$ ${safeToFixed(totalPaidAmount).replace('.', ',')} (${paidCount}/${totalInstallmentsCount} pagas)  |  SALDO RESTANTE: R$ ${safeToFixed(totalPendingAmount).replace('.', ',')}`, marginX + 4, y + 32);
 
-      y += 38;
+      y += 39;
 
       // Section 2: Table Header
       const renderTableHeader = (currentY: number) => {
@@ -508,7 +550,7 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
 
       const officialPixKey = '(14) 99733-9863';
       try {
-        const pixQrDataUrl = await generatePixQrCodeDataUrl(officialPixKey, totalPendingAmount, 'Tiago Dias');
+        const pixQrDataUrl = preloadedPixQrUrl || (await generatePixQrCodeDataUrl(officialPixKey, totalPendingAmount, 'Tiago Dias'));
         if (pixQrDataUrl) {
           doc.addImage(pixQrDataUrl, 'PNG', marginX + 2, y + 2, 30, 30, undefined, 'FAST');
         }
@@ -548,10 +590,11 @@ export const ExtratoTotalModal: React.FC<ExtratoTotalModalProps> = ({
       );
 
       // Trigger download
-      const filename = `Extrato_Total_${debtorName.replace(/\s+/g, '_')}_${documentId}.pdf`;
+      const safeName = debtorName.trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+      const filename = `Extrato_Total_${safeName}_${documentId}.pdf`;
       const pdfBlob = doc.output('blob');
-      triggerUniversalFileDownload(pdfBlob, filename);
-      if (onToast) onToast('PDF do Extrato Total baixado com sucesso!');
+      await triggerUniversalFileDownload(pdfBlob, filename);
+      if (onToast) onToast('✅ PDF do Extrato Total gerado com sucesso!');
     } catch (err) {
       console.error('Erro ao gerar PDF do extrato:', err);
       if (onToast) onToast('Ocorreu um erro ao gerar o PDF. Tente novamente.');

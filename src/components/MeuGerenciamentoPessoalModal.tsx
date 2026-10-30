@@ -195,6 +195,12 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
     if (onToast) onToast('Valor do gasto fixo atualizado!');
   };
 
+  const [pendingDeleteExpense, setPendingDeleteExpense] = useState<{
+    type: 'fixed' | 'variable' | 'daily';
+    id: string;
+    label: string;
+  } | null>(null);
+
   const handleDeleteFixed = (id: string) => {
     const updated = fixedExpenses.filter((item) => item.id !== id);
     setFixedExpenses(updated);
@@ -874,11 +880,13 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
 
                       <button
                         type="button"
-                        onClick={() => {
-                          if (confirm(`Remover "${item.name}" das despesas fixas?`)) {
-                            handleDeleteFixed(item.id);
-                          }
-                        }}
+                        onClick={() =>
+                          setPendingDeleteExpense({
+                            type: 'fixed',
+                            id: item.id,
+                            label: item.name,
+                          })
+                        }
                         className="p-1.5 rounded-lg text-slate-400 hover:text-red-300 hover:bg-red-500/20 transition-colors cursor-pointer"
                         title="Excluir"
                       >
@@ -1013,7 +1021,13 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
                         </span>
                         <button
                           type="button"
-                          onClick={() => handleDeleteVariable(item.id)}
+                          onClick={() =>
+                            setPendingDeleteExpense({
+                              type: 'variable',
+                              id: item.id,
+                              label: item.name,
+                            })
+                          }
                           className="p-1 text-slate-500 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
                           title="Remover"
                         >
@@ -1144,7 +1158,13 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
                           </span>
                           <button
                             type="button"
-                            onClick={() => handleDeleteDaily(item.id)}
+                            onClick={() =>
+                              setPendingDeleteExpense({
+                                type: 'daily',
+                                id: item.id,
+                                label: item.description,
+                              })
+                            }
                             className="p-1 text-slate-500 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors cursor-pointer"
                             title="Excluir Gasto"
                           >
@@ -1180,6 +1200,59 @@ export const MeuGerenciamentoPessoalModal: React.FC<MeuGerenciamentoPessoalModal
         </div>
 
       </div>
+
+      {/* Modal de Confirmação "Tem certeza?" para exclusão de despesas pessoais */}
+      {pendingDeleteExpense && (
+        <div
+          className="fixed inset-0 z-[150] bg-slate-950/80 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-150"
+          onClick={() => setPendingDeleteExpense(null)}
+        >
+          <div
+            className="bg-[#0b162c] border-2 border-red-500/50 rounded-2xl p-5 max-w-sm w-full shadow-2xl text-white space-y-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-2.5 border-b border-white/10 pb-3">
+              <div className="w-9 h-9 rounded-xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined text-[20px]">delete_forever</span>
+              </div>
+              <div>
+                <h4 className="font-extrabold text-sm text-white">Tem certeza que deseja excluir?</h4>
+                <p className="text-[11px] text-slate-400">Confirmação de exclusão de despesa</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-300 leading-relaxed">
+              Deseja realmente remover <strong className="text-white">"{pendingDeleteExpense.label}"</strong> desta lista?
+            </p>
+
+            <div className="flex items-center gap-2.5 pt-1">
+              <button
+                type="button"
+                onClick={() => setPendingDeleteExpense(null)}
+                className="flex-1 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 font-bold text-xs cursor-pointer border border-slate-700"
+              >
+                Não, Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  if (pendingDeleteExpense.type === 'fixed') {
+                    handleDeleteFixed(pendingDeleteExpense.id);
+                  } else if (pendingDeleteExpense.type === 'variable') {
+                    handleDeleteVariable(pendingDeleteExpense.id);
+                  } else {
+                    handleDeleteDaily(pendingDeleteExpense.id);
+                  }
+                  setPendingDeleteExpense(null);
+                }}
+                className="flex-1 py-2.5 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs cursor-pointer shadow-md"
+              >
+                Sim, Excluir
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -292,6 +292,14 @@ export default function App() {
   });
   const [deletingDebtorTarget, setDeletingDebtorTarget] = useState<Debtor | null>(null);
   const [deletingInstallmentTarget, setDeletingInstallmentTarget] = useState<Installment | null>(null);
+  const [deletingPurchaseTarget, setDeletingPurchaseTarget] = useState<{
+    purchaseId?: string;
+    productName?: string;
+    debtorId?: string;
+    debtorName?: string;
+    installmentsCount: number;
+    totalAmount: number;
+  } | null>(null);
   const [userSettingsTab, setUserSettingsTab] = useState<'profile' | 'address' | 'pix' | 'security' | 'backup' | 'suporte' | 'lixeira'>('profile');
 
   // Domain data in state - with robust LocalStorage persistence and fallback per user ID
@@ -1847,8 +1855,59 @@ export default function App() {
     showToast('Parcela excluída definitivamente com sucesso!');
   };
 
-  // Excluir compra inteira (produto + todas as suas parcelas) sem jamais reaparecer ao recarregar
+  // Solicita confirmação antes de excluir compra inteira (nunca exclui com apenas 1 clique)
   const handleDeletePurchase = (purchaseId?: string, productName?: string, debtorId?: string) => {
+    const normProd = (productName || '').trim().toLowerCase();
+    const matchedPurchases = purchases.filter((p) => {
+      if (purchaseId && p.id === purchaseId) return true;
+      if (
+        normProd &&
+        (p.product || '').trim().toLowerCase() === normProd &&
+        (!debtorId || p.debtorId === debtorId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    const matchedPurchaseIds = new Set<string>(matchedPurchases.map((p) => p.id));
+    if (purchaseId) matchedPurchaseIds.add(purchaseId);
+
+    const matchedInstallments = installments.filter((i) => {
+      if (i.purchaseId && matchedPurchaseIds.has(i.purchaseId)) return true;
+      if (
+        normProd &&
+        (i.product || '').trim().toLowerCase() === normProd &&
+        (!debtorId || i.debtorId === debtorId)
+      ) {
+        return true;
+      }
+      return false;
+    });
+
+    const resolvedDebtor =
+      debtors.find((d) => d.id === (debtorId || matchedPurchases[0]?.debtorId || matchedInstallments[0]?.debtorId)) ||
+      null;
+    const totalAmt =
+      matchedPurchases[0]?.totalAmount ||
+      matchedInstallments.reduce((acc, i) => acc + safeToNumber(i.originalAmount || i.amount), 0);
+
+    setDeletingPurchaseTarget({
+      purchaseId,
+      productName: productName || matchedPurchases[0]?.product || matchedInstallments[0]?.product || 'Compra',
+      debtorId: debtorId || resolvedDebtor?.id,
+      debtorName: resolvedDebtor?.name || matchedPurchases[0]?.debtorName || matchedInstallments[0]?.debtorName || 'Cliente',
+      installmentsCount: matchedInstallments.length || matchedPurchases[0]?.installmentsTotal || 1,
+      totalAmount: totalAmt,
+    });
+  };
+
+  // Excluir compra inteira (produto + todas as suas parcelas) após confirmação do usuário
+  const handleConfirmDeletePurchase = () => {
+    if (!deletingPurchaseTarget) return;
+    const { purchaseId, productName, debtorId } = deletingPurchaseTarget;
+    setDeletingPurchaseTarget(null);
+
     const activeUserId = currentUser?.id || DEFAULT_USER.id;
     const normProd = (productName || '').trim().toLowerCase();
 
@@ -3893,6 +3952,85 @@ export default function App() {
         onConfirmDelete={handleConfirmDeleteInstallment}
       />
 
+      {/* Delete Purchase Confirmation Modal (Pergunta "Tem certeza?" antes de excluir compra/item) */}
+      {deletingPurchaseTarget && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          aria-label="Confirmar Exclusão de Compra"
+          className="fixed inset-0 z-[9998] flex items-center justify-center p-3 sm:p-4 bg-slate-950/80 backdrop-blur-md animate-fadeIn overflow-y-auto"
+          onClick={() => setDeletingPurchaseTarget(null)}
+        >
+          <div
+            className="bg-[#0b162c] border-2 border-red-500/60 rounded-2xl sm:rounded-3xl p-4 sm:p-6 max-w-md w-full shadow-[0_0_50px_rgba(239,68,68,0.3)] text-white space-y-4 my-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between border-b border-white/10 pb-3.5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-10 h-10 rounded-2xl bg-red-500/20 text-red-400 border border-red-500/30 flex items-center justify-center font-bold shrink-0">
+                  <span className="material-symbols-outlined text-[22px]">delete_forever</span>
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-base text-white">Tem certeza que deseja excluir?</h3>
+                  <p className="text-[11px] text-slate-400">Confirmação de segurança antes de excluir a compra</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeletingPurchaseTarget(null)}
+                className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 hover:text-white flex items-center justify-center transition-colors cursor-pointer"
+              >
+                <span className="material-symbols-outlined text-[18px]">close</span>
+              </button>
+            </div>
+
+            <div className="bg-slate-900/90 rounded-2xl p-3.5 border border-white/10 flex items-center gap-3">
+              <div className="w-11 h-11 rounded-full bg-red-500/20 text-red-400 flex items-center justify-center shrink-0">
+                <span className="material-symbols-outlined">shopping_bag</span>
+              </div>
+              <div className="min-w-0 flex-1">
+                <h4 className="font-extrabold text-white text-sm truncate">
+                  {deletingPurchaseTarget.productName || 'Compra'}
+                </h4>
+                <p className="text-xs text-slate-400 truncate">
+                  Cliente: <strong className="text-slate-200">{deletingPurchaseTarget.debtorName}</strong> •{' '}
+                  <strong className="text-amber-400">{deletingPurchaseTarget.installmentsCount} parcela(s)</strong>
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-4 text-center space-y-1">
+              <span className="material-symbols-outlined text-3xl text-red-400 block">warning</span>
+              <p className="text-sm font-bold text-white">
+                Tem certeza que deseja excluir esta compra?
+              </p>
+              <p className="text-xs text-slate-300">
+                Esta ação removerá o item <strong>"{deletingPurchaseTarget.productName}"</strong> e todas as suas{' '}
+                <strong>{deletingPurchaseTarget.installmentsCount} parcela(s)</strong> do banco de dados.
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="button"
+                onClick={() => setDeletingPurchaseTarget(null)}
+                className="flex-1 py-3 px-4 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 hover:text-white font-bold text-xs transition-all cursor-pointer border border-slate-700"
+              >
+                Não, Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={handleConfirmDeletePurchase}
+                className="flex-1 py-3 px-4 rounded-xl bg-red-600 hover:bg-red-500 text-white font-bold text-xs transition-all cursor-pointer shadow-lg flex items-center justify-center gap-1.5"
+              >
+                <span className="material-symbols-outlined text-[16px]">delete_forever</span>
+                <span>Sim, Excluir</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Modal (Boas-vindas primeiro login HASPAHO TIAGO DIAS) */}
       {currentUser && (
         <WelcomeModal
@@ -3950,12 +4088,22 @@ export default function App() {
         debtor={extratoDebtor}
         purchase={extratoPurchase}
         installments={
-          extratoPurchase
-            ? installments.filter((i) => i.purchaseId === extratoPurchase.id)
-            : extratoDebtor
-            ? installments.filter((i) => i.debtorId === extratoDebtor.id)
-            : extratoInstallmentsList.length > 0
+          extratoInstallmentsList.length > 0
             ? installments.filter((i) => extratoInstallmentsList.some((e) => e.id === i.id))
+            : extratoPurchase
+            ? installments.filter(
+                (i) =>
+                  i.purchaseId === extratoPurchase.id ||
+                  (i.debtorId === extratoPurchase.debtorId &&
+                    (i.product || '').trim().toLowerCase() === (extratoPurchase.product || '').trim().toLowerCase())
+              )
+            : extratoDebtor
+            ? installments.filter(
+                (i) =>
+                  i.debtorId === extratoDebtor.id ||
+                  ((extratoDebtor.name || '').trim().length > 0 &&
+                    (i.debtorName || '').trim().toLowerCase() === (extratoDebtor.name || '').trim().toLowerCase())
+              )
             : installments
         }
         onToast={showToast}
@@ -4011,7 +4159,7 @@ export default function App() {
 
       {/* Floating Toast Notification */}
       {toastMessage && (
-        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
+        <div className="fixed top-4 left-1/2 -translate-x-1/2 z-[9999] bg-slate-900 text-white text-xs font-semibold px-4 py-2.5 rounded-full shadow-xl flex items-center gap-2 animate-in fade-in slide-in-from-top-2">
           <span className="material-symbols-outlined text-emerald-400 text-[18px]">check_circle</span>
           <span>{toastMessage}</span>
         </div>
